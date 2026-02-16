@@ -326,26 +326,36 @@ app.get('/api/payments/gcash/session/:reference', async (req, res) => {
 });
 
 app.post('/api/webhooks/payments', async (req, res) => {
+  // PayMongo REQUIRES webhook to ALWAYS return 200
+  // Even if payment failed or there's an error
+  // Otherwise PayMongo will retry up to 12 times
   try {
     if (providerName === 'paymongo') {
       const verified = verifyPaymongoWebhook(req);
       if (!verified.ok) {
-        return res.status(401).json({ error: verified.error });
+        console.error('[Webhook] Signature verification failed:', verified.error);
+        // Still return 200 to acknowledge receipt
+        return res.status(200).json({ received: true, error: verified.error });
       }
 
       const extracted = extractPaymongoWebhookPayload(req.body);
       if (!extracted) {
-        return res.status(200).json({ ok: true, ignored: true });
+        console.log('[Webhook] Event ignored (not a payment event)');
+        return res.status(200).json({ received: true, ignored: true });
       }
 
       const result = await processPaymentWebhook(extracted);
-      return res.status(result.statusCode).json(result.body);
+      // Always return 200, but include the actual result
+      console.log('[Webhook] Processed:', result.body);
+      return res.status(200).json({ received: true, ...result.body });
     }
 
     const result = await processPaymentWebhook(req.body);
-    return res.status(result.statusCode).json(result.body);
+    return res.status(200).json({ received: true, ...result.body });
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    console.error('[Webhook] Error processing webhook:', error.message);
+    // ALWAYS return 200 even on error
+    return res.status(200).json({ received: true, error: error.message });
   }
 });
 
