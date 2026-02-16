@@ -86,6 +86,87 @@ class PaymongoProvider {
       paymongoCheckoutSessionId: sessionData.id
     };
   }
+
+  /**
+   * Check the status of a PayMongo checkout session directly via API.
+   * Returns { paid: boolean, sessionStatus, payments, metadata }
+   */
+  async getCheckoutSessionStatus(checkoutSessionId) {
+    const response = await fetch(`${this.apiBaseUrl}/checkout_sessions/${checkoutSessionId}`, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: this.getAuthHeader()
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const msg = data?.errors?.[0]?.detail || 'Failed to fetch PayMongo checkout session';
+      throw new Error(msg);
+    }
+
+    const session = data?.data;
+    const attrs = session?.attributes || {};
+    const payments = attrs.payments || [];
+    const paymentIntent = attrs.payment_intent;
+    const metadata = attrs.metadata || {};
+
+    // Check if payment intent status is "succeeded" or if there are payments
+    const isPaid =
+      payments.length > 0 ||
+      paymentIntent?.attributes?.status === 'succeeded';
+
+    // Extract payment details if available
+    let paymentDetails = null;
+    let customerInfo = null;
+
+    if (payments.length > 0) {
+      const firstPayment = payments[0];
+      const payAttrs = firstPayment.attributes || {};
+      const billing = payAttrs.billing || {};
+
+      paymentDetails = {
+        paymentId: firstPayment.id,
+        amount: Number(payAttrs.amount || 0) / 100,
+        currency: payAttrs.currency || 'PHP',
+        status: payAttrs.status,
+        paidAt: payAttrs.paid_at
+          ? new Date(payAttrs.paid_at * 1000).toISOString()
+          : new Date().toISOString(),
+        source: payAttrs.source?.type || 'gcash'
+      };
+
+      // Extract customer billing information
+      customerInfo = {
+        name: billing.name || null,
+        email: billing.email || null,
+        phone: billing.phone || null
+      };
+    }
+
+    // Also check checkout session billing if no payment billing available
+    if (!customerInfo && attrs.billing) {
+      customerInfo = {
+        name: attrs.billing.name || null,
+        email: attrs.billing.email || null,
+        phone: attrs.billing.phone || null
+      };
+    }
+
+    return {
+      checkoutSessionId: session.id,
+      sessionStatus: attrs.status,
+      paid: isPaid,
+      payments,
+      paymentDetails,
+      customerInfo,
+      metadata,
+      localReference: metadata.local_reference || null,
+      invoiceId: metadata.invoice_id || null
+    };
+  }
 }
 
 module.exports = PaymongoProvider;

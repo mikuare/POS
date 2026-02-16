@@ -78,7 +78,10 @@ function toAppPayment(dbPayment) {
     amountPaid: Number(dbPayment.amount_paid),
     change: Number(dbPayment.change_amount || 0),
     success: Boolean(dbPayment.success),
-    successMessage: dbPayment.success_message
+    successMessage: dbPayment.success_message,
+    customerName: dbPayment.customer_name || null,
+    customerEmail: dbPayment.customer_email || null,
+    customerPhone: dbPayment.customer_phone || null
   };
 }
 
@@ -242,7 +245,10 @@ async function setInvoicePaid(invoiceId, paymentData) {
       amount_paid: paymentData.amountPaid,
       change_amount: paymentData.change || 0,
       success: Boolean(paymentData.success),
-      success_message: paymentData.successMessage || null
+      success_message: paymentData.successMessage || null,
+      customer_name: paymentData.customerName || null,
+      customer_email: paymentData.customerEmail || null,
+      customer_phone: paymentData.customerPhone || null
     };
 
     const { error: paymentError } = await supabase
@@ -446,6 +452,151 @@ async function getSalesReport({ dateFrom, dateTo }) {
   };
 }
 
+async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
+  const { fromIso, toIso } = dateFrom && dateTo
+    ? normalizeDateRange({ dateFrom, dateTo })
+    : { fromIso: null, toIso: null };
+
+  if (isSupabaseEnabled()) {
+    let query = supabase
+      .from('pos_invoices')
+      .select('id,reference,total_amount,payment_method,status,created_at,updated_at')
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    if (fromIso && toIso) {
+      query = query.gte('created_at', fromIso).lte('created_at', toIso);
+    }
+
+    const { data: invoicesData, error: invoicesError } = await query;
+
+    if (invoicesError) {
+      throw new Error(`Supabase invoices query failed: ${invoicesError.message}`);
+    }
+
+    const invoiceIds = (invoicesData || []).map((x) => x.id);
+    let payments = [];
+    let gcashSessions = [];
+
+    if (invoiceIds.length) {
+      const { data: dbPayments, error: paymentsError } = await supabase
+        .from('pos_payments')
+        .select('invoice_id,method,amount_paid,change_amount,paid_at,provider,provider_reference,customer_name,customer_email,customer_phone')
+        .in('invoice_id', invoiceIds);
+
+      if (paymentsError) {
+        throw new Error(`Supabase payments query failed: ${paymentsError.message}`);
+      }
+      payments = dbPayments || [];
+
+      const { data: dbSessions, error: sessionsError } = await supabase
+        .from('pos_gcash_sessions')
+        .select('invoice_id,reference,provider,checkout_url,status')
+        .in('invoice_id', invoiceIds);
+
+      if (!sessionsError) {
+        gcashSessions = dbSessions || [];
+      }
+    }
+
+    const paymentByInvoiceId = new Map(payments.map((p) => [p.invoice_id, p]));
+    const sessionByInvoiceId = new Map(gcashSessions.map((s) => [s.invoice_id, s]));
+
+    return (invoicesData || []).map((inv) => {
+      const payment = paymentByInvoiceId.get(inv.id);
+      const session = sessionByInvoiceId.get(inv.id);
+      return {
+        id: inv.id,
+        reference: inv.reference,
+        status: inv.status,
+        paymentMethod: inv.payment_method,
+        total: Number(inv.total_amount),
+        createdAt: inv.created_at,
+        updatedAt: inv.updated_at,
+        payment: payment ? {
+          method: payment.method,
+          amountPaid: Number(payment.amount_paid),
+          change: Number(payment.change_amount || 0),
+          paidAt: payment.paid_at,
+          provider: payment.provider,
+          providerReference: payment.provider_reference,
+          customerName: payment.customer_name || null,
+          customerEmail: payment.customer_email || null,
+          customerPhone: payment.customer_phone || null
+        } : null,
+        gcashSession: session ? {
+          reference: session.reference,
+          provider: session.provider,
+          checkoutUrl: session.checkout_url,
+          status: session.status
+        } : null
+      };
+    });
+  }
+
+  // In-memory fallback
+  let results = Array.from(invoices.values());
+
+  if (status) {
+    results = results.filter((inv) => inv.status === status);
+  }
+
+  if (fromIso && toIso) {
+    results = results.filter((inv) => {
+      const d = new Date(inv.createdAt);
+      return d >= new Date(fromIso) && d <= new Date(toIso);
+    });
+  }
+
+  return results
+    .map((inv) => ({
+      id: inv.id,
+      reference: inv.reference,
+      status: inv.status,
+      paymentMethod: inv.paymentMethod,
+      total: inv.total,
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+      payment: inv.payment,
+      gcashSession: gcashSessions.get(inv.id) || null
+    }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+async function getGcashSessionByInvoiceId(invoiceId) {
+  // Check local memory first
+  for (const [, session] of gcashSessions) {
+    if (session.invoiceId === invoiceId) {
+      return session;
+    }
+  }
+
+  if (!isSupabaseEnabled()) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('pos_gcash_sessions')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase GCash session fetch failed: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const session = toAppSession(data);
+  gcashSessions.set(session.reference, session);
+  return session;
+}
+
 module.exports = {
   listProducts,
   createInvoice,
@@ -453,5 +604,7 @@ module.exports = {
   setInvoicePaid,
   saveGcashSession,
   getGcashSessionByReference,
-  getSalesReport
+  getGcashSessionByInvoiceId,
+  getSalesReport,
+  listAllInvoices
 };

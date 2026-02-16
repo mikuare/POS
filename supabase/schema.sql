@@ -35,6 +35,9 @@ create table if not exists public.pos_payments (
   change_amount numeric(12,2) not null default 0,
   success boolean not null default true,
   success_message text,
+  customer_name text,
+  customer_email text,
+  customer_phone text,
   created_at timestamptz not null default now()
 );
 

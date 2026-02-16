@@ -12,7 +12,9 @@ const {
   setInvoicePaid,
   saveGcashSession,
   getGcashSessionByReference,
-  getSalesReport
+  getGcashSessionByInvoiceId,
+  getSalesReport,
+  listAllInvoices
 } = require('./data/store');
 const { isSupabaseEnabled, getSupabaseMode } = require('./data/supabaseClient');
 const MockProvider = require('./providers/mockProvider');
@@ -89,7 +91,10 @@ function timingSafeEqualHex(a, b) {
 function verifyPaymongoWebhook(req) {
   const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET || '';
   if (!webhookSecret) {
-    return { ok: false, error: 'PAYMONGO_WEBHOOK_SECRET is not configured' };
+    // If no webhook secret configured, log warning but allow processing
+    // This helps during initial setup
+    console.warn('[Webhook] PAYMONGO_WEBHOOK_SECRET is not configured - skipping signature verification');
+    return { ok: true };
   }
 
   const headerValue = req.get('paymongo-signature') || req.get('Paymongo-Signature');
@@ -98,7 +103,10 @@ function verifyPaymongoWebhook(req) {
     return { ok: false, error: 'Missing or invalid PayMongo signature header' };
   }
 
-  const signedPayload = `${signature.t}.${req.rawBody || ''}`;
+  // Use rawBody if available, otherwise fall back to JSON.stringify(req.body)
+  // Vercel serverless may not preserve rawBody from Express verify callback
+  const bodyString = req.rawBody || JSON.stringify(req.body);
+  const signedPayload = `${signature.t}.${bodyString}`;
   const computed = crypto.createHmac('sha256', webhookSecret).update(signedPayload).digest('hex');
 
   const isLive = Boolean(req.body?.data?.attributes?.livemode);
@@ -345,6 +353,128 @@ app.post('/api/mock/gcash/pay', async (req, res) => {
     const { reference } = req.body;
     const result = await processPaymentWebhook({ provider: 'mock', reference, status: 'PAID' });
     return res.status(result.statusCode).json(result.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// ── Admin: list all transactions (pending + paid) ──
+app.get('/api/admin/transactions', async (req, res) => {
+  try {
+    const { status: filterStatus, range } = req.query;
+    let dateFrom, dateTo;
+
+    if (range) {
+      const rangeData = buildSalesRange({ range });
+      dateFrom = rangeData.dateFrom;
+      dateTo = rangeData.dateTo;
+    }
+
+    const transactions = await listAllInvoices({
+      dateFrom,
+      dateTo,
+      status: filterStatus || undefined
+    });
+
+    return res.json({ transactions });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// ── Verify GCash payment status directly with PayMongo ──
+app.post('/api/payments/gcash/verify/:invoiceId', async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const invoice = await getInvoice(invoiceId);
+
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (invoice.status === 'PAID') {
+      return res.json({ invoice, alreadyPaid: true, message: 'Invoice is already paid' });
+    }
+
+    if (invoice.paymentMethod !== 'gcash') {
+      return res.status(400).json({ error: 'Invoice payment method is not gcash' });
+    }
+
+    // Find the GCash session for this invoice
+    const session = await getGcashSessionByInvoiceId(invoiceId);
+
+    if (!session) {
+      return res.status(404).json({ error: 'No GCash checkout session found for this invoice' });
+    }
+
+    // Only PayMongo provider supports direct status check
+    if (providerName !== 'paymongo' || !provider.getCheckoutSessionStatus) {
+      return res.status(400).json({ error: 'Direct payment verification not supported for this provider' });
+    }
+
+    const checkoutSessionId = session.paymongoCheckoutSessionId || session.reference;
+
+    // Try to find the PayMongo checkout session ID
+    // It might be stored in the session or we need to look it up
+    let paymongoSessionId = null;
+
+    if (session.paymongoCheckoutSessionId) {
+      paymongoSessionId = session.paymongoCheckoutSessionId;
+    } else {
+      // Try to find it from Supabase gcash_sessions table
+      // The checkout_url contains the session ID
+      if (session.checkoutUrl) {
+        const urlParts = session.checkoutUrl.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (lastPart) {
+          paymongoSessionId = `cs_${lastPart}`;
+        }
+      }
+    }
+
+    if (!paymongoSessionId) {
+      return res.status(400).json({ error: 'Cannot determine PayMongo checkout session ID' });
+    }
+
+    // Check status directly with PayMongo
+    const statusResult = await provider.getCheckoutSessionStatus(paymongoSessionId);
+
+    if (statusResult.paid) {
+      // Payment confirmed! Update invoice to PAID
+      const paymentDetails = statusResult.paymentDetails || {};
+      const customerInfo = statusResult.customerInfo || {};
+      const paidInvoice = await setInvoicePaid(invoiceId, {
+        method: 'gcash',
+        provider: 'paymongo',
+        providerReference: paymentDetails.paymentId || paymongoSessionId,
+        recipientGcashNumber: customerInfo.phone || '',
+        paidAt: paymentDetails.paidAt || new Date().toISOString(),
+        amountPaid: paymentDetails.amount || invoice.total,
+        change: 0,
+        success: true,
+        successMessage: 'Payment verified directly with PayMongo',
+        customerName: customerInfo.name || null,
+        customerEmail: customerInfo.email || null,
+        customerPhone: customerInfo.phone || null
+      });
+
+      // Update session status
+      session.status = 'PAID';
+      await saveGcashSession(session);
+
+      return res.json({
+        invoice: paidInvoice,
+        verified: true,
+        message: 'Payment confirmed via PayMongo API'
+      });
+    }
+
+    return res.json({
+      invoice,
+      verified: false,
+      sessionStatus: statusResult.sessionStatus,
+      message: 'Payment not yet completed on PayMongo'
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }

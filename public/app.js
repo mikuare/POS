@@ -5,6 +5,7 @@
   poller: null,
 };
 
+// ── POS Tab Elements ──
 const productsEl = document.getElementById('products');
 const cartEl = document.getElementById('cart');
 const totalEl = document.getElementById('total');
@@ -21,7 +22,28 @@ const salesDailyBtn = document.getElementById('salesDailyBtn');
 const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
 
+// ── Admin Tab Elements ──
+const adminFilterEl = document.getElementById('adminFilter');
+const adminRangeEl = document.getElementById('adminRange');
+const adminRefreshBtn = document.getElementById('adminRefreshBtn');
+const adminVerifyAllBtn = document.getElementById('adminVerifyAllBtn');
+const adminTransactionsEl = document.getElementById('adminTransactions');
+const statTotalEl = document.getElementById('statTotal');
+const statPaidEl = document.getElementById('statPaid');
+const statPendingEl = document.getElementById('statPending');
+const statRevenueEl = document.getElementById('statRevenue');
+const statCashEl = document.getElementById('statCash');
+const statGcashEl = document.getElementById('statGcash');
+
+// ── Tab Elements ──
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
 let activeSalesRange = 'daily';
+
+// ══════════════════════════════════════════
+// Utility Functions
+// ══════════════════════════════════════════
 
 function money(value) {
   return `PHP ${Number(value).toFixed(2)}`;
@@ -29,6 +51,18 @@ function money(value) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  return d.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 function getCartItems() {
@@ -44,6 +78,39 @@ function getCartTotal() {
     return sum + (p ? p.price * qty : 0);
   }, 0);
 }
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Request failed');
+  }
+  return data;
+}
+
+// ══════════════════════════════════════════
+// Tab Navigation
+// ══════════════════════════════════════════
+
+function switchTab(tabName) {
+  tabBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+  });
+  tabContents.forEach((content) => {
+    content.classList.toggle('active', content.id === `tab-${tabName}`);
+  });
+
+  if (tabName === 'admin') {
+    refreshAdminTransactions();
+  }
+}
+
+// ══════════════════════════════════════════
+// POS Terminal Functions
+// ══════════════════════════════════════════
 
 function renderProducts() {
   productsEl.innerHTML = '';
@@ -100,18 +167,6 @@ function onProductClick(e) {
     state.cart[removeId] = Math.max(0, (state.cart[removeId] || 0) - 1);
     renderCart();
   }
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
-  }
-  return data;
 }
 
 function resetAfterSale() {
@@ -195,14 +250,42 @@ async function pollInvoice(invoiceId) {
     clearInterval(state.poller);
   }
 
+  let pollCount = 0;
+  const maxPolls = 90; // 3 minutes at 2s intervals
+
   state.poller = setInterval(async () => {
     try {
+      pollCount++;
+
+      // Every 5th poll, also try to verify directly with PayMongo
+      if (pollCount % 5 === 0) {
+        try {
+          const verifyResult = await api(`/api/payments/gcash/verify/${invoiceId}`, {
+            method: 'POST'
+          });
+          if (verifyResult.verified || verifyResult.alreadyPaid) {
+            clearInterval(state.poller);
+            state.poller = null;
+            const inv = verifyResult.invoice;
+            renderReceipt(inv);
+            await refreshSalesReport(activeSalesRange);
+            return;
+          }
+        } catch (verifyErr) {
+          // Ignore verify errors, continue polling
+        }
+      }
+
       const { invoice } = await api(`/api/invoices/${invoiceId}`);
       if (invoice.status === 'PAID') {
         clearInterval(state.poller);
         state.poller = null;
         renderReceipt(invoice);
         await refreshSalesReport(activeSalesRange);
+      } else if (pollCount >= maxPolls) {
+        clearInterval(state.poller);
+        state.poller = null;
+        setStatus('Payment verification timed out. Check Admin tab to verify manually.');
       }
     } catch (err) {
       setStatus(`Polling error: ${err.message}`);
@@ -264,7 +347,7 @@ async function handleCheckout() {
     });
 
     window.open(checkout.checkoutUrl, '_blank', 'noopener');
-    setStatus(`GCash checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment webhook...\nReference: ${checkout.reference}`);
+    setStatus(`GCash checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment...\nReference: ${checkout.reference}\n\nPayment will be auto-verified every 10 seconds.`);
 
     await pollInvoice(invoice.id);
   } catch (error) {
@@ -276,12 +359,204 @@ function onPaymentMethodChange() {
   cashRowEl.style.display = paymentMethodEl.value === 'cash' ? 'flex' : 'none';
 }
 
-async function init() {
-  const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
-  state.products = products;
-  renderProducts();
-  renderCart();
+// ══════════════════════════════════════════
+// Admin / Transactions Functions
+// ══════════════════════════════════════════
 
+async function refreshAdminTransactions() {
+  try {
+    const filterStatus = adminFilterEl.value;
+    const range = adminRangeEl.value;
+
+    let url = '/api/admin/transactions?';
+    if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
+    if (range) url += `range=${encodeURIComponent(range)}&`;
+
+    const { transactions } = await api(url);
+    renderAdminTransactions(transactions);
+    renderAdminStats(transactions);
+  } catch (error) {
+    adminTransactionsEl.innerHTML = `<p class="error">Error loading transactions: ${error.message}</p>`;
+  }
+}
+
+function renderAdminStats(transactions) {
+  const total = transactions.length;
+  const paid = transactions.filter((t) => t.status === 'PAID');
+  const pending = transactions.filter((t) => t.status === 'PENDING');
+
+  const totalRevenue = paid.reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+  const cashRevenue = paid
+    .filter((t) => t.paymentMethod === 'cash')
+    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+  const gcashRevenue = paid
+    .filter((t) => t.paymentMethod === 'gcash')
+    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+
+  statTotalEl.textContent = total;
+  statPaidEl.textContent = paid.length;
+  statPendingEl.textContent = pending.length;
+  statRevenueEl.textContent = money(totalRevenue);
+  statCashEl.textContent = money(cashRevenue);
+  statGcashEl.textContent = money(gcashRevenue);
+}
+
+function renderAdminTransactions(transactions) {
+  if (!transactions.length) {
+    adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    return;
+  }
+
+  const rows = transactions.map((t) => {
+    const statusClass = t.status === 'PAID' ? 'badge-paid' : 'badge-pending';
+    const methodClass = t.paymentMethod === 'gcash' ? 'badge-gcash' : 'badge-cash';
+
+    const verifyBtn = (t.status === 'PENDING' && t.paymentMethod === 'gcash')
+      ? `<button class="verify-btn small" data-verify="${t.id}">Verify</button>`
+      : '';
+
+    const paidInfo = t.payment
+      ? `<div class="txn-paid-info">Paid: ${money(t.payment.amountPaid)} at ${formatDate(t.payment.paidAt)}</div>`
+      : '';
+
+    // Customer information from PayMongo billing
+    let customerInfoHtml = '';
+    if (t.payment) {
+      const name = t.payment.customerName;
+      const email = t.payment.customerEmail;
+      const phone = t.payment.customerPhone;
+
+      if (name || email || phone) {
+        customerInfoHtml = `
+          <div class="txn-customer">
+            <div class="txn-customer-label">Customer Info:</div>
+            ${name ? `<div class="txn-customer-field"><span class="field-icon">👤</span> ${escapeHtml(name)}</div>` : ''}
+            ${email ? `<div class="txn-customer-field"><span class="field-icon">📧</span> ${escapeHtml(email)}</div>` : ''}
+            ${phone ? `<div class="txn-customer-field"><span class="field-icon">📱</span> ${escapeHtml(phone)}</div>` : ''}
+          </div>
+        `;
+      }
+    }
+
+    return `
+      <div class="txn-row">
+        <div class="txn-main">
+          <div class="txn-ref">${t.reference}</div>
+          <div class="txn-badges">
+            <span class="badge ${statusClass}">${t.status}</span>
+            <span class="badge ${methodClass}">${t.paymentMethod.toUpperCase()}</span>
+          </div>
+        </div>
+        <div class="txn-details">
+          <div class="txn-amount">${money(t.total)}</div>
+          <div class="txn-date">${formatDate(t.createdAt)}</div>
+          ${paidInfo}
+          ${customerInfoHtml}
+        </div>
+        <div class="txn-actions">
+          ${verifyBtn}
+        </div>
+      </div>
+    `;
+  });
+
+  adminTransactionsEl.innerHTML = rows.join('');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function verifyPayment(invoiceId) {
+  try {
+    const btn = document.querySelector(`[data-verify="${invoiceId}"]`);
+    if (btn) {
+      btn.textContent = 'Verifying...';
+      btn.disabled = true;
+    }
+
+    const result = await api(`/api/payments/gcash/verify/${invoiceId}`, {
+      method: 'POST'
+    });
+
+    if (result.verified || result.alreadyPaid) {
+      alert(`✅ Payment verified! Invoice ${result.invoice.reference} is now PAID.`);
+    } else {
+      alert(`⏳ Payment not yet completed.\nStatus: ${result.sessionStatus || 'unknown'}\n${result.message}`);
+    }
+
+    await refreshAdminTransactions();
+    await refreshSalesReport(activeSalesRange);
+  } catch (error) {
+    alert(`❌ Verification failed: ${error.message}`);
+    await refreshAdminTransactions();
+  }
+}
+
+async function verifyAllPending() {
+  try {
+    adminVerifyAllBtn.textContent = 'Verifying...';
+    adminVerifyAllBtn.disabled = true;
+
+    const filterStatus = adminFilterEl.value;
+    const range = adminRangeEl.value;
+
+    let url = '/api/admin/transactions?status=PENDING&';
+    if (range) url += `range=${encodeURIComponent(range)}&`;
+
+    const { transactions } = await api(url);
+    const gcashPending = transactions.filter((t) => t.paymentMethod === 'gcash');
+
+    if (!gcashPending.length) {
+      alert('No pending GCash transactions to verify.');
+      adminVerifyAllBtn.textContent = 'Verify All Pending';
+      adminVerifyAllBtn.disabled = false;
+      return;
+    }
+
+    let verified = 0;
+    let failed = 0;
+
+    for (const t of gcashPending) {
+      try {
+        const result = await api(`/api/payments/gcash/verify/${t.id}`, { method: 'POST' });
+        if (result.verified || result.alreadyPaid) {
+          verified++;
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    alert(`Verification complete!\n✅ Verified: ${verified}\n⏳ Still pending: ${gcashPending.length - verified - failed}\n❌ Errors: ${failed}`);
+
+    await refreshAdminTransactions();
+    await refreshSalesReport(activeSalesRange);
+  } catch (error) {
+    alert(`Verification error: ${error.message}`);
+  } finally {
+    adminVerifyAllBtn.textContent = 'Verify All Pending';
+    adminVerifyAllBtn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════
+// Event Listeners & Init
+// ══════════════════════════════════════════
+
+function setupEventListeners() {
+  // Tab navigation
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+  });
+
+  // POS events
   productsEl.addEventListener('click', onProductClick);
   cartEl.addEventListener('click', onProductClick);
   paymentMethodEl.addEventListener('change', onPaymentMethodChange);
@@ -294,6 +569,28 @@ async function init() {
   salesWeeklyBtn.addEventListener('click', () => refreshSalesReport('weekly'));
   salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange));
 
+  // Admin events
+  adminRefreshBtn.addEventListener('click', refreshAdminTransactions);
+  adminVerifyAllBtn.addEventListener('click', verifyAllPending);
+  adminFilterEl.addEventListener('change', refreshAdminTransactions);
+  adminRangeEl.addEventListener('change', refreshAdminTransactions);
+
+  // Delegate verify button clicks in admin transactions list
+  adminTransactionsEl.addEventListener('click', (e) => {
+    const verifyId = e.target.getAttribute('data-verify');
+    if (verifyId) {
+      verifyPayment(verifyId);
+    }
+  });
+}
+
+async function init() {
+  const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
+  state.products = products;
+  renderProducts();
+  renderCart();
+
+  setupEventListeners();
   onPaymentMethodChange();
   await refreshSalesReport('daily');
 }
@@ -301,4 +598,3 @@ async function init() {
 init().catch((error) => {
   setStatus(`Startup error: ${error.message}`);
 });
-
