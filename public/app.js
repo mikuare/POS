@@ -196,11 +196,15 @@ async function handleCheckout() {
       body: JSON.stringify({ invoiceId: invoice.id })
     });
 
+    const qrMarkup = checkout.qrDataUrl
+      ? `<img class="qr" alt="GCash QR" src="${checkout.qrDataUrl}" />`
+      : '<div>No direct QR in POS for this provider. Continue in hosted checkout.</div>';
+
     gcashInfoEl.innerHTML = `
       <h3>GCash Checkout</h3>
       <div>Pay To GCash Number: <strong>${checkout?.merchant?.gcashNumber || state.gcashOwnerNumber}</strong></div>
       <div>Reference: ${checkout.reference}</div>
-      <img class="qr" alt="GCash QR" src="${checkout.qrDataUrl}" />
+      ${qrMarkup}
       <div class="row">
         <button id="openCheckout" class="secondary">Open Hosted Checkout</button>
       </div>

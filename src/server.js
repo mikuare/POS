@@ -1,5 +1,6 @@
 ﻿require('dotenv').config();
 
+const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -24,61 +25,12 @@ const providerName = (process.env.PAYMENT_PROVIDER || 'mock').toLowerCase();
 const gcashOwnerNumber = process.env.GCASH_OWNER_NUMBER || '09615745812';
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const provider = providerName === 'paymongo'
-  ? new PaymongoProvider()
+  ? new PaymongoProvider({ baseUrl, gcashOwnerNumber })
   : new MockProvider({ baseUrl, gcashOwnerNumber });
-
-async function processPaymentWebhook(payload) {
-  const { reference, status, provider: webhookProvider } = payload;
-  const session = await getGcashSessionByReference(reference);
-
-  if (!session) {
-    return { statusCode: 404, body: { error: 'Session not found for reference' } };
-  }
-
-  if ((status || '').toUpperCase() !== 'PAID') {
-    return { statusCode: 200, body: { ok: true, ignored: true } };
-  }
-
-  const invoice = await setInvoicePaid(session.invoiceId, {
-    method: 'gcash',
-    provider: webhookProvider || session.provider,
-    providerReference: reference,
-    recipientGcashNumber: session?.merchant?.gcashNumber || gcashOwnerNumber,
-    paidAt: new Date().toISOString(),
-    amountPaid: session.amount,
-    change: 0,
-    success: true,
-    successMessage: 'Payment Successful'
-  });
-
-  session.status = 'PAID';
-  await saveGcashSession(session);
-
-  return { statusCode: 200, body: { ok: true, invoice } };
-}
-
-app.get('/health', (_req, res) => {
-  res.json({
-    ok: true,
-    provider: providerName,
-    gcashOwnerNumber,
-    supabaseEnabled: isSupabaseEnabled(),
-    supabaseMode: getSupabaseMode(),
-    now: new Date().toISOString()
-  });
-});
-
-app.get('/api/config', (_req, res) => {
-  res.json({ gcashOwnerNumber });
-});
-
-app.get('/api/products', (_req, res) => {
-  res.json({ products: listProducts() });
-});
 
 function buildSalesRange(query) {
   const now = new Date();
@@ -111,6 +63,142 @@ function buildSalesRange(query) {
     dateTo: end.toISOString()
   };
 }
+
+function parsePaymongoSignature(headerValue) {
+  const parts = String(headerValue || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const parsed = {};
+
+  parts.forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx === -1) return;
+    const key = part.slice(0, idx);
+    const value = part.slice(idx + 1);
+    parsed[key] = value;
+  });
+
+  return parsed;
+}
+
+function timingSafeEqualHex(a, b) {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function verifyPaymongoWebhook(req) {
+  const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET || '';
+  if (!webhookSecret) {
+    return { ok: false, error: 'PAYMONGO_WEBHOOK_SECRET is not configured' };
+  }
+
+  const headerValue = req.get('paymongo-signature') || req.get('Paymongo-Signature');
+  const signature = parsePaymongoSignature(headerValue);
+  if (!signature.t || (!signature.te && !signature.li)) {
+    return { ok: false, error: 'Missing or invalid PayMongo signature header' };
+  }
+
+  const signedPayload = `${signature.t}.${req.rawBody || ''}`;
+  const computed = crypto.createHmac('sha256', webhookSecret).update(signedPayload).digest('hex');
+
+  const isLive = Boolean(req.body?.data?.attributes?.livemode);
+  const expected = isLive ? signature.li : signature.te;
+
+  if (!timingSafeEqualHex(computed, expected)) {
+    return { ok: false, error: 'Invalid PayMongo webhook signature' };
+  }
+
+  return { ok: true };
+}
+
+function extractPaymongoWebhookPayload(body) {
+  const eventType = body?.data?.attributes?.type;
+  const eventData = body?.data?.attributes?.data;
+  const metadata = eventData?.attributes?.metadata || {};
+
+  if (eventType === 'checkout_session.payment.paid') {
+    return {
+      provider: 'paymongo',
+      reference: metadata.local_reference || metadata.reference || null,
+      providerReference: eventData?.id || null,
+      status: 'PAID',
+      amountPaid: null
+    };
+  }
+
+  if (eventType === 'payment.paid') {
+    return {
+      provider: 'paymongo',
+      reference: metadata.local_reference || metadata.reference || null,
+      providerReference: eventData?.id || null,
+      status: 'PAID',
+      amountPaid: Number(eventData?.attributes?.amount || 0) / 100
+    };
+  }
+
+  return null;
+}
+
+async function processPaymentWebhook(payload) {
+  const {
+    reference,
+    status,
+    provider: webhookProvider,
+    providerReference,
+    amountPaid
+  } = payload;
+
+  if (!reference) {
+    return { statusCode: 400, body: { error: 'Missing payment reference in webhook payload' } };
+  }
+
+  const session = await getGcashSessionByReference(reference);
+
+  if (!session) {
+    return { statusCode: 404, body: { error: 'Session not found for reference' } };
+  }
+
+  if ((status || '').toUpperCase() !== 'PAID') {
+    return { statusCode: 200, body: { ok: true, ignored: true } };
+  }
+
+  const invoice = await setInvoicePaid(session.invoiceId, {
+    method: 'gcash',
+    provider: webhookProvider || session.provider,
+    providerReference: providerReference || reference,
+    recipientGcashNumber: session?.merchant?.gcashNumber || gcashOwnerNumber,
+    paidAt: new Date().toISOString(),
+    amountPaid: Number(amountPaid || session.amount),
+    change: 0,
+    success: true,
+    successMessage: 'Payment Successful'
+  });
+
+  session.status = 'PAID';
+  await saveGcashSession(session);
+
+  return { statusCode: 200, body: { ok: true, invoice } };
+}
+
+app.get('/health', (_req, res) => {
+  res.json({
+    ok: true,
+    provider: providerName,
+    gcashOwnerNumber,
+    supabaseEnabled: isSupabaseEnabled(),
+    supabaseMode: getSupabaseMode(),
+    now: new Date().toISOString()
+  });
+});
+
+app.get('/api/config', (_req, res) => {
+  res.json({ gcashOwnerNumber });
+});
+
+app.get('/api/products', (_req, res) => {
+  res.json({ products: listProducts() });
+});
 
 app.post('/api/invoices', async (req, res) => {
   try {
@@ -232,6 +320,21 @@ app.get('/api/payments/gcash/session/:reference', async (req, res) => {
 
 app.post('/api/webhooks/payments', async (req, res) => {
   try {
+    if (providerName === 'paymongo') {
+      const verified = verifyPaymongoWebhook(req);
+      if (!verified.ok) {
+        return res.status(401).json({ error: verified.error });
+      }
+
+      const extracted = extractPaymongoWebhookPayload(req.body);
+      if (!extracted) {
+        return res.status(200).json({ ok: true, ignored: true });
+      }
+
+      const result = await processPaymentWebhook(extracted);
+      return res.status(result.statusCode).json(result.body);
+    }
+
     const result = await processPaymentWebhook(req.body);
     return res.status(result.statusCode).json(result.body);
   } catch (error) {
