@@ -17,6 +17,56 @@ class PaymongoProvider {
     return `Basic ${Buffer.from(`${this.secretKey}:`).toString('base64')}`;
   }
 
+  /**
+   * Create a PayMongo Customer object so it appears in
+   * PayMongo Dashboard > Payment Channels > Customers.
+   * Returns the customer ID (cus_xxx) or null if creation fails.
+   */
+  async createCustomer({ name, email, phone }) {
+    // PayMongo requires at least first_name and last_name
+    const nameParts = String(name || 'POS Customer').trim().split(/\s+/);
+    const firstName = nameParts[0] || 'POS';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Customer';
+
+    const customerBody = {
+      data: {
+        attributes: {
+          first_name: firstName,
+          last_name: lastName,
+          email: email || undefined,
+          phone: phone || undefined,
+          default_device: 'phone'
+        }
+      }
+    };
+
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/customers`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          authorization: this.getAuthHeader()
+        },
+        body: JSON.stringify(customerBody)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.warn('[PayMongo] Failed to create customer:', data?.errors?.[0]?.detail || 'Unknown error');
+        return null;
+      }
+
+      const customerId = data?.data?.id;
+      console.log(`[PayMongo] Customer created: ${customerId} (${firstName} ${lastName})`);
+      return customerId;
+    } catch (err) {
+      console.warn('[PayMongo] Customer creation error:', err.message);
+      return null;
+    }
+  }
+
   async createGcashCheckout({ invoice, customerInfo = {} }) {
     const localReference = `GC-${uuidv4()}`;
     const amountInCentavos = Math.round(Number(invoice.total) * 100);
@@ -25,6 +75,16 @@ class PaymongoProvider {
     const billingName = customerInfo.name || 'POS Customer';
     const billingEmail = customerInfo.email || 'pos-customer@example.com';
     const billingPhone = customerInfo.phone || null;
+
+    // Create a PayMongo Customer object so it shows in Dashboard > Customers
+    let paymongoCustomerId = null;
+    if (customerInfo.name || customerInfo.email || customerInfo.phone) {
+      paymongoCustomerId = await this.createCustomer({
+        name: billingName,
+        email: billingEmail,
+        phone: billingPhone
+      });
+    }
 
     const body = {
       data: {
@@ -45,10 +105,12 @@ class PaymongoProvider {
           })),
           payment_method_types: ['gcash'],
           description: `Invoice ${invoice.reference}`,
+          ...(paymongoCustomerId && { customer_id: paymongoCustomerId }),
           metadata: {
             invoice_id: invoice.id,
             invoice_reference: invoice.reference,
-            local_reference: localReference
+            local_reference: localReference,
+            ...(paymongoCustomerId && { paymongo_customer_id: paymongoCustomerId })
           },
           success_url: this.successUrl,
           cancel_url: this.cancelUrl
