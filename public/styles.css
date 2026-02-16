@@ -95,6 +95,19 @@ select {
   max-width: 240px;
 }
 
+.sales-list {
+  margin-top: 12px;
+}
+
+.sales-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
 @media (max-width: 800px) {
   .grid {
     grid-template-columns: 1fr;

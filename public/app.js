@@ -16,6 +16,13 @@ const checkoutBtn = document.getElementById('checkoutBtn');
 const clearBtn = document.getElementById('clearBtn');
 const cashRowEl = document.getElementById('cashRow');
 const gcashInfoEl = document.getElementById('gcashInfo');
+const salesSummaryEl = document.getElementById('salesSummary');
+const salesListEl = document.getElementById('salesList');
+const salesDailyBtn = document.getElementById('salesDailyBtn');
+const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
+const salesRefreshBtn = document.getElementById('salesRefreshBtn');
+
+let activeSalesRange = 'daily';
 
 function money(value) {
   return `PHP ${Number(value).toFixed(2)}`;
@@ -144,6 +151,46 @@ function renderReceipt(invoice) {
   );
 }
 
+function renderSalesReport(report) {
+  salesSummaryEl.textContent = [
+    `Range: ${report.range.label.toUpperCase()}`,
+    `Total Sales: ${money(report.totalSales)}`,
+    `Transactions: ${report.totalTransactions}`,
+    `Average Ticket: ${money(report.averageTicket)}`,
+    `Cash: ${money(report.byMethod?.cash || 0)}`,
+    `GCash: ${money(report.byMethod?.gcash || 0)}`
+  ].join('\n');
+
+  const rows = (report.transactions || []).slice(0, 10);
+  if (!rows.length) {
+    salesListEl.innerHTML = '<p>No sales found for this range.</p>';
+    return;
+  }
+
+  salesListEl.innerHTML = rows
+    .map(
+      (x) => `
+      <div class="sales-row">
+        <span>${x.reference}</span>
+        <span>${String(x.method || '').toUpperCase()}</span>
+        <span>${money(x.amountPaid)}</span>
+      </div>
+    `
+    )
+    .join('');
+}
+
+async function refreshSalesReport(range = activeSalesRange) {
+  try {
+    activeSalesRange = range;
+    const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
+    renderSalesReport(report);
+  } catch (error) {
+    salesSummaryEl.textContent = `Sales report error: ${error.message}`;
+    salesListEl.innerHTML = '';
+  }
+}
+
 async function pollInvoice(invoiceId) {
   if (state.poller) {
     clearInterval(state.poller);
@@ -156,6 +203,7 @@ async function pollInvoice(invoiceId) {
         clearInterval(state.poller);
         state.poller = null;
         renderReceipt(invoice);
+        await refreshSalesReport(activeSalesRange);
       }
     } catch (err) {
       setStatus(`Polling error: ${err.message}`);
@@ -187,6 +235,7 @@ async function handleCheckout() {
         body: JSON.stringify({ invoiceId: invoice.id, amountTendered: tendered })
       });
       renderReceipt(paid.invoice);
+      await refreshSalesReport(activeSalesRange);
       resetAfterSale();
       return;
     }
@@ -243,8 +292,12 @@ async function init() {
     resetAfterSale();
     setStatus('Cleared. Ready.');
   });
+  salesDailyBtn.addEventListener('click', () => refreshSalesReport('daily'));
+  salesWeeklyBtn.addEventListener('click', () => refreshSalesReport('weekly'));
+  salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange));
 
   onPaymentMethodChange();
+  await refreshSalesReport('daily');
 }
 
 init().catch((error) => {
