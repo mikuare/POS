@@ -18,6 +18,32 @@ class PaymongoProvider {
   }
 
   /**
+   * Convert Philippine phone number to international format.
+   * 09171234567 → +639171234567
+   * 639171234567 → +639171234567
+   * +639171234567 → +639171234567
+   */
+  formatPhoneNumber(phone) {
+    if (!phone) return null;
+    let cleaned = String(phone).replace(/[^0-9+]/g, '');
+    
+    // If starts with 0, replace with +63
+    if (cleaned.startsWith('0')) {
+      cleaned = '+63' + cleaned.slice(1);
+    }
+    // If starts with 63 (no +), add +
+    else if (cleaned.startsWith('63') && !cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned;
+    }
+    // If doesn't start with +, assume it needs +63
+    else if (!cleaned.startsWith('+')) {
+      cleaned = '+63' + cleaned;
+    }
+    
+    return cleaned;
+  }
+
+  /**
    * Create a PayMongo Customer object so it appears in
    * PayMongo Dashboard > Payment Channels > Customers.
    * Returns the customer ID (cus_xxx) or null if creation fails.
@@ -28,13 +54,16 @@ class PaymongoProvider {
     const firstName = nameParts[0] || 'POS';
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Customer';
 
+    // Format phone to international format (+63...)
+    const formattedPhone = this.formatPhoneNumber(phone);
+
     const customerBody = {
       data: {
         attributes: {
           first_name: firstName,
           last_name: lastName,
           email: email || undefined,
-          phone: phone || undefined,
+          phone: formattedPhone || undefined,
           default_device: 'phone'
         }
       }
