@@ -42,6 +42,23 @@
               <input id="amountTendered" type="number" min="0" placeholder="0" />
             </div>
 
+            <!-- Customer Info (shown for GCash) -->
+            <div id="customerInfoRow" class="customer-info-section" style="display:none;">
+              <div class="customer-info-label">Customer Information (pre-fills PayMongo checkout)</div>
+              <div class="row">
+                <label for="customerName">Name:</label>
+                <input id="customerName" type="text" placeholder="e.g. Juan Dela Cruz" />
+              </div>
+              <div class="row">
+                <label for="customerEmail">Email:</label>
+                <input id="customerEmail" type="email" placeholder="e.g. juan@email.com" />
+              </div>
+              <div class="row">
+                <label for="customerPhone">Phone/GCash #:</label>
+                <input id="customerPhone" type="tel" placeholder="e.g. 09123456789" />
+              </div>
+            </div>
+
             <div class="row">
               <button id="checkoutBtn">Checkout</button>
               <button id="clearBtn" class="secondary">Clear</button>

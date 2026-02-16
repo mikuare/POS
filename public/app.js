@@ -22,6 +22,12 @@ const salesDailyBtn = document.getElementById('salesDailyBtn');
 const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
 
+// ── Customer Info Elements ──
+const customerInfoRowEl = document.getElementById('customerInfoRow');
+const customerNameEl = document.getElementById('customerName');
+const customerEmailEl = document.getElementById('customerEmail');
+const customerPhoneEl = document.getElementById('customerPhone');
+
 // ── Admin Tab Elements ──
 const adminFilterEl = document.getElementById('adminFilter');
 const adminRangeEl = document.getElementById('adminRange');
@@ -177,6 +183,10 @@ function resetAfterSale() {
     clearInterval(state.poller);
     state.poller = null;
   }
+  // Clear customer info fields
+  customerNameEl.value = '';
+  customerEmailEl.value = '';
+  customerPhoneEl.value = '';
   renderCart();
 }
 
@@ -322,9 +332,18 @@ async function handleCheckout() {
       return;
     }
 
+    // Collect customer info from the form
+    const customerInfo = {};
+    const cName = (customerNameEl.value || '').trim();
+    const cEmail = (customerEmailEl.value || '').trim();
+    const cPhone = (customerPhoneEl.value || '').trim();
+    if (cName) customerInfo.name = cName;
+    if (cEmail) customerInfo.email = cEmail;
+    if (cPhone) customerInfo.phone = cPhone;
+
     const { checkout } = await api('/api/payments/gcash/checkout', {
       method: 'POST',
-      body: JSON.stringify({ invoiceId: invoice.id })
+      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
     });
 
     const qrMarkup = checkout.qrDataUrl
@@ -356,7 +375,9 @@ async function handleCheckout() {
 }
 
 function onPaymentMethodChange() {
-  cashRowEl.style.display = paymentMethodEl.value === 'cash' ? 'flex' : 'none';
+  const isCash = paymentMethodEl.value === 'cash';
+  cashRowEl.style.display = isCash ? 'flex' : 'none';
+  customerInfoRowEl.style.display = isCash ? 'none' : 'block';
 }
 
 // ══════════════════════════════════════════

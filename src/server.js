@@ -288,7 +288,7 @@ app.post('/api/payments/cash', async (req, res) => {
 
 app.post('/api/payments/gcash/checkout', async (req, res) => {
   try {
-    const { invoiceId } = req.body;
+    const { invoiceId, customerInfo } = req.body;
     const invoice = await getInvoice(invoiceId);
 
     if (!invoice) {
@@ -303,7 +303,8 @@ app.post('/api/payments/gcash/checkout', async (req, res) => {
       return res.status(400).json({ error: 'Invoice already paid' });
     }
 
-    const session = await provider.createGcashCheckout({ invoice });
+    // Pass customer info to provider for pre-filling PayMongo checkout
+    const session = await provider.createGcashCheckout({ invoice, customerInfo: customerInfo || {} });
     await saveGcashSession({ ...session, invoiceId: invoice.id, status: 'PENDING' });
 
     return res.status(201).json({ checkout: session });

@@ -17,16 +17,22 @@ class PaymongoProvider {
     return `Basic ${Buffer.from(`${this.secretKey}:`).toString('base64')}`;
   }
 
-  async createGcashCheckout({ invoice }) {
+  async createGcashCheckout({ invoice, customerInfo = {} }) {
     const localReference = `GC-${uuidv4()}`;
     const amountInCentavos = Math.round(Number(invoice.total) * 100);
+
+    // Use provided customer info or defaults
+    const billingName = customerInfo.name || 'POS Customer';
+    const billingEmail = customerInfo.email || 'pos-customer@example.com';
+    const billingPhone = customerInfo.phone || null;
 
     const body = {
       data: {
         attributes: {
           billing: {
-            name: 'POS Customer',
-            email: 'pos-customer@example.com'
+            name: billingName,
+            email: billingEmail,
+            ...(billingPhone && { phone: billingPhone })
           },
           send_email_receipt: false,
           show_description: true,
