@@ -1,10 +1,9 @@
 ﻿const { v4: uuidv4 } = require('uuid');
 
 class PaymongoProvider {
-  constructor({ baseUrl, gcashOwnerNumber }) {
+  constructor({ baseUrl }) {
     this.providerName = 'paymongo';
     this.baseUrl = baseUrl;
-    this.gcashOwnerNumber = gcashOwnerNumber;
     this.secretKey = process.env.PAYMONGO_SECRET_KEY || '';
     this.successUrl = process.env.PAYMONGO_SUCCESS_URL || `${baseUrl}/`;
     this.cancelUrl = process.env.PAYMONGO_CANCEL_URL || `${baseUrl}/`;
@@ -27,8 +26,7 @@ class PaymongoProvider {
         attributes: {
           billing: {
             name: 'POS Customer',
-            email: 'pos-customer@example.com',
-            phone: this.gcashOwnerNumber
+            email: 'pos-customer@example.com'
           },
           send_email_receipt: false,
           show_description: true,
@@ -82,9 +80,7 @@ class PaymongoProvider {
       currency: 'PHP',
       qrText: '',
       qrDataUrl: '',
-      merchant: {
-        gcashNumber: this.gcashOwnerNumber
-      },
+      merchant: {},
       checkoutUrl,
       status: 'PENDING',
       paymongoCheckoutSessionId: sessionData.id

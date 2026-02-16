@@ -3,7 +3,6 @@
   cart: {},
   activeInvoice: null,
   poller: null,
-  gcashOwnerNumber: '09615745812'
 };
 
 const productsEl = document.getElementById('products');
@@ -145,7 +144,7 @@ function renderReceipt(invoice) {
       `Total: ${money(invoice.total)}`,
       `Paid: ${money(invoice.payment.amountPaid)}`,
       `Change: ${money(invoice.payment.change || 0)}`,
-      invoice.paymentMethod === 'gcash' ? `Recipient GCash: ${invoice.payment.recipientGcashNumber || state.gcashOwnerNumber}` : '',
+      invoice.paymentMethod === 'gcash' ? `Recipient GCash: ${invoice.payment.recipientGcashNumber || 'via PayMongo'}` : '',
       `Paid At: ${invoice.payment.paidAt}`
     ].filter(Boolean).join('\n')
   );
@@ -251,7 +250,7 @@ async function handleCheckout() {
 
     gcashInfoEl.innerHTML = `
       <h3>GCash Checkout</h3>
-      <div>Pay To GCash Number: <strong>${checkout?.merchant?.gcashNumber || state.gcashOwnerNumber}</strong></div>
+      <div>Gateway: <strong>${String(checkout.provider || '').toUpperCase()}</strong></div>
       <div>Reference: ${checkout.reference}</div>
       ${qrMarkup}
       <div class="row">
@@ -265,7 +264,7 @@ async function handleCheckout() {
     });
 
     window.open(checkout.checkoutUrl, '_blank', 'noopener');
-    setStatus(`GCash checkout created for ${checkout?.merchant?.gcashNumber || state.gcashOwnerNumber}. Waiting for payment webhook...\nReference: ${checkout.reference}`);
+    setStatus(`GCash checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment webhook...\nReference: ${checkout.reference}`);
 
     await pollInvoice(invoice.id);
   } catch (error) {
@@ -278,9 +277,8 @@ function onPaymentMethodChange() {
 }
 
 async function init() {
-  const [{ products }, config] = await Promise.all([api('/api/products'), api('/api/config')]);
+  const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
   state.products = products;
-  state.gcashOwnerNumber = config.gcashOwnerNumber || state.gcashOwnerNumber;
   renderProducts();
   renderCart();
 
@@ -303,3 +301,4 @@ async function init() {
 init().catch((error) => {
   setStatus(`Startup error: ${error.message}`);
 });
+

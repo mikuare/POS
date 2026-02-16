@@ -21,16 +21,15 @@ const PaymongoProvider = require('./providers/paymongoProvider');
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const baseUrl = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
-const providerName = (process.env.PAYMENT_PROVIDER || 'mock').toLowerCase();
-const gcashOwnerNumber = process.env.GCASH_OWNER_NUMBER || '09615745812';
+const providerName = (process.env.PAYMENT_PROVIDER || 'paymongo').toLowerCase();
 
 app.use(cors());
 app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const provider = providerName === 'paymongo'
-  ? new PaymongoProvider({ baseUrl, gcashOwnerNumber })
-  : new MockProvider({ baseUrl, gcashOwnerNumber });
+  ? new PaymongoProvider({ baseUrl })
+  : new MockProvider({ baseUrl });
 
 function buildSalesRange(query) {
   const now = new Date();
@@ -167,7 +166,7 @@ async function processPaymentWebhook(payload) {
     method: 'gcash',
     provider: webhookProvider || session.provider,
     providerReference: providerReference || reference,
-    recipientGcashNumber: session?.merchant?.gcashNumber || gcashOwnerNumber,
+    recipientGcashNumber: session?.merchant?.gcashNumber || '',
     paidAt: new Date().toISOString(),
     amountPaid: Number(amountPaid || session.amount),
     change: 0,
@@ -185,7 +184,6 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     provider: providerName,
-    gcashOwnerNumber,
     supabaseEnabled: isSupabaseEnabled(),
     supabaseMode: getSupabaseMode(),
     now: new Date().toISOString()
@@ -193,7 +191,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/api/config', (_req, res) => {
-  res.json({ gcashOwnerNumber });
+  res.json({});
 });
 
 app.get('/api/products', (_req, res) => {
