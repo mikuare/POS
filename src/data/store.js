@@ -2,6 +2,8 @@
 const { getSupabase, isSupabaseEnabled } = require('./supabaseClient');
 
 const PRODUCTS = [
+  { id: 'p0', name: 'Candy', price: 5 },
+  { id: 'p00', name: 'Water Cup', price: 10 },
   { id: 'p1', name: 'Milk Tea', price: 120 },
   { id: 'p2', name: 'Burger', price: 180 },
   { id: 'p3', name: 'Fries', price: 90 },
