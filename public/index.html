@@ -1,0 +1,49 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POS System - Cash / GCash</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <h1>POS System (Cash + GCash)</h1>
+      <div class="grid">
+        <section class="card">
+          <h2>Products</h2>
+          <div id="products"></div>
+        </section>
+
+        <section class="card">
+          <h2>Cart / Checkout</h2>
+          <div id="cart"></div>
+          <div class="total" id="total">Total: PHP 0.00</div>
+
+          <div class="row">
+            <label for="paymentMethod">Payment:</label>
+            <select id="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="gcash">GCash</option>
+            </select>
+          </div>
+
+          <div class="row" id="cashRow">
+            <label for="amountTendered">Amount Tendered:</label>
+            <input id="amountTendered" type="number" min="0" placeholder="0" />
+          </div>
+
+          <div class="row">
+            <button id="checkoutBtn">Checkout</button>
+            <button id="clearBtn" class="secondary">Clear</button>
+          </div>
+
+          <div id="gcashInfo"></div>
+          <div id="status" class="status">Ready.</div>
+        </section>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

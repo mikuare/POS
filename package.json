@@ -1,0 +1,19 @@
+{
+  "name": "pos-system-gcash-sample",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sample POS with Cash and GCash payment flow (gateway style)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "uuid": "^11.0.3"
+  }
+}
