@@ -3,17 +3,29 @@
   cart: {},
   activeInvoice: null,
   poller: null,
+  activeCategory: 'main-dish',
+  orderType: null,
+  cashPromptActive: false,
+  discountAmount: 0,
 };
 
-// ── POS Tab Elements ──
+// -- POS Tab Elements --
 const productsEl = document.getElementById('products');
 const cartEl = document.getElementById('cart');
-const totalEl = document.getElementById('total');
+const addToCartConfettiEl = document.getElementById('addToCartConfetti');
+const yummyOrderEmojiEl = document.getElementById('yummyOrderEmoji');
+const subtotalValueEl = document.getElementById('subtotalValue');
+const discountInputEl = document.getElementById('discountInput');
+const totalDueValueEl = document.getElementById('totalDueValue');
 const statusEl = document.getElementById('status');
 const paymentMethodEl = document.getElementById('paymentMethod');
 const amountTenderedEl = document.getElementById('amountTendered');
-const checkoutBtn = document.getElementById('checkoutBtn');
+const cashPayBtn = document.getElementById('cashPayBtn');
 const clearBtn = document.getElementById('clearBtn');
+const dineInCheckoutBtn = document.getElementById('dineInCheckoutBtn');
+const takeOutCheckoutBtn = document.getElementById('takeOutCheckoutBtn');
+const cashPaymentBtn = document.getElementById('cashPaymentBtn');
+const ePaymentBtn = document.getElementById('ePaymentBtn');
 const cashRowEl = document.getElementById('cashRow');
 const gcashInfoEl = document.getElementById('gcashInfo');
 const salesSummaryEl = document.getElementById('salesSummary');
@@ -21,14 +33,46 @@ const salesListEl = document.getElementById('salesList');
 const salesDailyBtn = document.getElementById('salesDailyBtn');
 const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
+const categoryTitleEl = document.getElementById('categoryTitle');
+const paymentSuccessModalEl = document.getElementById('paymentSuccessModal');
+const receiptRefEl = document.getElementById('receiptRef');
+const receiptDateEl = document.getElementById('receiptDate');
+const receiptOrderTypeEl = document.getElementById('receiptOrderType');
+const receiptPaymentMethodEl = document.getElementById('receiptPaymentMethod');
+const receiptItemsEl = document.getElementById('receiptItems');
+const receiptSubtotalEl = document.getElementById('receiptSubtotal');
+const receiptDiscountEl = document.getElementById('receiptDiscount');
+const receiptTotalDueEl = document.getElementById('receiptTotalDue');
+const receiptAmountPaidEl = document.getElementById('receiptAmountPaid');
+const receiptChangeEl = document.getElementById('receiptChange');
+const receiptPrintBtn = document.getElementById('receiptPrintBtn');
+const receiptPrintAreaEl = document.getElementById('receiptPrintArea');
+const paymentSuccessDoneBtn = document.getElementById('paymentSuccessDoneBtn');
+const adminReceiptModalEl = document.getElementById('adminReceiptModal');
+const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
+const adminReceiptRefEl = document.getElementById('adminReceiptRef');
+const adminReceiptDateEl = document.getElementById('adminReceiptDate');
+const adminReceiptOrderTypeEl = document.getElementById('adminReceiptOrderType');
+const adminReceiptPaymentMethodEl = document.getElementById('adminReceiptPaymentMethod');
+const adminReceiptItemsEl = document.getElementById('adminReceiptItems');
+const adminReceiptSubtotalEl = document.getElementById('adminReceiptSubtotal');
+const adminReceiptDiscountEl = document.getElementById('adminReceiptDiscount');
+const adminReceiptTotalDueEl = document.getElementById('adminReceiptTotalDue');
+const adminReceiptAmountPaidEl = document.getElementById('adminReceiptAmountPaid');
+const adminReceiptChangeEl = document.getElementById('adminReceiptChange');
+const adminReceiptPrintBtn = document.getElementById('adminReceiptPrintBtn');
+const adminReceiptCloseBtn = document.getElementById('adminReceiptCloseBtn');
+const eWalletModalEl = document.getElementById('eWalletModal');
+const chooseGcashBtn = document.getElementById('chooseGcashBtn');
+const choosePaymayaBtn = document.getElementById('choosePaymayaBtn');
+const cancelEwalletBtn = document.getElementById('cancelEwalletBtn');
 
-// ── Customer Info Elements ──
-const customerInfoRowEl = document.getElementById('customerInfoRow');
+// -- Customer Info Elements --
 const customerNameEl = document.getElementById('customerName');
 const customerEmailEl = document.getElementById('customerEmail');
 const customerPhoneEl = document.getElementById('customerPhone');
 
-// ── Admin Tab Elements ──
+// -- Admin Tab Elements --
 const adminFilterEl = document.getElementById('adminFilter');
 const adminRangeEl = document.getElementById('adminRange');
 const adminRefreshBtn = document.getElementById('adminRefreshBtn');
@@ -40,23 +84,102 @@ const statPendingEl = document.getElementById('statPending');
 const statRevenueEl = document.getElementById('statRevenue');
 const statCashEl = document.getElementById('statCash');
 const statGcashEl = document.getElementById('statGcash');
+const adminLoginModalEl = document.getElementById('adminLoginModal');
+const adminUsernameEl = document.getElementById('adminUsername');
+const adminPasswordEl = document.getElementById('adminPassword');
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const adminCancelBtn = document.getElementById('adminCancelBtn');
+const adminLoginErrorEl = document.getElementById('adminLoginError');
+const adminCloseBtn = document.getElementById('adminCloseBtn');
 
-// ── Tab Elements ──
+// -- Tab Elements --
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 let activeSalesRange = 'daily';
+const ADMIN_DEFAULT_USERNAME = 'admin';
+const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
+let confettiAnimation = null;
+let yummyOrderAnimation = null;
 
-// ══════════════════════════════════════════
+// ------------------------------------------
 // Utility Functions
-// ══════════════════════════════════════════
+// ------------------------------------------
 
 function money(value) {
   return `PHP ${Number(value).toFixed(2)}`;
 }
 
+function getPaymentMethodLabel(method) {
+  const map = {
+    cash: 'Cash',
+    gcash: 'GCash',
+    paymaya: 'PayMaya'
+  };
+  return map[String(method || '').toLowerCase()] || String(method || '').toUpperCase();
+}
+
+function getPaymentMethodIcon(method) {
+  const normalized = String(method || '').toLowerCase();
+  if (normalized === 'cash') return '/Other/Cash.png';
+  if (normalized === 'paymaya') return '/Other/Maya.png';
+  return '/Other/GCash.png';
+}
+
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function ensureConfettiAnimation() {
+  if (confettiAnimation || !addToCartConfettiEl || !window.lottie) {
+    return;
+  }
+
+  confettiAnimation = window.lottie.loadAnimation({
+    container: addToCartConfettiEl,
+    renderer: 'svg',
+    loop: false,
+    autoplay: false,
+    path: '/assets/confetti'
+  });
+}
+
+function loadYummyEmoji(container) {
+  if (!container || !window.lottie) return null;
+  return window.lottie.loadAnimation({
+    container,
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+    path: '/assets/yummy'
+  });
+}
+
+function ensureYummyAnimations() {
+  if (!yummyOrderAnimation) {
+    yummyOrderAnimation = loadYummyEmoji(yummyOrderEmojiEl);
+  }
+}
+
+function playAddToCartConfetti() {
+  ensureConfettiAnimation();
+  if (!confettiAnimation) return;
+  confettiAnimation.stop();
+  confettiAnimation.goToAndPlay(0, true);
+}
+
+function setOrderType(type) {
+  state.orderType = type;
+  state.cashPromptActive = false;
+  if (cashPaymentBtn) cashPaymentBtn.disabled = false;
+  if (ePaymentBtn) ePaymentBtn.disabled = false;
+  if (amountTenderedEl) amountTenderedEl.value = '';
+  setPaymentMethod('cash');
+  setStatus(`${getOrderTypeLabel(type)} selected. Choose Cash or E-Payment.`);
+}
+
+function getOrderTypeLabel(type) {
+  return type === 'take-out' ? 'Take Out' : 'Dine In';
 }
 
 function formatDate(isoString) {
@@ -85,6 +208,18 @@ function getCartTotal() {
   }, 0);
 }
 
+function getDiscountAmount() {
+  const subtotal = getCartTotal();
+  const discount = Number(state.discountAmount || 0);
+  if (!Number.isFinite(discount) || discount <= 0) return 0;
+  return Math.min(discount, subtotal);
+}
+
+function getTotalDue() {
+  const subtotal = getCartTotal();
+  return Math.max(0, subtotal - getDiscountAmount());
+}
+
 async function api(path, options = {}) {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -97,9 +232,9 @@ async function api(path, options = {}) {
   return data;
 }
 
-// ══════════════════════════════════════════
+// ------------------------------------------
 // Tab Navigation
-// ══════════════════════════════════════════
+// ------------------------------------------
 
 function switchTab(tabName) {
   tabBtns.forEach((btn) => {
@@ -114,24 +249,107 @@ function switchTab(tabName) {
   }
 }
 
-// ══════════════════════════════════════════
+function openAdminLogin() {
+  if (!adminLoginModalEl) return;
+  document.body.classList.add('admin-login-open');
+  if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
+  if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
+  if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
+  if (adminUsernameEl) adminUsernameEl.focus();
+}
+
+function closeAdminLogin() {
+  document.body.classList.remove('admin-login-open');
+}
+
+async function openAdminDashboard() {
+  document.body.classList.add('admin-open');
+  await refreshAdminTransactions();
+  await refreshSalesReport(activeSalesRange);
+}
+
+function closeAdminDashboard() {
+  document.body.classList.remove('admin-open');
+}
+
+async function submitAdminLogin() {
+  const username = (adminUsernameEl?.value || '').trim();
+  const password = adminPasswordEl?.value || '';
+
+  if (username !== ADMIN_DEFAULT_USERNAME || password !== ADMIN_DEFAULT_PASSWORD) {
+    if (adminLoginErrorEl) adminLoginErrorEl.textContent = 'Invalid username or password.';
+    return;
+  }
+
+  closeAdminLogin();
+  await openAdminDashboard();
+}
+
+// ------------------------------------------
 // POS Terminal Functions
-// ══════════════════════════════════════════
+// ------------------------------------------
+
+function getCategoryName(category) {
+  const categoryNames = {
+    'main-dish': 'Main Dish',
+    'rice': 'Rice',
+    'burger': 'Burger',
+    'drinks': 'Drinks',
+    'fries': 'Fries',
+    'dessert': 'Dessert',
+    'sauces': 'Sauces'
+  };
+  return categoryNames[category] || category;
+}
 
 function renderProducts() {
   productsEl.innerHTML = '';
-  state.products.forEach((p) => {
+  
+  // Filter products by active category
+  const filteredProducts = state.products.filter(
+    (p) => (p.category || '').toLowerCase() === state.activeCategory
+  );
+
+  if (filteredProducts.length === 0) {
+    productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products in this category.</p>';
+    return;
+  }
+
+  filteredProducts.forEach((p) => {
     const row = document.createElement('div');
     row.className = 'product-row';
     row.innerHTML = `
-      <div>
-        <strong>${p.name}</strong><br />
-        <small>${money(p.price)}</small>
+      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" />
+      <div class="product-info">
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">${money(p.price)}</div>
       </div>
-      <button data-add="${p.id}">Add</button>
+      <button data-add="${p.id}">Add to Order</button>
     `;
     productsEl.appendChild(row);
   });
+}
+
+function setPaymentMethod(method) {
+  paymentMethodEl.value = method;
+  onPaymentMethodChange();
+  cashPaymentBtn?.classList.toggle('active', method === 'cash');
+  ePaymentBtn?.classList.toggle('active', method !== 'cash');
+}
+
+function switchCategory(category) {
+  state.activeCategory = category;
+  
+  // Update active state on category buttons
+  document.querySelectorAll('.category-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-category') === category);
+  });
+  
+  // Update category title
+  categoryTitleEl.textContent = getCategoryName(category);
+  
+  // Re-render products
+  renderProducts();
 }
 
 function renderCart() {
@@ -139,7 +357,7 @@ function renderCart() {
 
   const items = getCartItems();
   if (!items.length) {
-    cartEl.innerHTML = '<p>No items yet.</p>';
+    cartEl.innerHTML = '<p>No Orders Yet</p>'; 
   } else {
     const byId = Object.fromEntries(state.products.map((p) => [p.id, p]));
     items.forEach(({ productId, qty }) => {
@@ -147,8 +365,8 @@ function renderCart() {
       const row = document.createElement('div');
       row.className = 'cart-row';
       row.innerHTML = `
-        <div>${p.name} x ${qty}</div>
-        <div>
+        <div class="cart-item-name">${p.name} x ${qty}</div>
+        <div class="cart-item-price">
           ${money(p.price * qty)}
           <button class="secondary" data-remove="${p.id}">-1</button>
         </div>
@@ -157,7 +375,14 @@ function renderCart() {
     });
   }
 
-  totalEl.textContent = `Total: ${money(getCartTotal())}`;
+  const subtotal = getCartTotal();
+  const discount = getDiscountAmount();
+  const totalDue = getTotalDue();
+  if (subtotalValueEl) subtotalValueEl.textContent = money(subtotal);
+  if (totalDueValueEl) totalDueValueEl.textContent = money(totalDue);
+  if (discountInputEl) {
+    discountInputEl.value = discount ? discount.toFixed(2) : '0';
+  }
 }
 
 function onProductClick(e) {
@@ -167,6 +392,7 @@ function onProductClick(e) {
   if (addId) {
     state.cart[addId] = (state.cart[addId] || 0) + 1;
     renderCart();
+    playAddToCartConfetti();
   }
 
   if (removeId) {
@@ -178,15 +404,17 @@ function onProductClick(e) {
 function resetAfterSale() {
   state.cart = {};
   state.activeInvoice = null;
+  state.discountAmount = 0;
   gcashInfoEl.innerHTML = '';
   if (state.poller) {
     clearInterval(state.poller);
     state.poller = null;
   }
   // Clear customer info fields
-  customerNameEl.value = '';
-  customerEmailEl.value = '';
-  customerPhoneEl.value = '';
+  if (customerNameEl) customerNameEl.value = '';
+  if (customerEmailEl) customerEmailEl.value = '';
+  if (customerPhoneEl) customerPhoneEl.value = '';
+  if (discountInputEl) discountInputEl.value = '0';
   renderCart();
 }
 
@@ -201,18 +429,155 @@ function renderReceipt(invoice) {
     [
       `Invoice: ${invoice.reference}`,
       `Status: ${invoice.status}`,
-      `Payment: ${invoice.paymentMethod.toUpperCase()}`,
+      `Order: ${getOrderTypeLabel(state.orderType)}`,
+      `Payment: ${getPaymentMethodLabel(invoice.paymentMethod)}`,
       `Result: ${successText}`,
       '',
       lines,
       '',
-      `Total: ${money(invoice.total)}`,
+      `Subtotal: ${money(invoice.subtotal ?? invoice.total)}`,
+      `Discount: ${money(invoice.discount || 0)}`,
+      `Total Due: ${money(invoice.total)}`,
       `Paid: ${money(invoice.payment.amountPaid)}`,
       `Change: ${money(invoice.payment.change || 0)}`,
-      invoice.paymentMethod === 'gcash' ? `Recipient GCash: ${invoice.payment.recipientGcashNumber || 'via PayMongo'}` : '',
+      invoice.paymentMethod !== 'cash' ? `Recipient ${getPaymentMethodLabel(invoice.paymentMethod)}: ${invoice.payment.recipientGcashNumber || 'via PayMongo'}` : '',
       `Paid At: ${invoice.payment.paidAt}`
     ].filter(Boolean).join('\n')
   );
+}
+
+function renderPaymentReceiptModal(invoice) {
+  const orderLabel = getOrderTypeLabel(state.orderType);
+  const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
+  const paidAt = invoice?.payment?.paidAt || new Date().toISOString();
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="receipt-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+
+  if (receiptRefEl) receiptRefEl.textContent = invoice.reference;
+  if (receiptDateEl) receiptDateEl.textContent = formatDate(paidAt);
+  if (receiptOrderTypeEl) receiptOrderTypeEl.textContent = orderLabel;
+  if (receiptPaymentMethodEl) receiptPaymentMethodEl.textContent = paymentLabel;
+  if (receiptItemsEl) receiptItemsEl.innerHTML = itemRows;
+  if (receiptSubtotalEl) receiptSubtotalEl.textContent = money(invoice.subtotal ?? invoice.total);
+  if (receiptDiscountEl) receiptDiscountEl.textContent = money(invoice.discount || 0);
+  if (receiptTotalDueEl) receiptTotalDueEl.textContent = money(invoice.total || 0);
+  if (receiptAmountPaidEl) receiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
+  if (receiptChangeEl) receiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+}
+
+function renderAdminReceiptModal(invoice) {
+  const paidAt = invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString();
+  const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : 'N/A';
+  const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="receipt-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+
+  if (adminReceiptRefEl) adminReceiptRefEl.textContent = invoice.reference || '-';
+  if (adminReceiptDateEl) adminReceiptDateEl.textContent = formatDate(paidAt);
+  if (adminReceiptOrderTypeEl) adminReceiptOrderTypeEl.textContent = orderLabel;
+  if (adminReceiptPaymentMethodEl) adminReceiptPaymentMethodEl.textContent = paymentLabel;
+  if (adminReceiptItemsEl) adminReceiptItemsEl.innerHTML = itemRows || '<div class="receipt-item-row"><span>No items found</span><strong>-</strong></div>';
+  if (adminReceiptSubtotalEl) adminReceiptSubtotalEl.textContent = money(invoice.subtotal ?? invoice.total ?? 0);
+  if (adminReceiptDiscountEl) adminReceiptDiscountEl.textContent = money(invoice.discount || 0);
+  if (adminReceiptTotalDueEl) adminReceiptTotalDueEl.textContent = money(invoice.total || 0);
+  if (adminReceiptAmountPaidEl) adminReceiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
+  if (adminReceiptChangeEl) adminReceiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+}
+
+function finalizeSuccessfulPayment(invoice, modeLabel) {
+  renderPaymentReceiptModal(invoice, modeLabel);
+  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.add('open');
+}
+
+function closePaymentSuccessModal() {
+  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
+  resetAfterSale();
+  state.cashPromptActive = false;
+  if (amountTenderedEl) amountTenderedEl.value = '';
+  setStatus('Payment completed. Ready for next order.');
+}
+
+function printReceiptContent(printAreaEl) {
+  if (!printAreaEl) return;
+  const printWindow = window.open('', '_blank', 'width=420,height=780');
+  if (!printWindow) {
+    setStatus('Pop-up blocked. Please allow pop-ups to print receipt.');
+    return;
+  }
+
+  const receiptHtml = printAreaEl.innerHTML;
+  const printStyles = `
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 8px; color: #2d1b12; }
+      .receipt-print-area { width: 80mm; margin: 0 auto; }
+      .receipt-header { text-align: center; border-bottom: 1px dashed #c8a88f; padding-bottom: 10px; margin-bottom: 10px; }
+      .receipt-logo { width: 110px; height: auto; object-fit: contain; margin-bottom: 6px; }
+      .receipt-header h3 { margin: 0; font-size: 24px; font-weight: 800; }
+      .receipt-header p { margin: 2px 0; font-size: 12px; }
+      .receipt-meta { display: grid; gap: 4px; margin-bottom: 10px; font-size: 12px; }
+      .receipt-meta div { display: flex; justify-content: space-between; border-bottom: 1px dotted #e6d3c3; padding-bottom: 2px; }
+      .receipt-items { border-top: 1px dashed #c8a88f; border-bottom: 1px dashed #c8a88f; padding: 8px 0; margin: 10px 0; }
+      .receipt-item-row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; gap: 8px; }
+      .receipt-item-row strong { white-space: nowrap; }
+      .receipt-totals { display: grid; gap: 4px; }
+      .receipt-totals div { display: flex; justify-content: space-between; font-size: 13px; }
+      .receipt-totals .total-due { margin-top: 4px; padding-top: 6px; border-top: 1px solid #cfb29b; font-size: 16px; font-weight: 800; }
+      .receipt-footer { margin-top: 12px; text-align: center; font-size: 12px; font-weight: 700; }
+    </style>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head><meta charset="utf-8" /><title>Receipt</title>${printStyles}</head>
+      <body><div class="receipt-print-area">${receiptHtml}</div></body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    setTimeout(() => printWindow.close(), 200);
+  }, 120);
+}
+
+function printReceiptFromModal() {
+  printReceiptContent(receiptPrintAreaEl);
+}
+
+function printAdminReceiptFromModal() {
+  printReceiptContent(adminReceiptPrintAreaEl);
+}
+
+function openAdminReceiptModal() {
+  if (adminReceiptModalEl) adminReceiptModalEl.classList.add('open');
+}
+
+function closeAdminReceiptModal() {
+  if (adminReceiptModalEl) adminReceiptModalEl.classList.remove('open');
+}
+
+function openEwalletModal() {
+  if (!eWalletModalEl) return;
+  eWalletModalEl.classList.add('open');
+}
+
+function closeEwalletModal() {
+  if (!eWalletModalEl) return;
+  eWalletModalEl.classList.remove('open');
 }
 
 function renderSalesReport(report) {
@@ -222,7 +587,7 @@ function renderSalesReport(report) {
     `Transactions: ${report.totalTransactions}`,
     `Average Ticket: ${money(report.averageTicket)}`,
     `Cash: ${money(report.byMethod?.cash || 0)}`,
-    `GCash: ${money(report.byMethod?.gcash || 0)}`
+    `E-Wallet: ${money((report.byMethod?.gcash || 0) + (report.byMethod?.paymaya || 0))}`
   ].join('\n');
 
   const rows = (report.transactions || []).slice(0, 10);
@@ -234,10 +599,13 @@ function renderSalesReport(report) {
   salesListEl.innerHTML = rows
     .map(
       (x) => `
-      <div class="sales-row">
-        <span>${x.reference}</span>
-        <span>${String(x.method || '').toUpperCase()}</span>
-        <span>${money(x.amountPaid)}</span>
+      <div class="sales-row sales-row-clickable" data-receipt="${x.invoiceId || ''}">
+        <span class="sales-ref">${x.reference}</span>
+        <span class="method-chip">
+          <img class="payment-method-icon" src="${getPaymentMethodIcon(x.method)}" alt="${getPaymentMethodLabel(x.method)}" />
+          ${getPaymentMethodLabel(x.method)}
+        </span>
+        <span class="sales-amount">${money(x.amountPaid)}</span>
       </div>
     `
     )
@@ -270,7 +638,7 @@ async function pollInvoice(invoiceId) {
       // Every 5th poll, also try to verify directly with PayMongo
       if (pollCount % 5 === 0) {
         try {
-          const verifyResult = await api(`/api/payments/gcash/verify/${invoiceId}`, {
+          const verifyResult = await api(`/api/payments/ewallet/verify/${invoiceId}`, {
             method: 'POST'
           });
           if (verifyResult.verified || verifyResult.alreadyPaid) {
@@ -279,6 +647,7 @@ async function pollInvoice(invoiceId) {
             const inv = verifyResult.invoice;
             renderReceipt(inv);
             await refreshSalesReport(activeSalesRange);
+            finalizeSuccessfulPayment(inv, 'E-Payment');
             return;
           }
         } catch (verifyErr) {
@@ -292,6 +661,7 @@ async function pollInvoice(invoiceId) {
         state.poller = null;
         renderReceipt(invoice);
         await refreshSalesReport(activeSalesRange);
+        finalizeSuccessfulPayment(invoice, 'E-Payment');
       } else if (pollCount >= maxPolls) {
         clearInterval(state.poller);
         state.poller = null;
@@ -312,36 +682,44 @@ async function handleCheckout() {
     }
 
     const paymentMethod = paymentMethodEl.value;
+    const discountAmount = getDiscountAmount();
 
     const { invoice } = await api('/api/invoices', {
       method: 'POST',
-      body: JSON.stringify({ items, paymentMethod })
+      body: JSON.stringify({ items, paymentMethod, discountAmount })
     });
 
     state.activeInvoice = invoice;
 
     if (paymentMethod === 'cash') {
-      const tendered = Number(amountTenderedEl.value || 0);
+      const tendered = Number(amountTenderedEl?.value || 0);
+      if (tendered <= 0) {
+        setStatus('Enter customer cash tendered amount.');
+        if (amountTenderedEl) amountTenderedEl.focus();
+        return;
+      }
       const paid = await api('/api/payments/cash', {
         method: 'POST',
         body: JSON.stringify({ invoiceId: invoice.id, amountTendered: tendered })
       });
       renderReceipt(paid.invoice);
       await refreshSalesReport(activeSalesRange);
-      resetAfterSale();
+      finalizeSuccessfulPayment(paid.invoice, 'Cash');
       return;
     }
 
     // Collect customer info from the form
     const customerInfo = {};
-    const cName = (customerNameEl.value || '').trim();
-    const cEmail = (customerEmailEl.value || '').trim();
-    const cPhone = (customerPhoneEl.value || '').trim();
+    const cName = (customerNameEl?.value || '').trim();
+    const cEmail = (customerEmailEl?.value || '').trim();
+    const cPhone = (customerPhoneEl?.value || '').trim();
     if (cName) customerInfo.name = cName;
     if (cEmail) customerInfo.email = cEmail;
     if (cPhone) customerInfo.phone = cPhone;
 
-    const { checkout } = await api('/api/payments/gcash/checkout', {
+    const eWalletMethod = String(paymentMethod).toLowerCase();
+    const eWalletLabel = getPaymentMethodLabel(eWalletMethod);
+    const { checkout } = await api('/api/payments/ewallet/checkout', {
       method: 'POST',
       body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
     });
@@ -351,8 +729,9 @@ async function handleCheckout() {
       : '<div>No direct QR in POS for this provider. Continue in hosted checkout.</div>';
 
     gcashInfoEl.innerHTML = `
-      <h3>GCash Checkout</h3>
+      <h3>${eWalletLabel} Checkout</h3>
       <div>Gateway: <strong>${String(checkout.provider || '').toUpperCase()}</strong></div>
+      <div>Method: <strong>${eWalletLabel}</strong></div>
       <div>Reference: ${checkout.reference}</div>
       ${qrMarkup}
       <div class="row">
@@ -366,7 +745,7 @@ async function handleCheckout() {
     });
 
     window.open(checkout.checkoutUrl, '_blank', 'noopener');
-    setStatus(`GCash checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment...\nReference: ${checkout.reference}\n\nPayment will be auto-verified every 10 seconds.`);
+    setStatus(`${eWalletLabel} checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment...\nReference: ${checkout.reference}\n\nPayment will be auto-verified every 10 seconds.`);
 
     await pollInvoice(invoice.id);
   } catch (error) {
@@ -376,13 +755,14 @@ async function handleCheckout() {
 
 function onPaymentMethodChange() {
   const isCash = paymentMethodEl.value === 'cash';
-  cashRowEl.style.display = isCash ? 'flex' : 'none';
-  customerInfoRowEl.style.display = isCash ? 'none' : 'block';
+  if (cashRowEl) {
+    cashRowEl.style.display = (isCash && state.cashPromptActive) ? 'flex' : 'none';
+  }
 }
 
-// ══════════════════════════════════════════
+// ------------------------------------------
 // Admin / Transactions Functions
-// ══════════════════════════════════════════
+// ------------------------------------------
 
 async function refreshAdminTransactions() {
   try {
@@ -411,7 +791,7 @@ function renderAdminStats(transactions) {
     .filter((t) => t.paymentMethod === 'cash')
     .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
   const gcashRevenue = paid
-    .filter((t) => t.paymentMethod === 'gcash')
+    .filter((t) => t.paymentMethod === 'gcash' || t.paymentMethod === 'paymaya')
     .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
 
   statTotalEl.textContent = total;
@@ -430,10 +810,13 @@ function renderAdminTransactions(transactions) {
 
   const rows = transactions.map((t) => {
     const statusClass = t.status === 'PAID' ? 'badge-paid' : 'badge-pending';
-    const methodClass = t.paymentMethod === 'gcash' ? 'badge-gcash' : 'badge-cash';
+    const methodClass = t.paymentMethod === 'cash' ? 'badge-cash' : 'badge-gcash';
 
-    const verifyBtn = (t.status === 'PENDING' && t.paymentMethod === 'gcash')
+    const verifyBtn = (t.status === 'PENDING' && t.paymentMethod !== 'cash')
       ? `<button class="verify-btn small" data-verify="${t.id}">Verify</button>`
+      : '';
+    const receiptBtn = (t.status === 'PAID')
+      ? `<button class="secondary small" data-receipt="${t.id}">Receipt</button>`
       : '';
 
     const paidInfo = t.payment
@@ -451,9 +834,9 @@ function renderAdminTransactions(transactions) {
         customerInfoHtml = `
           <div class="txn-customer">
             <div class="txn-customer-label">Customer Info:</div>
-            ${name ? `<div class="txn-customer-field"><span class="field-icon">👤</span> ${escapeHtml(name)}</div>` : ''}
-            ${email ? `<div class="txn-customer-field"><span class="field-icon">📧</span> ${escapeHtml(email)}</div>` : ''}
-            ${phone ? `<div class="txn-customer-field"><span class="field-icon">📱</span> ${escapeHtml(phone)}</div>` : ''}
+            ${name ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(name)}</div>` : ''}
+            ${email ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(email)}</div>` : ''}
+            ${phone ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(phone)}</div>` : ''}
           </div>
         `;
       }
@@ -462,10 +845,13 @@ function renderAdminTransactions(transactions) {
     return `
       <div class="txn-row">
         <div class="txn-main">
-          <div class="txn-ref">${t.reference}</div>
+          <button class="txn-ref receipt-link" data-receipt="${t.id}">${t.reference}</button>
           <div class="txn-badges">
             <span class="badge ${statusClass}">${t.status}</span>
-            <span class="badge ${methodClass}">${t.paymentMethod.toUpperCase()}</span>
+            <span class="badge ${methodClass} method-badge">
+              <img class="payment-method-icon" src="${getPaymentMethodIcon(t.paymentMethod)}" alt="${getPaymentMethodLabel(t.paymentMethod)}" />
+              ${getPaymentMethodLabel(t.paymentMethod)}
+            </span>
           </div>
         </div>
         <div class="txn-details">
@@ -476,6 +862,7 @@ function renderAdminTransactions(transactions) {
         </div>
         <div class="txn-actions">
           ${verifyBtn}
+          ${receiptBtn}
         </div>
       </div>
     `;
@@ -502,20 +889,20 @@ async function verifyPayment(invoiceId) {
       btn.disabled = true;
     }
 
-    const result = await api(`/api/payments/gcash/verify/${invoiceId}`, {
+    const result = await api(`/api/payments/ewallet/verify/${invoiceId}`, {
       method: 'POST'
     });
 
     if (result.verified || result.alreadyPaid) {
-      alert(`✅ Payment verified! Invoice ${result.invoice.reference} is now PAID.`);
+      alert(`? Payment verified! Invoice ${result.invoice.reference} is now PAID.`);
     } else {
-      alert(`⏳ Payment not yet completed.\nStatus: ${result.sessionStatus || 'unknown'}\n${result.message}`);
+      alert(`? Payment not yet completed.\nStatus: ${result.sessionStatus || 'unknown'}\n${result.message}`);
     }
 
     await refreshAdminTransactions();
     await refreshSalesReport(activeSalesRange);
   } catch (error) {
-    alert(`❌ Verification failed: ${error.message}`);
+    alert(`? Verification failed: ${error.message}`);
     await refreshAdminTransactions();
   }
 }
@@ -532,10 +919,10 @@ async function verifyAllPending() {
     if (range) url += `range=${encodeURIComponent(range)}&`;
 
     const { transactions } = await api(url);
-    const gcashPending = transactions.filter((t) => t.paymentMethod === 'gcash');
+    const gcashPending = transactions.filter((t) => t.paymentMethod !== 'cash');
 
     if (!gcashPending.length) {
-      alert('No pending GCash transactions to verify.');
+      alert('No pending E-Payment transactions to verify.');
       adminVerifyAllBtn.textContent = 'Verify All Pending';
       adminVerifyAllBtn.disabled = false;
       return;
@@ -546,7 +933,7 @@ async function verifyAllPending() {
 
     for (const t of gcashPending) {
       try {
-        const result = await api(`/api/payments/gcash/verify/${t.id}`, { method: 'POST' });
+        const result = await api(`/api/payments/ewallet/verify/${t.id}`, { method: 'POST' });
         if (result.verified || result.alreadyPaid) {
           verified++;
         }
@@ -555,7 +942,7 @@ async function verifyAllPending() {
       }
     }
 
-    alert(`Verification complete!\n✅ Verified: ${verified}\n⏳ Still pending: ${gcashPending.length - verified - failed}\n❌ Errors: ${failed}`);
+    alert(`Verification complete!\n? Verified: ${verified}\n? Still pending: ${gcashPending.length - verified - failed}\n? Errors: ${failed}`);
 
     await refreshAdminTransactions();
     await refreshSalesReport(activeSalesRange);
@@ -567,9 +954,23 @@ async function verifyAllPending() {
   }
 }
 
-// ══════════════════════════════════════════
+async function viewReceipt(invoiceId) {
+  try {
+    const { invoice } = await api(`/api/invoices/${invoiceId}`);
+    if (!invoice) {
+      alert('Receipt not found.');
+      return;
+    }
+    renderAdminReceiptModal(invoice);
+    openAdminReceiptModal();
+  } catch (error) {
+    alert(`Unable to load receipt: ${error.message}`);
+  }
+}
+
+// ------------------------------------------
 // Event Listeners & Init
-// ══════════════════════════════════════════
+// ------------------------------------------
 
 function setupEventListeners() {
   // Tab navigation
@@ -577,11 +978,97 @@ function setupEventListeners() {
     btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
   });
 
+  // Category buttons
+  document.querySelectorAll('.category-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const category = btn.getAttribute('data-category');
+      switchCategory(category);
+    });
+  });
+
   // POS events
   productsEl.addEventListener('click', onProductClick);
   cartEl.addEventListener('click', onProductClick);
   paymentMethodEl.addEventListener('change', onPaymentMethodChange);
-  checkoutBtn.addEventListener('click', handleCheckout);
+  if (dineInCheckoutBtn) {
+    dineInCheckoutBtn.addEventListener('click', () => {
+      setOrderType('dine-in');
+    });
+  }
+  if (takeOutCheckoutBtn) {
+    takeOutCheckoutBtn.addEventListener('click', () => {
+      setOrderType('take-out');
+    });
+  }
+  if (cashPaymentBtn) {
+    cashPaymentBtn.addEventListener('click', () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      state.cashPromptActive = true;
+      setPaymentMethod('cash');
+      setStatus('Enter cash tendered amount, then click Pay.');
+      if (amountTenderedEl) amountTenderedEl.focus();
+    });
+  }
+  if (cashPayBtn) {
+    cashPayBtn.addEventListener('click', async () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!amountTenderedEl?.value) {
+        setStatus('Enter customer cash tendered amount.');
+        if (amountTenderedEl) amountTenderedEl.focus();
+        return;
+      }
+      setPaymentMethod('cash');
+      await handleCheckout();
+    });
+  }
+  if (ePaymentBtn) {
+    ePaymentBtn.addEventListener('click', async () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
+      openEwalletModal();
+    });
+  }
+  if (chooseGcashBtn) {
+    chooseGcashBtn.addEventListener('click', async () => {
+      closeEwalletModal();
+      setPaymentMethod('gcash');
+      await handleCheckout();
+    });
+  }
+  if (choosePaymayaBtn) {
+    choosePaymayaBtn.addEventListener('click', async () => {
+      closeEwalletModal();
+      setPaymentMethod('paymaya');
+      await handleCheckout();
+    });
+  }
+  if (cancelEwalletBtn) {
+    cancelEwalletBtn.addEventListener('click', closeEwalletModal);
+  }
+  if (discountInputEl) {
+    discountInputEl.addEventListener('input', () => {
+      const raw = Number(discountInputEl.value || 0);
+      const subtotal = getCartTotal();
+      if (!Number.isFinite(raw) || raw <= 0) {
+        state.discountAmount = 0;
+      } else {
+        state.discountAmount = Math.min(raw, subtotal);
+      }
+      renderCart();
+    });
+  }
   clearBtn.addEventListener('click', () => {
     resetAfterSale();
     setStatus('Cleared. Ready.');
@@ -595,12 +1082,77 @@ function setupEventListeners() {
   adminVerifyAllBtn.addEventListener('click', verifyAllPending);
   adminFilterEl.addEventListener('change', refreshAdminTransactions);
   adminRangeEl.addEventListener('change', refreshAdminTransactions);
+  salesListEl.addEventListener('click', (e) => {
+    const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
+    if (receiptId) {
+      viewReceipt(receiptId);
+    }
+  });
 
   // Delegate verify button clicks in admin transactions list
   adminTransactionsEl.addEventListener('click', (e) => {
-    const verifyId = e.target.getAttribute('data-verify');
+    const verifyId = e.target.closest('[data-verify]')?.getAttribute('data-verify');
     if (verifyId) {
       verifyPayment(verifyId);
+      return;
+    }
+    const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
+    if (receiptId) {
+      viewReceipt(receiptId);
+    }
+  });
+
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener('click', () => {
+      submitAdminLogin();
+    });
+  }
+
+  if (adminCancelBtn) {
+    adminCancelBtn.addEventListener('click', closeAdminLogin);
+  }
+
+  if (adminCloseBtn) {
+    adminCloseBtn.addEventListener('click', closeAdminDashboard);
+  }
+
+  if (paymentSuccessDoneBtn) {
+    paymentSuccessDoneBtn.addEventListener('click', closePaymentSuccessModal);
+  }
+  if (receiptPrintBtn) {
+    receiptPrintBtn.addEventListener('click', printReceiptFromModal);
+  }
+  if (adminReceiptPrintBtn) {
+    adminReceiptPrintBtn.addEventListener('click', printAdminReceiptFromModal);
+  }
+  if (adminReceiptCloseBtn) {
+    adminReceiptCloseBtn.addEventListener('click', closeAdminReceiptModal);
+  }
+
+  if (adminPasswordEl) {
+    adminPasswordEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAdminLogin();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      openAdminLogin();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      closeEwalletModal();
+      if (paymentSuccessModalEl?.classList.contains('open')) {
+        closePaymentSuccessModal();
+      }
+      closeAdminReceiptModal();
+      closeAdminLogin();
+      closeAdminDashboard();
     }
   });
 }
@@ -608,14 +1160,27 @@ function setupEventListeners() {
 async function init() {
   const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
   state.products = products;
+  ensureConfettiAnimation();
+  ensureYummyAnimations();
   renderProducts();
   renderCart();
 
   setupEventListeners();
-  onPaymentMethodChange();
+  if (cashPaymentBtn) cashPaymentBtn.disabled = true;
+  if (ePaymentBtn) ePaymentBtn.disabled = true;
+  setPaymentMethod('cash');
+  setStatus('Select order type first: Dine In or Take Out.');
   await refreshSalesReport('daily');
 }
 
 init().catch((error) => {
   setStatus(`Startup error: ${error.message}`);
 });
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-﻿-- POS schema for invoices, items, payments, and GCash sessions
+-- POS schema for invoices, items, payments, and GCash sessions
 
 create table if not exists public.pos_invoices (
   id uuid primary key,

@@ -1,111 +1,50 @@
-# POS System Enhancement - TODO
+# POS System - 2-Panel Layout with Category Buttons
 
-## Completed ✅
-- [x] Step 1: Add `getCheckoutSessionStatus()` to PaymongoProvider
-- [x] Step 2: Add `listAllInvoices()` and `getGcashSessionByInvoiceId()` to store.js
-- [x] Step 3: Update server.js with new endpoints and webhook fix
-- [x] Step 4: Update index.html with admin dashboard
-- [x] Step 5: Update app.js with admin functionality
-- [x] Step 6: Update styles.css with admin styling
-- [x] Step 7: Deployed to Vercel (https://www.judech.online)
-- [x] Step 8: Tested health endpoint - WORKING
-- [x] Step 9: Tested admin transactions endpoint - WORKING (shows 5 transactions)
-- [x] Step 10: Tested payment verification endpoint - WORKING (3 payments verified)
-- [x] Step 11: Tested sales report - WORKING (PHP 140 total, 3 transactions)
-- [x] Step 12: Customer info extraction from PayMongo billing data (paymongoProvider.js)
-- [x] Step 13: Customer info storage in database (store.js - customer_name, customer_email, customer_phone)
-- [x] Step 14: Customer info passthrough in verify endpoint (server.js)
-- [x] Step 15: Customer info display in admin dashboard (app.js + styles.css)
-- [x] Step 16: Supabase migration file created (20260216060000_add_customer_info_to_payments.sql)
-- [x] Step 17: Schema updated (supabase/schema.sql)
-- [x] Step 18: .env.example created with all required variables
-- [x] Step 19: README.md updated with PayMongo setup + troubleshooting guide
+## Implementation Progress
 
-## Pending - User Action Required ⏳
-- [ ] **Run Supabase migration** (see instructions below)
-- [ ] Deploy to Vercel (`vercel --prod`)
-- [ ] Test end-to-end with real GCash payment
+### Step 1: Update Product Data Structure ✅
+- [x] Add category field to products in store.js
+- [x] Organize products into 6 categories
+- [x] Add sample products for each category
 
-## Test Results
-| Test | Status | Details |
-|------|--------|---------|
-| Health Check | ✅ PASS | Provider: paymongo, Supabase: enabled |
-| Admin Transactions | ✅ PASS | Returns all invoices (PENDING + PAID) |
-| Payment Verification | ✅ PASS | Successfully verifies with PayMongo API |
-| Sales Report | ✅ PASS | Shows PHP 140 total from 3 paid transactions |
-| Frontend HTML | ✅ PASS | Tab navigation (POS Terminal / Admin) |
-| Syntax Check | ✅ PASS | All JS files pass `node -c` |
+### Step 2: Update HTML Structure ✅
+- [x] Restructure POS Terminal tab into 2 main panels
+- [x] Create left panel for Cart/Checkout
+- [x] Create right panel with category buttons and product display
+- [x] Add category button elements
 
-## Current Data
-- Total Transactions: 5
-- PAID: 3 (PHP 10 + PHP 120 + PHP 10 = PHP 140)
-- PENDING: 2 (PHP 15 + PHP 15 = PHP 30)
+### Step 3: Update CSS Styling ✅
+- [x] Create 2-panel layout styles
+- [x] Style vertical category buttons
+- [x] Add active state for selected category
+- [x] Style product grid display
+- [x] Ensure responsive design
 
-## Features Implemented
-1. **Webhook Fix**: Added rawBody fallback for Vercel serverless
-2. **Direct PayMongo Verification**: New endpoint `/api/payments/gcash/verify/:invoiceId`
-3. **Admin Dashboard**: Tab-based UI with POS Terminal and Admin views
-4. **All Transactions View**: Shows PENDING + PAID with status badges
-5. **Verify Payment Button**: Manual verification for pending GCash payments
-6. **Batch Verify**: "Verify All Pending" button to check all at once
-7. **Auto-Verify Polling**: Every 5th poll automatically verifies with PayMongo
-8. **Customer Info Capture**: Extracts name, email, phone from PayMongo billing data
-9. **Customer Info Display**: Shows customer details in admin transaction list
+### Step 4: Update JavaScript Logic ✅
+- [x] Add category state management
+- [x] Implement category filtering
+- [x] Add category button click handlers
+- [x] Update product rendering for categories
+- [x] Set default category on load
 
----
+### Step 5: Testing 🔄
+- [ ] Test category switching
+- [ ] Verify cart functionality
+- [ ] Test checkout flow
+- [ ] Check responsive design
 
-## Supabase Migration Instructions
+## Summary of Changes
 
-Run this SQL in your **Supabase SQL Editor** to add customer info columns:
+### Files Modified:
+1. **src/data/store.js** - Added 36 products across 6 categories (Main Dish, Burger, Dessert, Fries, Drinks & Soda, Sauce)
+2. **public/index.html** - Restructured layout into 2-panel design with category sidebar
+3. **public/styles.css** - Added new styles for 2-panel layout, category buttons, and product grid
+4. **public/app.js** - Added category filtering logic and state management
 
-```sql
-ALTER TABLE public.pos_payments
-  ADD COLUMN IF NOT EXISTS customer_name text,
-  ADD COLUMN IF NOT EXISTS customer_email text,
-  ADD COLUMN IF NOT EXISTS customer_phone text;
-```
-
-**Steps:**
-1. Go to your Supabase Dashboard: https://supabase.com/dashboard
-2. Select your project
-3. Go to **SQL Editor** (left sidebar)
-4. Paste the SQL above
-5. Click **Run**
-6. Verify columns were added in **Table Editor > pos_payments**
-
----
-
-## Deployment Instructions
-
-After running the Supabase migration:
-
-```bash
-vercel --prod
-```
-
----
-
-## Testing Customer Info Capture
-
-1. Open POS: https://www.judech.online
-2. Add products to cart
-3. Select GCash payment
-4. Click Checkout
-5. In PayMongo checkout, fill in:
-   - Name
-   - Email
-   - Phone number (GCash number)
-6. Complete payment with test credentials (OTP: 123456)
-7. Go to **Admin Dashboard** tab
-8. Click **Verify** on the pending transaction
-9. Customer info (👤 name, 📧 email, 📱 phone) should appear in the transaction details
-
----
-
-## Notes
-- Webhook rawBody fallback added for Vercel serverless
-- Direct PayMongo verification endpoint added
-- Admin dashboard with all transactions view
-- Verify payment button for pending GCash transactions
-- Customer billing info captured from PayMongo checkout sessions
-- Customer info stored in pos_payments table (customer_name, customer_email, customer_phone)
+### Key Features Implemented:
+- ✅ 2-panel layout (Left: Cart/Checkout, Right: Categories + Products)
+- ✅ Vertical category buttons on left side of right panel
+- ✅ Product filtering by category
+- ✅ Responsive design for mobile devices
+- ✅ Active state highlighting for selected category
+- ✅ Grid-based product display with hover effects

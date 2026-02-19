@@ -5,8 +5,10 @@
   "description": "Sample POS with Cash and GCash payment flow (gateway style)",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --env-file=.env.development --watch src/server.js",
+    "start": "node --env-file=.env.production src/server.js",
+    "start:dev": "node --env-file=.env.development src/server.js",
+    "start:prod": "node --env-file=.env.production src/server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

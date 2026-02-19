@@ -28,10 +28,21 @@ const providerName = (process.env.PAYMENT_PROVIDER || 'paymongo').toLowerCase();
 app.use(cors());
 app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.get('/assets/confetti', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'Confetti.json'));
+});
+app.get('/assets/yummy', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'Yummy emoji.json'));
+});
 
 const provider = providerName === 'paymongo'
   ? new PaymongoProvider({ baseUrl })
   : new MockProvider({ baseUrl });
+
+function isEWalletMethod(method) {
+  const m = String(method || '').toLowerCase();
+  return m === 'gcash' || m === 'paymaya';
+}
 
 function buildSalesRange(query) {
   const now = new Date();
@@ -128,6 +139,7 @@ function extractPaymongoWebhookPayload(body) {
     return {
       provider: 'paymongo',
       reference: metadata.local_reference || metadata.reference || null,
+      method: metadata.payment_method || null,
       providerReference: eventData?.id || null,
       status: 'PAID',
       amountPaid: null
@@ -138,6 +150,7 @@ function extractPaymongoWebhookPayload(body) {
     return {
       provider: 'paymongo',
       reference: metadata.local_reference || metadata.reference || null,
+      method: metadata.payment_method || null,
       providerReference: eventData?.id || null,
       status: 'PAID',
       amountPaid: Number(eventData?.attributes?.amount || 0) / 100
@@ -151,6 +164,7 @@ async function processPaymentWebhook(payload) {
   const {
     reference,
     status,
+    method,
     provider: webhookProvider,
     providerReference,
     amountPaid
@@ -171,10 +185,10 @@ async function processPaymentWebhook(payload) {
   }
 
   const invoice = await setInvoicePaid(session.invoiceId, {
-    method: 'gcash',
+    method: method || session.method || 'gcash',
     provider: webhookProvider || session.provider,
     providerReference: providerReference || reference,
-    recipientGcashNumber: session?.merchant?.gcashNumber || '',
+    recipientGcashNumber: (method || session.method || 'gcash') === 'gcash' ? (session?.merchant?.gcashNumber || '') : '',
     paidAt: new Date().toISOString(),
     amountPaid: Number(amountPaid || session.amount),
     change: 0,
@@ -208,11 +222,15 @@ app.get('/api/products', (_req, res) => {
 
 app.post('/api/invoices', async (req, res) => {
   try {
-    const { items, paymentMethod } = req.body;
-    if (!['cash', 'gcash'].includes((paymentMethod || '').toLowerCase())) {
-      return res.status(400).json({ error: 'paymentMethod must be cash or gcash' });
+    const { items, paymentMethod, discountAmount } = req.body;
+    if (!['cash', 'gcash', 'paymaya'].includes((paymentMethod || '').toLowerCase())) {
+      return res.status(400).json({ error: 'paymentMethod must be cash, gcash, or paymaya' });
     }
-    const invoice = await createInvoice({ items: items || [], paymentMethod: paymentMethod.toLowerCase() });
+    const invoice = await createInvoice({
+      items: items || [],
+      paymentMethod: paymentMethod.toLowerCase(),
+      discountAmount: Number(discountAmount || 0)
+    });
     return res.status(201).json({ invoice });
   } catch (error) {
     return res.status(400).json({ error: error.message });
@@ -286,7 +304,7 @@ app.post('/api/payments/cash', async (req, res) => {
   }
 });
 
-app.post('/api/payments/gcash/checkout', async (req, res) => {
+async function createEwalletCheckoutHandler(req, res) {
   try {
     const { invoiceId, customerInfo } = req.body;
     const invoice = await getInvoice(invoiceId);
@@ -295,8 +313,8 @@ app.post('/api/payments/gcash/checkout', async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    if (invoice.paymentMethod !== 'gcash') {
-      return res.status(400).json({ error: 'Invoice payment method is not gcash' });
+    if (!isEWalletMethod(invoice.paymentMethod)) {
+      return res.status(400).json({ error: 'Invoice payment method is not an e-wallet (gcash/paymaya)' });
     }
 
     if (invoice.status === 'PAID') {
@@ -304,14 +322,21 @@ app.post('/api/payments/gcash/checkout', async (req, res) => {
     }
 
     // Pass customer info to provider for pre-filling PayMongo checkout
-    const session = await provider.createGcashCheckout({ invoice, customerInfo: customerInfo || {} });
+    const session = await provider.createEwalletCheckout({
+      invoice,
+      paymentMethod: invoice.paymentMethod,
+      customerInfo: customerInfo || {}
+    });
     await saveGcashSession({ ...session, invoiceId: invoice.id, status: 'PENDING' });
 
     return res.status(201).json({ checkout: session });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
-});
+}
+
+app.post('/api/payments/ewallet/checkout', createEwalletCheckoutHandler);
+app.post('/api/payments/gcash/checkout', createEwalletCheckoutHandler);
 
 app.get('/api/payments/gcash/session/:reference', async (req, res) => {
   try {
@@ -394,7 +419,7 @@ app.get('/api/admin/transactions', async (req, res) => {
 });
 
 // ── Verify GCash payment status directly with PayMongo ──
-app.post('/api/payments/gcash/verify/:invoiceId', async (req, res) => {
+async function verifyEwalletPaymentHandler(req, res) {
   try {
     const { invoiceId } = req.params;
     const invoice = await getInvoice(invoiceId);
@@ -407,8 +432,8 @@ app.post('/api/payments/gcash/verify/:invoiceId', async (req, res) => {
       return res.json({ invoice, alreadyPaid: true, message: 'Invoice is already paid' });
     }
 
-    if (invoice.paymentMethod !== 'gcash') {
-      return res.status(400).json({ error: 'Invoice payment method is not gcash' });
+    if (!isEWalletMethod(invoice.paymentMethod)) {
+      return res.status(400).json({ error: 'Invoice payment method is not an e-wallet (gcash/paymaya)' });
     }
 
     // Find the GCash session for this invoice
@@ -455,10 +480,10 @@ app.post('/api/payments/gcash/verify/:invoiceId', async (req, res) => {
       const paymentDetails = statusResult.paymentDetails || {};
       const customerInfo = statusResult.customerInfo || {};
       const paidInvoice = await setInvoicePaid(invoiceId, {
-        method: 'gcash',
+        method: invoice.paymentMethod,
         provider: 'paymongo',
         providerReference: paymentDetails.paymentId || paymongoSessionId,
-        recipientGcashNumber: customerInfo.phone || '',
+        recipientGcashNumber: invoice.paymentMethod === 'gcash' ? (customerInfo.phone || '') : '',
         paidAt: paymentDetails.paidAt || new Date().toISOString(),
         amountPaid: paymentDetails.amount || invoice.total,
         change: 0,
@@ -489,7 +514,10 @@ app.post('/api/payments/gcash/verify/:invoiceId', async (req, res) => {
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
-});
+}
+
+app.post('/api/payments/ewallet/verify/:invoiceId', verifyEwalletPaymentHandler);
+app.post('/api/payments/gcash/verify/:invoiceId', verifyEwalletPaymentHandler);
 
 app.get('/checkout/:reference', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'checkout.html'));

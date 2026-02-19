@@ -2,12 +2,51 @@
 const { getSupabase, isSupabaseEnabled } = require('./supabaseClient');
 
 const PRODUCTS = [
-  { id: 'p0', name: 'Candy', price: 5 },
-  { id: 'p00', name: 'Water Cup', price: 10 },
-  { id: 'p1', name: 'Milk Tea', price: 120 },
-  { id: 'p2', name: 'Burger', price: 180 },
-  { id: 'p3', name: 'Fries', price: 90 },
-  { id: 'p4', name: 'Iced Coffee', price: 140 }
+  // Main Dish
+  { id: 'p1', name: 'Succulent Roast Beef', price: 249, category: 'main-dish', image: '/Main Dish/Succulent Roast Beef Slides with rice and beef sauce.png' },
+  { id: 'p2', name: 'Roasted Beef w Java Rice', price: 229, category: 'main-dish', image: '/Main Dish/roasted beef w java rice.png' },
+  { id: 'p3', name: 'Party Tray', price: 799, category: 'main-dish', image: '/Main Dish/Party Tray.png' },
+  { id: 'p4', name: 'Letchon Baka', price: 269, category: 'main-dish', image: '/Main Dish/Letchon Baka.png' },
+  { id: 'p5', name: 'Crispy Letchon Kawali', price: 219, category: 'main-dish', image: '/Main Dish/Crispy Letchon Kawali.png' },
+  { id: 'p6', name: 'Beef Steak with Hot Sauce', price: 239, category: 'main-dish', image: '/Main Dish/beef steak with hot sauce.png' },
+  { id: 'p7', name: 'Beef Caldereta', price: 229, category: 'main-dish', image: '/Main Dish/Beef Caldereta.png' },
+
+  // Rice
+  { id: 'p20', name: 'Delicious Fried Rice', price: 79, category: 'rice', image: '/Rice/Delicious fried rice.png' },
+  { id: 'p21', name: 'Unli Rice', price: 59, category: 'rice', image: '/Rice/Unli Rice.png' },
+  { id: 'p22', name: 'Brown Rice Bowl', price: 69, category: 'rice', image: '/Rice/Steaming bowl of brown rice.png' },
+  { id: 'p23', name: 'Fluffy Rice Bowl', price: 65, category: 'rice', image: '/Rice/Steaming bowl of fluffy rice.png' },
+
+  // Burger
+  { id: 'p30', name: 'Spicy Jalapeno Cheeseburger', price: 189, category: 'burger', image: '/Burger/Spicy jalapeño cheeseburger with fries.png' },
+  { id: 'p31', name: 'Gourmet Cheese Burger', price: 179, category: 'burger', image: '/Burger/Gourmet cheese burger.png' },
+  { id: 'p32', name: 'Crispy Chicken Sandwich', price: 169, category: 'burger', image: '/Burger/Crispy chicken sandwich with slaw Burger.png' },
+  { id: 'p33', name: 'BBQ Bacon Cheeseburger', price: 199, category: 'burger', image: '/Burger/BBQ bacon cheeseburger.png' },
+
+  // Drinks
+  { id: 'p40', name: 'Lemon-Lime Soda', price: 59, category: 'drinks', image: '/Drinks/Refreshing lemon-lime soda on wood.png' },
+  { id: 'p41', name: 'Iced Tea Citrus Mint', price: 69, category: 'drinks', image: '/Drinks/Iced tea with citrus and mint.png' },
+  { id: 'p42', name: 'Refreshing Soda Lemon', price: 55, category: 'drinks', image: '/Drinks/Refreshing soda with lemon wedges.png' },
+  { id: 'p43', name: 'Coke Float', price: 79, category: 'drinks', image: '/Drinks/Coke Float.png' },
+  { id: 'p44', name: 'Mango Juice', price: 85, category: 'drinks', image: '/Drinks/Refreshing mango juice with mint garnish.png' },
+  { id: 'p45', name: 'Citrus Iced Drink', price: 75, category: 'drinks', image: '/Drinks/Citrus iced drinks with mint garnish.png' },
+  { id: 'p46', name: 'Strawberry Lemonade', price: 89, category: 'drinks', image: '/Drinks/Refreshing strawberry lemonade.png' },
+
+  // Fries
+  { id: 'p50', name: 'Loaded Bacon Cheese Fries', price: 139, category: 'fries', image: '/Fries/Loaded bacon cheese fries close-up.png' },
+  { id: 'p51', name: 'Crispy Fries', price: 99, category: 'fries', image: '/Fries/Crispy Fries with dipping sauce.png' },
+  { id: 'p52', name: 'Cajun Seasoned Fries', price: 119, category: 'fries', image: '/Fries/Cajun seasoned fries.png' },
+
+  // Dessert
+  { id: 'p60', name: 'Strawberry Cheesecake Slice', price: 109, category: 'dessert', image: '/Dessert/Delicious strawberry cheesecake slice.png' },
+  { id: 'p61', name: 'Leche Flan Slice', price: 89, category: 'dessert', image: '/Dessert/Delicious slice of leche flan.png' },
+  { id: 'p62', name: 'Chocolate Fudge Cake Slice', price: 119, category: 'dessert', image: '/Dessert/Delicious chocolate fudge cake slice.png' },
+
+  // Sauces
+  { id: 'p70', name: 'Spicy Vinegar Sauce', price: 25, category: 'sauces', image: '/Sauces/Spicy Vinegar sauce.png' },
+  { id: 'p71', name: 'Spicy BBQ Sauce', price: 30, category: 'sauces', image: '/Sauces/Spicy BBQ sauce.png' },
+  { id: 'p72', name: 'Gravy Sauce', price: 25, category: 'sauces', image: '/Sauces/Gravy Sauce.png' },
+  { id: 'p73', name: 'Baka Sauce', price: 35, category: 'sauces', image: '/Sauces/Baka Sauce.png' }
 ];
 
 const invoices = new Map();
@@ -38,6 +77,8 @@ function toAppInvoice(dbInvoice, lineItems, payment) {
     updatedAt: dbInvoice.updated_at,
     status: dbInvoice.status,
     paymentMethod: dbInvoice.payment_method,
+    subtotal: Number(dbInvoice.total_amount),
+    discount: 0,
     total: Number(dbInvoice.total_amount),
     lineItems,
     payment
@@ -113,7 +154,7 @@ async function persistInvoice(invoice) {
   }
 }
 
-async function createInvoice({ items, paymentMethod }) {
+async function createInvoice({ items, paymentMethod, discountAmount = 0 }) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Invoice must contain at least one item');
   }
@@ -138,7 +179,12 @@ async function createInvoice({ items, paymentMethod }) {
       };
     });
 
-  const total = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const requestedDiscount = Number(discountAmount || 0);
+  const discount = Number.isFinite(requestedDiscount) && requestedDiscount > 0
+    ? Math.min(requestedDiscount, subtotal)
+    : 0;
+  const total = Math.max(0, subtotal - discount);
   const invoice = {
     id: uuidv4(),
     reference: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -146,6 +192,8 @@ async function createInvoice({ items, paymentMethod }) {
     updatedAt: now,
     status: 'PENDING',
     paymentMethod,
+    subtotal,
+    discount,
     total,
     lineItems,
     payment: null
@@ -513,6 +561,8 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
         reference: inv.reference,
         status: inv.status,
         paymentMethod: inv.payment_method,
+        subtotal: Number(inv.total_amount),
+        discount: 0,
         total: Number(inv.total_amount),
         createdAt: inv.created_at,
         updatedAt: inv.updated_at,
@@ -557,6 +607,8 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
       reference: inv.reference,
       status: inv.status,
       paymentMethod: inv.paymentMethod,
+      subtotal: inv.subtotal ?? inv.total,
+      discount: inv.discount || 0,
       total: inv.total,
       createdAt: inv.createdAt,
       updatedAt: inv.updatedAt,
@@ -608,3 +660,4 @@ module.exports = {
   getSalesReport,
   listAllInvoices
 };
+

@@ -6,9 +6,11 @@ class MockProvider {
     this.baseUrl = baseUrl;
   }
 
-  async createGcashCheckout({ invoice }) {
-    const reference = `GC-${uuidv4()}`;
-    const qrText = `GCASH://PAY?invoice=${invoice.reference}&amount=${invoice.total}&ref=${reference}`;
+  async createEwalletCheckout({ invoice, paymentMethod = 'gcash' }) {
+    const method = String(paymentMethod || 'gcash').toLowerCase() === 'paymaya' ? 'paymaya' : 'gcash';
+    const prefix = method === 'paymaya' ? 'PM' : 'GC';
+    const reference = `${prefix}-${uuidv4()}`;
+    const qrText = `${method.toUpperCase()}://PAY?invoice=${invoice.reference}&amount=${invoice.total}&ref=${reference}`;
     const qrDataUrl = await QRCode.toDataURL(qrText);
 
     return {
@@ -20,8 +22,13 @@ class MockProvider {
       qrDataUrl,
       merchant: {},
       checkoutUrl: `${this.baseUrl}/checkout/${reference}`,
-      status: 'PENDING'
+      status: 'PENDING',
+      method
     };
+  }
+
+  async createGcashCheckout({ invoice }) {
+    return this.createEwalletCheckout({ invoice, paymentMethod: 'gcash' });
   }
 }
 

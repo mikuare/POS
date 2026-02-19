@@ -96,8 +96,11 @@ class PaymongoProvider {
     }
   }
 
-  async createGcashCheckout({ invoice, customerInfo = {} }) {
-    const localReference = `GC-${uuidv4()}`;
+  async createEwalletCheckout({ invoice, paymentMethod = 'gcash', customerInfo = {} }) {
+    const selectedMethod = String(paymentMethod || 'gcash').toLowerCase() === 'paymaya'
+      ? 'paymaya'
+      : 'gcash';
+    const localReference = `${selectedMethod === 'paymaya' ? 'PM' : 'GC'}-${uuidv4()}`;
     const amountInCentavos = Math.round(Number(invoice.total) * 100);
 
     // Use provided customer info or defaults
@@ -132,12 +135,13 @@ class PaymongoProvider {
             amount: Math.round(Number(item.price) * 100),
             currency: 'PHP'
           })),
-          payment_method_types: ['gcash'],
+          payment_method_types: [selectedMethod],
           description: `Invoice ${invoice.reference}`,
           ...(paymongoCustomerId && { customer_id: paymongoCustomerId }),
           metadata: {
             invoice_id: invoice.id,
             invoice_reference: invoice.reference,
+            payment_method: selectedMethod,
             local_reference: localReference,
             ...(paymongoCustomerId && { paymongo_customer_id: paymongoCustomerId })
           },
@@ -180,8 +184,13 @@ class PaymongoProvider {
       merchant: {},
       checkoutUrl,
       status: 'PENDING',
+      method: selectedMethod,
       paymongoCheckoutSessionId: sessionData.id
     };
+  }
+
+  async createGcashCheckout({ invoice, customerInfo = {} }) {
+    return this.createEwalletCheckout({ invoice, paymentMethod: 'gcash', customerInfo });
   }
 
   /**
@@ -232,7 +241,7 @@ class PaymongoProvider {
         paidAt: payAttrs.paid_at
           ? new Date(payAttrs.paid_at * 1000).toISOString()
           : new Date().toISOString(),
-        source: payAttrs.source?.type || 'gcash'
+        source: payAttrs.source?.type || metadata.payment_method || 'gcash'
       };
 
       // Extract customer billing information

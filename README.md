@@ -5,6 +5,7 @@ A runnable sample POS that supports:
 - `GCash` flow via gateway-style checkout session (mock provider included)
 - Webhook/callback style invoice status update to `PAID`
 - Optional Supabase cloud persistence for sales/transactions
+- **Separate Development and Production Environments**
 
 ## Why this architecture
 Direct GCash API access is generally restricted. Typical POS systems integrate through a payment gateway (PayMongo, Xendit, etc.):
@@ -13,7 +14,7 @@ Direct GCash API access is generally restricted. Typical POS systems integrate t
 3. Receive webhook/callback
 4. Mark invoice paid and print receipt
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Install dependencies
 ```bash
@@ -21,207 +22,256 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
+
+**For Development (Local Staging):**
 ```bash
-copy .env.example .env
+# Copy the example file
+copy .env.example .env.development
+
+# Edit .env.development with your TEST credentials
+# See ENVIRONMENT_SETUP_GUIDE.md for detailed instructions
 ```
 
-Then edit `.env` and configure based on your needs (see configuration sections below).
+**For Production:**
+```bash
+# Copy the example file
+copy .env.example .env.production
 
-### 3. Start the Server
+# Edit .env.production with your LIVE credentials
+# Configure Vercel environment variables (see guide)
+```
+
+### 3. Start the Development Server
 ```bash
 npm run dev
 ```
+
+Server will run on: `http://localhost:4000`
 
 ### 4. Open POS UI
 Navigate to: `http://localhost:4000`
 
-## Configuration
+## 📚 Complete Setup Guide
 
-### PayMongo Setup (for Real GCash Payments)
+For detailed setup instructions including:
+- PayMongo TEST and LIVE keys configuration
+- Webhook setup for local and production
+- Supabase project setup (dev and prod)
+- Vercel deployment configuration
 
-To use PayMongo for GCash payments in **TEST MODE**:
+**👉 See [ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md)**
 
-#### Step 1: Get Your PayMongo Test API Keys
-
-1. **Sign up/Login** to PayMongo Dashboard:
-   - Go to: https://dashboard.paymongo.com/
-   - Create an account or login
-
-2. **Navigate to API Keys**:
-   - Go to: https://dashboard.paymongo.com/developers/api-keys
-   - Switch to **TEST MODE** (toggle in the top-right corner)
-
-3. **Copy Your Test Secret Key**:
-   - Look for the **Secret Key** (starts with `sk_test_`)
-   - Click "Reveal" and copy the full key
-   - **IMPORTANT**: Use TEST keys (sk_test_) for development, NOT live keys (sk_live_)
-
-#### Step 2: Set Up Webhook (Required for Payment Confirmation)
-
-1. **Create a Webhook**:
-   - Go to: https://dashboard.paymongo.com/developers/webhooks
-   - Click "Add Webhook"
-   - **Webhook URL**: `https://your-domain.com/api/webhooks/payments`
-     - For local testing, use a tunnel service like ngrok:
-       ```bash
-       ngrok http 4000
-       ```
-     - Then use: `https://your-ngrok-url.ngrok.io/api/webhooks/payments`
-
-2. **Select Events**:
-   - Check: `checkout_session.payment.paid`
-   - Check: `payment.paid`
-
-3. **Copy Webhook Secret**:
-   - After creating, copy the **Webhook Signing Secret** (starts with `whsec_`)
-
-#### Step 3: Configure .env File
-
-Open your `.env` file and add:
-
-```env
-# Payment Provider
-PAYMENT_PROVIDER=paymongo
-
-# PayMongo Test Keys
-PAYMONGO_SECRET_KEY=sk_test_your_secret_key_here
-PAYMONGO_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-
-# Optional: Customize URLs
-PAYMONGO_SUCCESS_URL=http://localhost:4000/
-PAYMONGO_CANCEL_URL=http://localhost:4000/
-```
-
-#### Step 4: Restart Server
+## 💻 Available Scripts
 
 ```bash
-npm run dev
+# Development (uses .env.development)
+npm run dev              # Start with hot reload on localhost
+
+# Production
+npm run start:prod       # Start with production config locally
+npm run start            # Start production server (used by Vercel)
 ```
 
-#### Step 5: Test GCash Payment
+## 🌍 Environments
 
-1. Open POS: `http://localhost:4000`
-2. Add products to cart
-3. Select **GCash** as payment method
-4. Click **Checkout**
-5. A PayMongo checkout page will open
-6. Use PayMongo's test GCash credentials:
-   - **Test GCash Number**: Any 11-digit number (e.g., 09123456789)
-   - **OTP**: `123456` (test mode always accepts this)
-7. Complete payment
-8. POS will automatically update to PAID status via webhook
+### Development (Staging)
+- **URL**: `http://localhost:4000`
+- **Config**: `.env.development`
+- **PayMongo**: TEST keys (`sk_test_*`)
+- **Supabase**: Development project (recommended)
+- **Webhook**: ngrok tunnel for local testing
 
-### Mock Provider (for Testing Without PayMongo)
+### Production
+- **URL**: `https://www.judech.online`
+- **Config**: Vercel environment variables
+- **PayMongo**: LIVE keys (`sk_live_*`)
+- **Supabase**: Production project
+- **Webhook**: Production domain
 
-If you want to test without setting up PayMongo:
+## ⚙️ Configuration
 
-1. In `.env`, set:
-   ```env
-   PAYMENT_PROVIDER=mock
-   ```
+### Environment Files
 
-2. Restart server
+- **`.env.development`**: Local development with TEST keys
+- **`.env.production`**: Production with LIVE keys
+- **`.env.example`**: Template file (safe to commit)
 
-3. When checking out with GCash:
-   - A mock checkout page will open
-   - Click "Simulate Successful Payment"
-   - Invoice will be marked as PAID immediately
+### PayMongo Setup
 
-## Supabase setup (store transactions + sales)
-1. Open Supabase SQL Editor and run `supabase/schema.sql`.
-2. In `.env`, set:
-   - `SUPABASE_URL=https://<project-id>.supabase.co`
-   - `SUPABASE_SERVICE_ROLE_KEY=<from Supabase Project Settings > API>`
-3. Restart server.
-4. Verify with `GET /health` that `supabaseEnabled=true`.
+**Development (TEST Mode):**
+1. Get TEST keys from PayMongo dashboard (TEST mode)
+2. Set up ngrok for local webhook testing
+3. Configure `.env.development`
 
-## Test payment methods
-### Cash
-1. Add items
-2. Choose `Cash`
+**Production (LIVE Mode):**
+1. Get LIVE keys from PayMongo dashboard (LIVE mode)
+2. Set up production webhook
+3. Configure Vercel environment variables
+
+**👉 See [ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md) for step-by-step instructions**
+
+### Supabase Setup
+
+**Recommended: Separate Projects**
+- Development project for testing
+- Production project for live data
+
+**Quick Start: Same Project**
+- Use same Supabase project for both
+- ⚠️ Dev and prod data will be mixed
+
+**👉 See [ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md) for detailed setup**
+
+## 🧪 Testing Payment Methods
+
+### Cash Payment
+1. Add items to cart
+2. Choose `Cash` payment method
 3. Enter tendered amount
 4. Invoice is marked `PAID` and persisted
 
-### GCash (mock)
-1. Add items
-2. Choose `GCash`
-3. Click `Checkout`
-4. POS displays QR + opens checkout page
-5. In checkout page, click `Simulate Successful Payment`
-6. POS auto-refreshes and marks invoice `PAID` and persists
+### GCash Payment (Development)
+1. Add items to cart
+2. Choose `GCash` payment method
+3. Enter customer info (optional)
+4. Click `Checkout`
+5. PayMongo checkout page opens
+6. Use TEST credentials:
+   - GCash Number: Any 11-digit number
+   - OTP: `123456`
+7. Complete payment
+8. POS auto-updates to `PAID` via webhook
 
-## Troubleshooting
+### GCash Payment (Production)
+1. Same flow as development
+2. Uses real GCash account
+3. Real money transaction
+4. Webhook confirms payment
 
-### Error: "PAYMONGO_SECRET_KEY is not configured"
+## 🐛 Troubleshooting
 
-**Cause**: The PayMongo secret key is missing or empty in your `.env` file.
+### "npm run dev" shows production URL
 
-**Solution**:
-1. Make sure you've copied `.env.example` to `.env`
-2. Add your PayMongo test secret key to `.env`:
-   ```env
-   PAYMONGO_SECRET_KEY=sk_test_your_actual_key_here
-   ```
-3. Restart the server: `npm run dev`
+**Solution**: 
+- Verify `.env.development` exists and has `APP_BASE_URL=http://localhost:4000`
+- Restart server
 
-### Error: "PAYMONGO_WEBHOOK_SECRET is not configured"
-
-**Cause**: Webhook secret is missing when PayMongo tries to verify webhook signatures.
-
-**Solution**:
-1. Create a webhook in PayMongo dashboard
-2. Copy the webhook signing secret
-3. Add to `.env`:
-   ```env
-   PAYMONGO_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-   ```
-4. Restart the server
-
-### Webhook Not Receiving Events (Local Development)
-
-**Cause**: PayMongo cannot reach `localhost` directly.
+### Webhook not working locally
 
 **Solution**:
-1. Use ngrok or similar tunnel:
+- Start ngrok: `ngrok http 4000`
+- Update webhook URL in PayMongo dashboard
+- Verify webhook secret in `.env.development`
+
+### Changes not reflecting in production
+
+**Solution**:
+- Verify git push succeeded
+- Check Vercel deployment logs
+- Verify environment variables in Vercel
+- Clear browser cache
+
+**👉 See [ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md) for more troubleshooting**
+
+## 🔄 Development Workflow
+
+1. **Develop Locally**:
    ```bash
-   ngrok http 4000
+   npm run dev
    ```
-2. Update webhook URL in PayMongo dashboard to ngrok URL
-3. Restart server if needed
+   - Test with TEST PayMongo keys
+   - Use development Supabase
+   - Verify all features work
 
-### Payment Stuck on "Waiting for payment webhook"
+2. **Push to Production**:
+   ```bash
+   git add .
+   git commit -m "Your changes"
+   git push origin main
+   ```
+   - Vercel auto-deploys
+   - Uses LIVE PayMongo keys
+   - Uses production Supabase
 
-**Possible Causes**:
-- Webhook URL is incorrect
-- Webhook secret is wrong
-- Webhook events not selected in PayMongo dashboard
-- Firewall blocking webhook requests
+3. **Verify Production**:
+   - Visit: https://www.judech.online
+   - Test functionality
+   - Monitor for issues
 
-**Solution**:
-1. Check webhook configuration in PayMongo dashboard
-2. Verify webhook URL is accessible
-3. Check server logs for webhook errors
-4. Ensure `checkout_session.payment.paid` event is enabled
+## 🔒 Security Best Practices
 
-## Real Gateway Integration Notes (PayMongo)
+- ✅ Separate TEST and LIVE keys
+- ✅ Separate dev and prod Supabase projects
+- ✅ Never commit `.env` files to git
+- ✅ Use Vercel environment variables for production
+- ✅ Rotate keys if exposed
+- ✅ Monitor PayMongo dashboard regularly
 
-✅ **Current Implementation**:
-- Follows PayMongo's recommended checkout session flow
-- Implements webhook signature verification
-- Handles both `checkout_session.payment.paid` and `payment.paid` events
-- Uses test mode for development
+## 📋 API Endpoints
 
-⚠️ **Before Going Live**:
-- Switch to LIVE API keys (sk_live_) in production
-- Update webhook URL to production domain
-- Never expose secret keys in client-side code
-- Implement proper error handling and logging
+### Health Check
+```
+GET /health
+```
+
+### Products
+```
+GET /api/products
+```
+
+### Invoices
+```
+POST /api/invoices
+GET /api/invoices/:invoiceId
+```
+
+### Payments
+```
+POST /api/payments/cash
+POST /api/payments/gcash/checkout
+POST /api/payments/gcash/verify/:invoiceId
+GET /api/payments/gcash/session/:reference
+```
+
+### Webhooks
+```
+POST /api/webhooks/payments
+```
+
+### Reports
+```
+GET /api/reports/sales
+GET /api/admin/transactions
+```
+
+## 🚀 Production Deployment
+
+### Vercel Setup
+1. Connect GitHub repository to Vercel
+2. Configure environment variables (see guide)
+3. Deploy automatically on push to main
+
+### Environment Variables (Vercel)
+Add all variables from `.env.production` to Vercel dashboard:
+- `PORT`, `APP_BASE_URL`, `PAYMENT_PROVIDER`
+- `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- Success/Cancel URLs
+
+## 📚 Additional Resources
+
+- **[ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md)**: Complete setup instructions
+- **[TODO.md](TODO.md)**: Setup checklist
+- **[PAYMONGO_SETUP_GUIDE.md](PAYMONGO_SETUP_GUIDE.md)**: PayMongo-specific guide
+
+## ⚠️ Important Production Upgrades
+
+Before going live, consider:
+- Add authentication/authorization (cashier/admin roles)
+- Implement inventory management
+- Add official receipt numbering
+- Implement tax calculations
 - Add idempotent webhook handling
-- Test thoroughly with real GCash accounts
-
-## Important production upgrades
-- Add auth/roles for cashier/admin
-- Add inventory decrement + audit logs
-- Add official receipt numbering and tax logic
-- Add idempotent webhook handling + signature verification
-- Add retries for gateway/webhook failures
+- Implement retry logic for failures
+- Add comprehensive logging and monitoring
+- Set up backup and disaster recovery

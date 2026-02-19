@@ -1,14 +1,17 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>POS System - Cash / GCash</title>
+    <title>Ruel's Letchon Baka</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/Business%20Logo/Ruels%20Logo%20for%20business.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/Business%20Logo/Ruels%20Logo%20for%20business.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/Business%20Logo/Ruels%20Logo%20for%20business.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="app">
-      <h1>POS System (Cash + GCash)</h1>
+      <h1>POS System (Cash + GCash + PayMaya)</h1>
 
       <!-- Tab Navigation -->
       <div class="tabs">
@@ -18,57 +21,193 @@
 
       <!-- POS Terminal Tab -->
       <div id="tab-pos" class="tab-content active">
-        <div class="grid">
-          <section class="card">
-            <h2>Products</h2>
-            <div id="products"></div>
-          </section>
+        <div class="pos-layout">
+          <!-- Left Panel: Cart & Checkout -->
+          <div class="left-panel">
+            <section class="card">
+              <div class="order-brand">
+                <div class="order-brand-logo-wrap">
+                  <img class="order-brand-logo" src="/Business Logo/Ruels Logo for business.png" alt="Business Logo" />
 
-          <section class="card">
-            <h2>Cart / Checkout</h2>
-            <div id="cart"></div>
-            <div class="total" id="total">Total: PHP 0.00</div>
 
-            <div class="row">
-              <label for="paymentMethod">Payment:</label>
-              <select id="paymentMethod">
-                <option value="cash">Cash</option>
-                <option value="gcash">GCash</option>
-              </select>
-            </div>
-
-            <div class="row" id="cashRow">
-              <label for="amountTendered">Amount Tendered:</label>
-              <input id="amountTendered" type="number" min="0" placeholder="0" />
-            </div>
-
-            <!-- Customer Info (shown for GCash) -->
-            <div id="customerInfoRow" class="customer-info-section" style="display:none;">
-              <div class="customer-info-label">Customer Information (pre-fills PayMongo checkout)</div>
-              <div class="row">
-                <label for="customerName">Name:</label>
-                <input id="customerName" type="text" placeholder="e.g. Juan Dela Cruz" />
+                </div>
+                <div class="order-brand-text">
+                  <div class="order-title-row">
+                    <h2>Your Order</h2>
+                    <div id="yummyOrderEmoji" class="yummy-emoji"></div>
+                  </div>
+                  <p>Review your order and complete payment Thankyou!</p>
+                </div>
               </div>
-              <div class="row">
-                <label for="customerEmail">Email:</label>
-                <input id="customerEmail" type="email" placeholder="e.g. juan@email.com" />
+              <div id="cart"></div>
+              <div id="addToCartConfetti" class="add-to-cart-confetti"></div>
+              <div class="order-totals" id="orderTotals">
+                <div class="total-row">
+                  <span>Subtotal</span>
+                  <strong id="subtotalValue">PHP 0.00</strong>
+                </div>
+                <div class="total-row discount-row">
+                  <label for="discountInput">Discount</label>
+                  <input id="discountInput" type="number" min="0" step="0.01" value="0" />
+                </div>
+                <div class="total-row total-due-row">
+                  <span>Total Due</span>
+                  <strong id="totalDueValue">PHP 0.00</strong>
+                </div>
               </div>
-              <div class="row">
-                <label for="customerPhone">Phone/GCash #:</label>
-                <input id="customerPhone" type="tel" placeholder="e.g. 09123456789" />
+
+              <div class="row hidden-control">
+                <label for="paymentMethod">Payment:</label>
+                <select id="paymentMethod">
+                  <option value="cash">Cash</option>
+                  <option value="gcash">GCash</option>
+                  <option value="paymaya">PayMaya</option>
+                </select>
               </div>
+
+              <div class="row" id="cashRow" style="display:none;">
+                <label for="amountTendered">Amount Tendered:</label>
+                <input id="amountTendered" type="number" min="0" placeholder="Enter cash amount" />
+                <button id="cashPayBtn">Pay</button>
+              </div>
+
+              <div id="gcashInfo"></div>
+              <div id="status" class="status">Ready.</div>
+
+              <div class="order-footer">
+                <div class="order-footer-title">Order Checkout</div>
+                <div class="order-type-buttons">
+                  <button id="dineInCheckoutBtn">
+                    <img class="checkout-btn-icon" src="/Other/Dine in.png" alt="Dine In" />
+                    <span>Dine In Check Out</span>
+                  </button>
+                  <button id="takeOutCheckoutBtn">
+                    <img class="checkout-btn-icon" src="/Other/Take out.png" alt="Take Out" />
+                    <span>Take Out Check Out</span>
+                  </button>
+                </div>
+                <div class="order-footer-title">Payment Method</div>
+                <div class="payment-type-buttons">
+                  <button id="cashPaymentBtn" class="secondary">
+                    <img class="checkout-btn-icon" src="/Other/Cash.png" alt="Cash" />
+                    <span>Cash</span>
+                  </button>
+                  <button id="ePaymentBtn" class="secondary">
+                    <img class="checkout-btn-icon" src="/Other/E-Payment.png" alt="E-Payment" />
+                    <span>E - Payment</span>
+                  </button>
+                </div>
+                <div class="row">
+                  <button id="clearBtn" class="secondary">Clear</button>
+                </div>
+              </div>
+
+              <div id="paymentSuccessModal" class="payment-success-modal" aria-hidden="true">
+                <div class="payment-success-card">
+                  <div id="receiptPrintArea" class="receipt-print-area">
+                    <div class="receipt-header">
+                      <img class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+                      <h3>Ruel's Roast Beef</h3>
+                      <p>Location : Tres Martires, City of Baybay, 6521 Leyte</p>
+                      <p>Vat Registered TIN 342-231-312-00000</p>
+                    </div>
+                    <div class="receipt-meta">
+                      <div><span>Receipt No:</span> <strong id="receiptRef">-</strong></div>
+                      <div><span>Date:</span> <strong id="receiptDate">-</strong></div>
+                      <div><span>Order Type:</span> <strong id="receiptOrderType">-</strong></div>
+                      <div><span>Payment:</span> <strong id="receiptPaymentMethod">-</strong></div>
+                    </div>
+                    <div id="receiptItems" class="receipt-items"></div>
+                    <div class="receipt-totals">
+                      <div><span>Subtotal</span><strong id="receiptSubtotal">PHP 0.00</strong></div>
+                      <div><span>Discount</span><strong id="receiptDiscount">PHP 0.00</strong></div>
+                      <div class="total-due"><span>Total Due</span><strong id="receiptTotalDue">PHP 0.00</strong></div>
+                      <div><span>Amount Paid</span><strong id="receiptAmountPaid">PHP 0.00</strong></div>
+                      <div><span>Change</span><strong id="receiptChange">PHP 0.00</strong></div>
+                    </div>
+                    <p class="receipt-footer">Thank you for dining with us!</p>
+                  </div>
+                  <div class="receipt-actions">
+                    <button id="receiptPrintBtn">Print Receipt</button>
+                    <button id="paymentSuccessDoneBtn" class="secondary">Cancel</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="eWalletModal" class="e-wallet-modal" aria-hidden="true">
+                <div class="e-wallet-card">
+                  <h3>Choose E-Payment</h3>
+                  <p>Select your payment channel.</p>
+                  <div class="e-wallet-options">
+                    <button id="chooseGcashBtn" class="secondary e-wallet-option-btn">
+                      <img src="/Other/GCash.png" alt="GCash" />
+                      <span>GCash</span>
+                    </button>
+                    <button id="choosePaymayaBtn" class="secondary e-wallet-option-btn">
+                      <img src="/Other/Maya.png" alt="PayMaya" />
+                      <span>PayMaya</span>
+                    </button>
+                  </div>
+                  <button id="cancelEwalletBtn" class="secondary">Cancel</button>
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- Right Panel: Categories & Products -->
+          <div class="right-panel">
+            <div class="category-sidebar">
+              <h3>Menu</h3>
+              <button class="category-btn active" data-category="main-dish">
+                <img class="category-icon" src="/Menu/Main Dish.png" alt="Main Dish" />
+                <span class="category-label">Main Dish</span>
+              </button>
+              <button class="category-btn" data-category="rice">
+                <img class="category-icon" src="/Menu/Rice.png" alt="Rice" />
+                <span class="category-label">Rice</span>
+              </button>
+              <button class="category-btn" data-category="burger">
+                <img class="category-icon" src="/Menu/Burger.png" alt="Burger" />
+                <span class="category-label">Burger</span>
+              </button>
+              <button class="category-btn" data-category="drinks">
+                <img class="category-icon" src="/Menu/Drinks.png" alt="Drinks" />
+                <span class="category-label">Drinks</span>
+              </button>
+              <button class="category-btn" data-category="fries">
+                <img class="category-icon" src="/Menu/Fries.png" alt="Fries" />
+                <span class="category-label">Fries</span>
+              </button>
+              <button class="category-btn" data-category="dessert">
+                <img class="category-icon" src="/Menu/Dessert.png" alt="Dessert" />
+                <span class="category-label">Dessert</span>
+              </button>
+              <button class="category-btn" data-category="sauces">
+                <img class="category-icon" src="/Menu/Sauce.png" alt="Sauces" />
+                <span class="category-label">Sauces</span>
+              </button>
             </div>
 
-            <div class="row">
-              <button id="checkoutBtn">Checkout</button>
-              <button id="clearBtn" class="secondary">Clear</button>
+            <div class="products-area">
+              <section class="card">
+                <h2 id="categoryTitle">Main Dish</h2>
+                <div id="products" class="products-grid"></div>
+              </section>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div id="gcashInfo"></div>
-            <div id="status" class="status">Ready.</div>
-          </section>
-
-          <section class="card">
+      <!-- Admin / Transactions Overlay -->
+      <div id="tab-admin" class="tab-content admin-overlay">
+        <div class="admin-shell">
+          <div class="admin-shell-header">
+            <h2>Admin Dashboard</h2>
+            <button id="adminCloseBtn" class="secondary">Close</button>
+          </div>
+          <div class="admin-grid">
+          <section class="card full-width">
             <h2>Sales Summary</h2>
             <div class="row">
               <button id="salesDailyBtn" class="secondary">Today</button>
@@ -78,12 +217,7 @@
             <div id="salesSummary" class="status">Loading sales report...</div>
             <div id="salesList" class="sales-list"></div>
           </section>
-        </div>
-      </div>
 
-      <!-- Admin / Transactions Tab -->
-      <div id="tab-admin" class="tab-content">
-        <div class="admin-grid">
           <!-- Transaction Filters -->
           <section class="card full-width">
             <h2>All Transactions</h2>
@@ -130,7 +264,7 @@
                 <span class="stat-value" id="statCash">PHP 0.00</span>
               </div>
               <div class="stat-item">
-                <span class="stat-label">GCash Sales</span>
+                <span class="stat-label">E-Wallet Sales</span>
                 <span class="stat-value" id="statGcash">PHP 0.00</span>
               </div>
             </div>
@@ -143,10 +277,66 @@
               <p>Loading transactions...</p>
             </div>
           </section>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminReceiptModal" class="admin-receipt-backdrop" aria-hidden="true">
+        <div class="admin-receipt-card">
+          <div id="adminReceiptPrintArea" class="receipt-print-area">
+            <div class="receipt-header">
+              <img class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+              <h3>Ruel's Roast Beef</h3>
+              <p>Location : Tres Martires, City of Baybay, 6521 Leyte</p>
+              <p>Vat Registered TIN 342-231-312-00000</p>
+            </div>
+            <div class="receipt-meta">
+              <div><span>Receipt No:</span> <strong id="adminReceiptRef">-</strong></div>
+              <div><span>Date:</span> <strong id="adminReceiptDate">-</strong></div>
+              <div><span>Order Type:</span> <strong id="adminReceiptOrderType">-</strong></div>
+              <div><span>Payment:</span> <strong id="adminReceiptPaymentMethod">-</strong></div>
+            </div>
+            <div id="adminReceiptItems" class="receipt-items"></div>
+            <div class="receipt-totals">
+              <div><span>Subtotal</span><strong id="adminReceiptSubtotal">PHP 0.00</strong></div>
+              <div><span>Discount</span><strong id="adminReceiptDiscount">PHP 0.00</strong></div>
+              <div class="total-due"><span>Total Due</span><strong id="adminReceiptTotalDue">PHP 0.00</strong></div>
+              <div><span>Amount Paid</span><strong id="adminReceiptAmountPaid">PHP 0.00</strong></div>
+              <div><span>Change</span><strong id="adminReceiptChange">PHP 0.00</strong></div>
+            </div>
+            <p class="receipt-footer">Thank you for dining with us!</p>
+          </div>
+          <div class="receipt-actions">
+            <button id="adminReceiptPrintBtn">Print Receipt</button>
+            <button id="adminReceiptCloseBtn" class="secondary">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
 
+    <div id="adminLoginModal" class="admin-login-backdrop" aria-hidden="true">
+      <div class="admin-login-card">
+        <h2>Admin Login</h2>
+        <div class="row">
+          <label for="adminUsername">Username:</label>
+          <input id="adminUsername" type="text" value="admin" autocomplete="username" />
+        </div>
+        <div class="row">
+          <label for="adminPassword">Password:</label>
+          <input id="adminPassword" type="password" value="P@ssw0rd" autocomplete="current-password" />
+        </div>
+        <div id="adminLoginError" class="admin-login-error"></div>
+        <div class="row">
+          <button id="adminLoginBtn">Login</button>
+          <button id="adminCancelBtn" class="secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
+
+
+
