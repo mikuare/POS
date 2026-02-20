@@ -366,10 +366,12 @@ body.admin-open #tab-admin {
   gap: 12px;
   border: 2px solid #d8c1ae;
   border-radius: 12px;
-  padding: 10px;
+  padding: 10px 10px 28px;
   background: #f4e5d7;
   min-height: 0;
   overflow: auto;
+  box-sizing: border-box;
+  scroll-padding-bottom: 28px;
   position: relative;
 }
 
@@ -482,7 +484,10 @@ body.admin-open #tab-admin {
   gap: 12px;
   max-height: none;
   overflow-y: auto;
-  padding: 4px;
+  padding: 4px 4px 28px;
+  box-sizing: border-box;
+  align-content: start;
+  scroll-padding-bottom: 28px;
   flex: 1;
 }
 
@@ -665,9 +670,9 @@ body.admin-login-open .admin-login-backdrop {
 /* -- Product & Cart Rows -- */
 .product-row {
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-rows: 240px minmax(56px, auto) auto;
+  gap: 8px;
   background: #f4ece3;
   border: 1px solid #d8c1ae;
   border-radius: 8px;
@@ -687,11 +692,12 @@ body.admin-login-open .admin-login-backdrop {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 56px;
 }
 
 .product-image {
   width: 100%;
-  height: 240px;
+  height: 100%;
   aspect-ratio: 16 / 10;
   object-fit: contain;
   object-position: center;
@@ -719,9 +725,11 @@ body.admin-login-open .admin-login-backdrop {
 
 .product-row button {
   width: 100%;
-  padding: 7px;
-  font-size: 12px;
-  margin-top: auto;
+  padding: 9px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 2px;
+  border: 1px solid #3d2518;
 }
 
 .cart-row {
