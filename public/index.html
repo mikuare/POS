@@ -9,8 +9,82 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/Business%20Logo/Ruels%20Logo%20for%20business.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="auth-checking">
+    <div id="globalToast" class="global-toast" aria-live="polite" aria-hidden="true">
+      <div id="globalToastTitle" class="global-toast-title"></div>
+      <div id="globalToastMessage" class="global-toast-message"></div>
+    </div>
+    <section id="authGate" class="auth-gate" aria-label="Login or Sign Up">
+      <div class="auth-split">
+        <aside class="auth-brand-panel">
+          <div class="auth-brand-logo-wrap" aria-label="Ruel's Letchon Baka animated logo">
+            <video
+              id="authLogoVideo"
+              class="auth-logo-source"
+              src="/live logo/logo live.mp4"
+              autoplay
+              muted
+              loop
+              playsinline
+            ></video>
+            <canvas id="authLogoCanvas" class="auth-brand-logo"></canvas>
+          </div>
+          <h1>Ruel's Letchon Baka</h1>
+          <p>Welcome back. Sign in or create an account to continue to the product dashboard.</p>
+        </aside>
+        <section class="auth-form-panel">
+          <div class="auth-card">
+            <div class="auth-mode-switch" role="tablist" aria-label="Authentication mode">
+              <button id="showLoginBtn" class="auth-mode-btn active" type="button" role="tab" aria-selected="true">Login</button>
+              <button id="showSignupBtn" class="auth-mode-btn" type="button" role="tab" aria-selected="false">Sign Up</button>
+            </div>
+
+            <form id="loginForm" class="auth-form" autocomplete="on">
+              <h2>Login</h2>
+              <label for="loginEmail">Email</label>
+              <input id="loginEmail" type="email" required autocomplete="email" placeholder="you@example.com" />
+              <label for="loginPassword">Password</label>
+              <input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter password" />
+              <button type="submit">Login to Dashboard</button>
+            </form>
+
+            <form id="signupForm" class="auth-form hidden" autocomplete="on">
+              <h2>Create Account</h2>
+              <label for="signupName">Full Name</label>
+              <input id="signupName" type="text" required autocomplete="name" placeholder="Your name" />
+              <label for="signupEmail">Email</label>
+              <input id="signupEmail" type="email" required autocomplete="email" placeholder="you@example.com" />
+              <label for="signupRole">Role</label>
+              <select id="signupRole" required>
+                <option value="administrations">Administrations</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="encharge" selected>Encharge</option>
+              </select>
+              <label for="signupPassword">Password</label>
+              <input id="signupPassword" type="password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" />
+              <button type="submit">Sign Up and Continue</button>
+            </form>
+
+            <p id="authMessage" class="auth-message" aria-live="polite"></p>
+          </div>
+        </section>
+      </div>
+    </section>
+
     <div class="app">
+      <div class="user-topbar">
+        <div id="welcomeBanner" class="welcome-banner">
+          <img id="welcomeRoleIcon" class="welcome-role-icon" src="/User Role/Encharge.png" alt="User role icon" />
+          <span id="welcomeText">Welcome User, have a nice day.</span>
+        </div>
+        <div id="phDateTime" class="ph-datetime" aria-live="polite">Philippines Time: --</div>
+        <div class="settings-menu-wrap">
+          <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
+          <div id="settingsMenu" class="settings-menu" aria-hidden="true">
+            <button id="logoutBtn" type="button">Logout</button>
+          </div>
+        </div>
+      </div>
       <h1>POS System (Cash + GCash + PayMaya)</h1>
 
       <!-- Tab Navigation -->
@@ -73,6 +147,9 @@
 
               <div id="gcashInfo"></div>
               <div id="status" class="status">Ready.</div>
+              <div id="statusReceiptActions" class="row status-receipt-actions" style="display:none;">
+                <button id="statusPrintReceiptBtn" class="secondary" type="button" disabled>Print Receipt</button>
+              </div>
 
               <div class="order-footer">
                 <div class="order-footer-title">Order Checkout</div>
@@ -128,6 +205,7 @@
                     <p class="receipt-footer">Thank you for dining with us!</p>
                   </div>
                   <div class="receipt-actions">
+                    <button id="receiptMinimizeBtn" class="secondary">Minimize</button>
                     <button id="receiptPrintBtn">Print Receipt</button>
                     <button id="paymentSuccessDoneBtn" class="secondary">Cancel</button>
                   </div>
@@ -147,8 +225,24 @@
                       <img src="/Other/Maya.png" alt="PayMaya" />
                       <span>PayMaya</span>
                     </button>
+                    <button id="chooseScanQrBtn" class="secondary e-wallet-option-btn">
+                      <img src="/Other/E-Payment.png" alt="Scan QR" />
+                      <span>Pay via Scan QR</span>
+                    </button>
                   </div>
                   <button id="cancelEwalletBtn" class="secondary">Cancel</button>
+                </div>
+              </div>
+
+              <div id="scanQrModal" class="e-wallet-modal" aria-hidden="true">
+                <div class="e-wallet-card">
+                  <h3>Scan QR to Pay</h3>
+                  <p>Show this sample QR. Once customer presents proof of payment, click Finish.</p>
+                  <div id="scanQrContent" class="scan-qr-content"></div>
+                  <div class="row">
+                    <button id="scanQrFinishBtn" type="button">Finish</button>
+                    <button id="scanQrCancelBtn" class="secondary" type="button">Cancel</button>
+                  </div>
                 </div>
               </div>
             </section>

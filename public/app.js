@@ -2,6 +2,8 @@
   products: [],
   cart: {},
   activeInvoice: null,
+  lastPaidInvoice: null,
+  scanQrContext: null,
   poller: null,
   activeCategory: 'main-dish',
   orderType: null,
@@ -28,6 +30,8 @@ const cashPaymentBtn = document.getElementById('cashPaymentBtn');
 const ePaymentBtn = document.getElementById('ePaymentBtn');
 const cashRowEl = document.getElementById('cashRow');
 const gcashInfoEl = document.getElementById('gcashInfo');
+const statusReceiptActionsEl = document.getElementById('statusReceiptActions');
+const statusPrintReceiptBtn = document.getElementById('statusPrintReceiptBtn');
 const salesSummaryEl = document.getElementById('salesSummary');
 const salesListEl = document.getElementById('salesList');
 const salesDailyBtn = document.getElementById('salesDailyBtn');
@@ -48,6 +52,7 @@ const receiptChangeEl = document.getElementById('receiptChange');
 const receiptPrintBtn = document.getElementById('receiptPrintBtn');
 const receiptPrintAreaEl = document.getElementById('receiptPrintArea');
 const paymentSuccessDoneBtn = document.getElementById('paymentSuccessDoneBtn');
+const receiptMinimizeBtn = document.getElementById('receiptMinimizeBtn');
 const adminReceiptModalEl = document.getElementById('adminReceiptModal');
 const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
 const adminReceiptRefEl = document.getElementById('adminReceiptRef');
@@ -65,7 +70,36 @@ const adminReceiptCloseBtn = document.getElementById('adminReceiptCloseBtn');
 const eWalletModalEl = document.getElementById('eWalletModal');
 const chooseGcashBtn = document.getElementById('chooseGcashBtn');
 const choosePaymayaBtn = document.getElementById('choosePaymayaBtn');
+const chooseScanQrBtn = document.getElementById('chooseScanQrBtn');
 const cancelEwalletBtn = document.getElementById('cancelEwalletBtn');
+const scanQrModalEl = document.getElementById('scanQrModal');
+const scanQrContentEl = document.getElementById('scanQrContent');
+const scanQrFinishBtn = document.getElementById('scanQrFinishBtn');
+const scanQrCancelBtn = document.getElementById('scanQrCancelBtn');
+const authGateEl = document.getElementById('authGate');
+const showLoginBtn = document.getElementById('showLoginBtn');
+const showSignupBtn = document.getElementById('showSignupBtn');
+const loginFormEl = document.getElementById('loginForm');
+const signupFormEl = document.getElementById('signupForm');
+const loginEmailEl = document.getElementById('loginEmail');
+const loginPasswordEl = document.getElementById('loginPassword');
+const signupNameEl = document.getElementById('signupName');
+const signupEmailEl = document.getElementById('signupEmail');
+const signupRoleEl = document.getElementById('signupRole');
+const signupPasswordEl = document.getElementById('signupPassword');
+const authMessageEl = document.getElementById('authMessage');
+const authLogoVideoEl = document.getElementById('authLogoVideo');
+const authLogoCanvasEl = document.getElementById('authLogoCanvas');
+const welcomeBannerEl = document.getElementById('welcomeBanner');
+const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+const settingsMenuEl = document.getElementById('settingsMenu');
+const logoutBtn = document.getElementById('logoutBtn');
+const phDateTimeEl = document.getElementById('phDateTime');
+const welcomeRoleIconEl = document.getElementById('welcomeRoleIcon');
+const welcomeTextEl = document.getElementById('welcomeText');
+const globalToastEl = document.getElementById('globalToast');
+const globalToastTitleEl = document.getElementById('globalToastTitle');
+const globalToastMessageEl = document.getElementById('globalToastMessage');
 
 // -- Customer Info Elements --
 const customerNameEl = document.getElementById('customerName');
@@ -99,8 +133,16 @@ const tabContents = document.querySelectorAll('.tab-content');
 let activeSalesRange = 'daily';
 const ADMIN_DEFAULT_USERNAME = 'admin';
 const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
+const AUTH_SESSION_KEY = 'pos_active_user_v1';
+const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
+const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
+let appInitialized = false;
+let authLogoRenderStarted = false;
+let activeAuthSession = null;
+let phClockInterval = null;
+let toastTimer = null;
 
 // ------------------------------------------
 // Utility Functions
@@ -127,6 +169,7 @@ function getPaymentMethodIcon(method) {
 }
 
 function setStatus(text) {
+  statusEl.classList.remove('invoice-status');
   statusEl.textContent = text;
 }
 
@@ -232,6 +275,507 @@ async function api(path, options = {}) {
   return data;
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function readActiveSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.email) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeActiveSession(user) {
+  const sessionUser = {
+    name: user.name,
+    email: user.email,
+    role: user.role || 'encharge',
+    userId: user.userId || null
+  };
+  activeAuthSession = sessionUser;
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionUser));
+}
+
+function clearActiveSession() {
+  activeAuthSession = null;
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function writeAccessToken(token) {
+  if (!token) return;
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function readAccessToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function getUserUiStateKey() {
+  const userKey = activeAuthSession?.userId || activeAuthSession?.email || 'guest';
+  return `${UI_STATE_KEY_PREFIX}${userKey}`;
+}
+
+function readUserUiState() {
+  try {
+    const raw = localStorage.getItem(getUserUiStateKey());
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveUserUiState(patch) {
+  try {
+    const current = readUserUiState();
+    const next = { ...current, ...patch };
+    localStorage.setItem(getUserUiStateKey(), JSON.stringify(next));
+  } catch (_error) {
+    // Ignore local storage errors.
+  }
+}
+
+function canAccessAdminFeatures() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations' || role === 'supervisor';
+}
+
+function fireAudit(eventType, metadata = {}) {
+  if (!activeAuthSession?.email) return;
+  api('/api/auth/audit', {
+    method: 'POST',
+    body: JSON.stringify({
+      eventType,
+      userId: activeAuthSession.userId || null,
+      email: activeAuthSession.email,
+      metadata
+    })
+  }).catch(() => {});
+}
+
+function showConfirmationToast({ title, message, tone = 'success', duration = 2600 }) {
+  if (!globalToastEl) return;
+  if (globalToastTitleEl) globalToastTitleEl.textContent = title || 'Success';
+  if (globalToastMessageEl) globalToastMessageEl.textContent = message || '';
+  globalToastEl.classList.remove('success');
+  globalToastEl.classList.add(tone);
+  globalToastEl.setAttribute('aria-hidden', 'false');
+  globalToastEl.classList.add('show');
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    globalToastEl.classList.remove('show');
+    globalToastEl.setAttribute('aria-hidden', 'true');
+  }, duration);
+}
+
+function updateWelcomeBanner() {
+  if (!welcomeBannerEl) return;
+  const rawName = String(activeAuthSession?.name || '').trim();
+  const firstName = rawName ? rawName.split(/\s+/)[0] : 'User';
+  const role = String(activeAuthSession?.role || 'encharge').toLowerCase();
+  const roleIconMap = {
+    administrations: '/User Role/administrator.png',
+    supervisor: '/User Role/Supervisor.png',
+    encharge: '/User Role/Encharge.png'
+  };
+  if (welcomeRoleIconEl) {
+    welcomeRoleIconEl.src = roleIconMap[role] || roleIconMap.encharge;
+    welcomeRoleIconEl.alt = `${role} role icon`;
+  }
+  if (welcomeTextEl) {
+    welcomeTextEl.textContent = `Welcome ${firstName}, have a nice day.`;
+    return;
+  }
+  welcomeBannerEl.textContent = `Welcome ${firstName}, have a nice day.`;
+}
+
+function updatePhilippineDateTime() {
+  if (!phDateTimeEl) return;
+  const now = new Date();
+  const dateText = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }).format(now);
+  const timeText = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(now);
+  phDateTimeEl.textContent = `${dateText} | ${timeText} (Philippines)`;
+}
+
+function startPhilippineClock() {
+  updatePhilippineDateTime();
+  if (phClockInterval) return;
+  phClockInterval = setInterval(updatePhilippineDateTime, 1000);
+}
+
+function closeSettingsMenu() {
+  if (!settingsMenuEl) return;
+  settingsMenuEl.classList.remove('open');
+  settingsMenuEl.setAttribute('aria-hidden', 'true');
+  if (settingsToggleBtn) settingsToggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSettingsMenu() {
+  if (!settingsMenuEl) return;
+  const willOpen = !settingsMenuEl.classList.contains('open');
+  settingsMenuEl.classList.toggle('open', willOpen);
+  settingsMenuEl.setAttribute('aria-hidden', String(!willOpen));
+  if (settingsToggleBtn) settingsToggleBtn.setAttribute('aria-expanded', String(willOpen));
+}
+
+async function handleLogout() {
+  const displayName = String(activeAuthSession?.name || 'User').trim() || 'User';
+  try {
+    await api('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: activeAuthSession?.userId || null,
+        email: activeAuthSession?.email || null
+      })
+    });
+  } catch (_error) {
+    // Continue logout locally even if network call fails
+  }
+
+  closeSettingsMenu();
+  closeAdminLogin();
+  closeAdminDashboard();
+  closeAdminReceiptModal();
+  closeEwalletModal();
+  clearActiveSession();
+  lockDashboard();
+  setAuthMode('login');
+  showConfirmationToast({
+    title: 'Logged out successfully',
+    message: `See you next time, ${displayName}.`,
+    tone: 'success'
+  });
+  if (loginEmailEl) loginEmailEl.focus();
+}
+
+function setAuthMessage(message, isSuccess = false) {
+  if (!authMessageEl) return;
+  authMessageEl.textContent = message || '';
+  authMessageEl.classList.toggle('success', Boolean(isSuccess));
+}
+
+function setAuthMode(mode) {
+  const showLogin = mode !== 'signup';
+  if (loginFormEl) loginFormEl.classList.toggle('hidden', !showLogin);
+  if (signupFormEl) signupFormEl.classList.toggle('hidden', showLogin);
+  if (showLoginBtn) {
+    showLoginBtn.classList.toggle('active', showLogin);
+    showLoginBtn.setAttribute('aria-selected', String(showLogin));
+  }
+  if (showSignupBtn) {
+    showSignupBtn.classList.toggle('active', !showLogin);
+    showSignupBtn.setAttribute('aria-selected', String(!showLogin));
+  }
+  setAuthMessage('');
+}
+
+function unlockDashboard() {
+  document.body.classList.remove('auth-locked');
+  if (authGateEl) authGateEl.setAttribute('aria-hidden', 'true');
+  updateWelcomeBanner();
+}
+
+function lockDashboard() {
+  document.body.classList.add('auth-locked');
+  if (authGateEl) authGateEl.setAttribute('aria-hidden', 'false');
+}
+
+function startAppOnce() {
+  if (appInitialized) return;
+  appInitialized = true;
+  init().catch((error) => {
+    setStatus(`Startup error: ${error.message}`);
+  });
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  const email = normalizeEmail(loginEmailEl?.value);
+  const password = String(loginPasswordEl?.value || '');
+
+  if (!email || !password) {
+    setAuthMessage('Enter your email and password.');
+    return;
+  }
+
+  try {
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    writeActiveSession({
+      name: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      userId: result.user.id
+    });
+    writeAccessToken(result.session?.accessToken || '');
+    setAuthMessage('');
+    showConfirmationToast({
+      title: 'Login successful',
+      message: `Welcome ${result.user.fullName}. Have a nice day.`,
+      tone: 'success'
+    });
+    unlockDashboard();
+    startAppOnce();
+  } catch (error) {
+    clearActiveSession();
+    setAuthMessage(`Login failed: ${error.message}`);
+  }
+}
+
+async function handleSignupSubmit(event) {
+  event.preventDefault();
+  const name = String(signupNameEl?.value || '').trim();
+  const email = normalizeEmail(signupEmailEl?.value);
+  const role = String(signupRoleEl?.value || '').trim().toLowerCase();
+  const password = String(signupPasswordEl?.value || '');
+
+  if (!name || !email || !password || !role) {
+    setAuthMessage('Complete all fields to create an account.');
+    return;
+  }
+  if (password.length < 6) {
+    setAuthMessage('Password must be at least 6 characters.');
+    return;
+  }
+  if (!['administrations', 'supervisor', 'encharge'].includes(role)) {
+    setAuthMessage('Select a valid role.');
+    return;
+  }
+
+  try {
+    await api('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullName: name,
+        email,
+        role,
+        password
+      })
+    });
+
+    const loginResult = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    writeActiveSession({
+      name: loginResult.user.fullName,
+      email: loginResult.user.email,
+      role: loginResult.user.role,
+      userId: loginResult.user.id
+    });
+    writeAccessToken(loginResult.session?.accessToken || '');
+    setAuthMessage('Sign up successful. Redirecting to dashboard...', true);
+    showConfirmationToast({
+      title: 'Signup successful',
+      message: `Welcome ${loginResult.user.fullName}. Your account is ready.`,
+      tone: 'success'
+    });
+    unlockDashboard();
+    startAppOnce();
+  } catch (error) {
+    const errorText = String(error.message || '');
+    const isExisting = /already|exists|registered/i.test(errorText);
+    if (isExisting) {
+      setAuthMessage('This email is already registered. Please login instead.');
+      showConfirmationToast({
+        title: 'Signup blocked',
+        message: 'Email already exists. Use Login.',
+        tone: 'warning',
+        duration: 2200
+      });
+      setAuthMode('login');
+      if (loginEmailEl) loginEmailEl.value = email;
+      if (loginEmailEl) loginEmailEl.focus();
+      return;
+    }
+    setAuthMessage(`Sign up failed: ${error.message}`);
+  }
+}
+
+function setupAuth() {
+  if (showLoginBtn) {
+    showLoginBtn.addEventListener('click', () => setAuthMode('login'));
+  }
+  if (showSignupBtn) {
+    showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
+  }
+  if (loginFormEl) {
+    loginFormEl.addEventListener('submit', handleLoginSubmit);
+  }
+  if (signupFormEl) {
+    signupFormEl.addEventListener('submit', handleSignupSubmit);
+  }
+  if (settingsToggleBtn) {
+    settingsToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsMenu();
+    });
+  }
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleLogout);
+  }
+  document.addEventListener('click', (e) => {
+    if (!settingsMenuEl?.classList.contains('open')) return;
+    if (e.target?.closest('.settings-menu-wrap')) return;
+    closeSettingsMenu();
+  });
+  startPhilippineClock();
+  setAuthMode('login');
+}
+
+function startAuthLogoRender() {
+  if (authLogoRenderStarted || !authLogoVideoEl || !authLogoCanvasEl) return;
+  authLogoRenderStarted = true;
+
+  const context = authLogoCanvasEl.getContext('2d', { willReadFrequently: true });
+  if (!context) return;
+  let hasStartedRender = false;
+
+  function fitCanvas() {
+    const width = Math.max(1, authLogoVideoEl.videoWidth || 720);
+    const height = Math.max(1, authLogoVideoEl.videoHeight || 720);
+    authLogoCanvasEl.width = width;
+    authLogoCanvasEl.height = height;
+  }
+
+  function renderFrame() {
+    if (!authLogoVideoEl.videoWidth || !authLogoVideoEl.videoHeight) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+
+    fitCanvas();
+    context.drawImage(authLogoVideoEl, 0, 0, authLogoCanvasEl.width, authLogoCanvasEl.height);
+
+    const frame = context.getImageData(0, 0, authLogoCanvasEl.width, authLogoCanvasEl.height);
+    const pixels = frame.data;
+
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const isWhite = r > 220 && g > 220 && b > 220;
+      if (isWhite) {
+        pixels[i + 3] = 0;
+      } else if (r > 190 && g > 185 && b > 180) {
+        pixels[i + 3] = Math.max(0, pixels[i + 3] - 120);
+      }
+    }
+
+    context.putImageData(frame, 0, 0);
+    requestAnimationFrame(renderFrame);
+  }
+
+  function ensurePlayback() {
+    authLogoVideoEl.muted = true;
+    authLogoVideoEl.loop = true;
+    authLogoVideoEl.playsInline = true;
+    const playPromise = authLogoVideoEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
+  }
+
+  function startRenderIfReady() {
+    if (hasStartedRender) return;
+    if (authLogoVideoEl.readyState < 2) return;
+    hasStartedRender = true;
+    fitCanvas();
+    renderFrame();
+  }
+
+  authLogoVideoEl.addEventListener('loadedmetadata', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('loadeddata', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('canplay', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('pause', ensurePlayback);
+  authLogoVideoEl.addEventListener('ended', ensurePlayback);
+  authLogoVideoEl.addEventListener('stalled', ensurePlayback);
+
+  ensurePlayback();
+  if (authLogoVideoEl.readyState >= 2) {
+    startRenderIfReady();
+  }
+}
+
+async function bootstrap() {
+  setupAuth();
+  startAuthLogoRender();
+  document.body.classList.add('auth-checking');
+  const activeUser = readActiveSession();
+  const token = readAccessToken();
+
+  if (activeUser?.email && token) {
+    activeAuthSession = {
+      name: activeUser.name || 'User',
+      email: activeUser.email,
+      role: activeUser.role || 'encharge',
+      userId: activeUser.userId || null
+    };
+    unlockDashboard();
+    startAppOnce();
+
+    try {
+      const sessionResult = await api('/api/auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ accessToken: token })
+      });
+      activeAuthSession = {
+        name: sessionResult.user.fullName,
+        email: sessionResult.user.email,
+        role: sessionResult.user.role || 'encharge',
+        userId: sessionResult.user.id
+      };
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(activeAuthSession));
+      unlockDashboard();
+    } catch (_error) {
+      clearActiveSession();
+      lockDashboard();
+      if (loginEmailEl) loginEmailEl.focus();
+    } finally {
+      document.body.classList.remove('auth-checking');
+    }
+    return;
+  }
+  clearActiveSession();
+  lockDashboard();
+  document.body.classList.remove('auth-checking');
+  if (loginEmailEl) loginEmailEl.focus();
+}
+
 // ------------------------------------------
 // Tab Navigation
 // ------------------------------------------
@@ -250,6 +794,12 @@ function switchTab(tabName) {
 }
 
 function openAdminLogin() {
+  if (!canAccessAdminFeatures()) {
+    fireAudit('admin_access_denied', { reason: 'role_blocked', role: activeAuthSession?.role || 'unknown' });
+    setStatus('Admin dashboard access is allowed only for Administrations and Supervisor roles.');
+    return;
+  }
+  fireAudit('admin_access_allowed', { role: activeAuthSession?.role || 'unknown' });
   if (!adminLoginModalEl) return;
   document.body.classList.add('admin-login-open');
   if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
@@ -264,12 +814,14 @@ function closeAdminLogin() {
 
 async function openAdminDashboard() {
   document.body.classList.add('admin-open');
+  saveUserUiState({ adminOpen: true });
   await refreshAdminTransactions();
   await refreshSalesReport(activeSalesRange);
 }
 
 function closeAdminDashboard() {
   document.body.classList.remove('admin-open');
+  saveUserUiState({ adminOpen: false });
 }
 
 async function submitAdminLogin() {
@@ -339,6 +891,7 @@ function setPaymentMethod(method) {
 
 function switchCategory(category) {
   state.activeCategory = category;
+  saveUserUiState({ activeCategory: category });
   
   // Update active state on category buttons
   document.querySelectorAll('.category-btn').forEach((btn) => {
@@ -418,36 +971,56 @@ function resetAfterSale() {
   renderCart();
 }
 
+function updateReceiptActionVisibility() {
+  const hasReceipt = Boolean(state.lastPaidInvoice);
+  if (statusReceiptActionsEl) {
+    statusReceiptActionsEl.style.display = hasReceipt ? 'flex' : 'none';
+  }
+  if (statusPrintReceiptBtn) {
+    statusPrintReceiptBtn.disabled = !hasReceipt;
+  }
+}
+
 function renderReceipt(invoice) {
-  const lines = invoice.lineItems
-    .map((x) => `${x.name} x ${x.qty} = ${money(x.subtotal)}`)
-    .join('\n');
-
   const successText = invoice?.payment?.successMessage || (invoice.status === 'PAID' ? 'Payment Successful' : 'Payment Pending');
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="status-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+  const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : getOrderTypeLabel(state.orderType);
+  const paidAtText = formatDate(invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString());
 
-  setStatus(
-    [
-      `Invoice: ${invoice.reference}`,
-      `Status: ${invoice.status}`,
-      `Order: ${getOrderTypeLabel(state.orderType)}`,
-      `Payment: ${getPaymentMethodLabel(invoice.paymentMethod)}`,
-      `Result: ${successText}`,
-      '',
-      lines,
-      '',
-      `Subtotal: ${money(invoice.subtotal ?? invoice.total)}`,
-      `Discount: ${money(invoice.discount || 0)}`,
-      `Total Due: ${money(invoice.total)}`,
-      `Paid: ${money(invoice.payment.amountPaid)}`,
-      `Change: ${money(invoice.payment.change || 0)}`,
-      invoice.paymentMethod !== 'cash' ? `Recipient ${getPaymentMethodLabel(invoice.paymentMethod)}: ${invoice.payment.recipientGcashNumber || 'via PayMongo'}` : '',
-      `Paid At: ${invoice.payment.paidAt}`
-    ].filter(Boolean).join('\n')
-  );
+  statusEl.classList.add('invoice-status');
+  statusEl.innerHTML = `
+    <div class="status-head">
+      <div class="status-ref">Invoice: ${escapeHtml(invoice.reference || '-')}</div>
+      <div class="status-badge ${String(invoice.status || '').toLowerCase() === 'paid' ? 'paid' : ''}">${escapeHtml(invoice.status || '-')}</div>
+    </div>
+    <div class="status-grid">
+      <div class="status-grid-row"><span>Order</span><strong>${escapeHtml(orderLabel)}</strong></div>
+      <div class="status-grid-row"><span>Payment</span><strong>${escapeHtml(getPaymentMethodLabel(invoice.paymentMethod))}</strong></div>
+      <div class="status-grid-row"><span>Result</span><strong>${escapeHtml(successText)}</strong></div>
+    </div>
+    <div class="status-items">${itemRows || '<div class="status-item-row"><span>No items</span><strong>-</strong></div>'}</div>
+    <div class="status-totals">
+      <div class="status-total-row"><span>Subtotal</span><strong>${money(invoice.subtotal ?? invoice.total)}</strong></div>
+      <div class="status-total-row"><span>Discount</span><strong>${money(invoice.discount || 0)}</strong></div>
+      <div class="status-total-row grand"><span>Total Due</span><strong>${money(invoice.total)}</strong></div>
+      <div class="status-total-row"><span>Paid</span><strong>${money(invoice?.payment?.amountPaid || invoice.total || 0)}</strong></div>
+      <div class="status-total-row"><span>Change</span><strong>${money(invoice?.payment?.change || 0)}</strong></div>
+    </div>
+    <div class="status-paid-at">Paid At: ${escapeHtml(paidAtText)}</div>
+  `;
 }
 
 function renderPaymentReceiptModal(invoice) {
-  const orderLabel = getOrderTypeLabel(state.orderType);
+  const orderLabel = invoice?.orderType
+    ? getOrderTypeLabel(invoice.orderType)
+    : getOrderTypeLabel(state.orderType);
   const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
   const paidAt = invoice?.payment?.paidAt || new Date().toISOString();
   const itemRows = (invoice.lineItems || [])
@@ -497,16 +1070,21 @@ function renderAdminReceiptModal(invoice) {
 }
 
 function finalizeSuccessfulPayment(invoice, modeLabel) {
-  renderPaymentReceiptModal(invoice, modeLabel);
-  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.add('open');
+  state.lastPaidInvoice = invoice;
+  updateReceiptActionVisibility();
+  state.cashPromptActive = false;
+  if (amountTenderedEl) amountTenderedEl.value = '';
+  resetAfterSale();
 }
 
 function closePaymentSuccessModal() {
   if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
-  resetAfterSale();
-  state.cashPromptActive = false;
-  if (amountTenderedEl) amountTenderedEl.value = '';
-  setStatus('Payment completed. Ready for next order.');
+  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  if (receiptCardEl) receiptCardEl.classList.remove('collapsed');
+  if (receiptCardEl) receiptCardEl.classList.remove('minimizing');
+  if (receiptCardEl) receiptCardEl.style.transform = '';
+  if (receiptCardEl) receiptCardEl.style.opacity = '';
+  if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
 }
 
 function printReceiptContent(printAreaEl) {
@@ -558,6 +1136,47 @@ function printReceiptFromModal() {
   printReceiptContent(receiptPrintAreaEl);
 }
 
+function openLatestReceiptPreview() {
+  if (!state.lastPaidInvoice) {
+    setStatus('No paid transaction yet to preview receipt.');
+    return;
+  }
+  renderPaymentReceiptModal(state.lastPaidInvoice);
+  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.add('open');
+}
+
+function togglePaymentReceiptCollapse() {
+  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  const targetBtn = statusPrintReceiptBtn;
+  if (!receiptCardEl || !receiptMinimizeBtn) return;
+
+  if (receiptMinimizeBtn.textContent === 'Minimize' && paymentSuccessModalEl?.classList.contains('open')) {
+    if (!targetBtn) return;
+    const cardRect = receiptCardEl.getBoundingClientRect();
+    const targetRect = targetBtn.getBoundingClientRect();
+    const dx = (targetRect.left + (targetRect.width / 2)) - (cardRect.left + (cardRect.width / 2));
+    const dy = (targetRect.top + (targetRect.height / 2)) - (cardRect.top + (cardRect.height / 2));
+
+    receiptCardEl.classList.add('minimizing');
+    receiptCardEl.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
+    receiptCardEl.style.opacity = '0.15';
+    receiptMinimizeBtn.textContent = 'Expand';
+
+    setTimeout(() => {
+      if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
+      receiptCardEl.classList.remove('minimizing');
+      receiptCardEl.style.transform = '';
+      receiptCardEl.style.opacity = '';
+      if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
+    }, 360);
+    return;
+  }
+
+  const collapsed = !receiptCardEl.classList.contains('collapsed');
+  receiptCardEl.classList.toggle('collapsed', collapsed);
+  receiptMinimizeBtn.textContent = collapsed ? 'Expand' : 'Minimize';
+}
+
 function printAdminReceiptFromModal() {
   printReceiptContent(adminReceiptPrintAreaEl);
 }
@@ -578,6 +1197,132 @@ function openEwalletModal() {
 function closeEwalletModal() {
   if (!eWalletModalEl) return;
   eWalletModalEl.classList.remove('open');
+}
+
+function openScanQrModal() {
+  if (!scanQrModalEl) return;
+  scanQrModalEl.classList.add('open');
+}
+
+function closeScanQrModal() {
+  if (!scanQrModalEl) return;
+  scanQrModalEl.classList.remove('open');
+}
+
+function renderScanQrContent({ checkout, invoice, notice = 'Waiting for payment confirmation...' }) {
+  if (!scanQrContentEl) return;
+  const sampleQrDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
+      <rect width="220" height="220" fill="white"/>
+      <rect x="12" y="12" width="56" height="56" fill="black"/>
+      <rect x="20" y="20" width="40" height="40" fill="white"/>
+      <rect x="28" y="28" width="24" height="24" fill="black"/>
+      <rect x="152" y="12" width="56" height="56" fill="black"/>
+      <rect x="160" y="20" width="40" height="40" fill="white"/>
+      <rect x="168" y="28" width="24" height="24" fill="black"/>
+      <rect x="12" y="152" width="56" height="56" fill="black"/>
+      <rect x="20" y="160" width="40" height="40" fill="white"/>
+      <rect x="28" y="168" width="24" height="24" fill="black"/>
+      <rect x="84" y="84" width="8" height="8" fill="black"/>
+      <rect x="100" y="84" width="8" height="8" fill="black"/>
+      <rect x="116" y="84" width="8" height="8" fill="black"/>
+      <rect x="132" y="84" width="8" height="8" fill="black"/>
+      <rect x="84" y="100" width="8" height="8" fill="black"/>
+      <rect x="116" y="100" width="8" height="8" fill="black"/>
+      <rect x="132" y="100" width="8" height="8" fill="black"/>
+      <rect x="84" y="116" width="8" height="8" fill="black"/>
+      <rect x="100" y="116" width="8" height="8" fill="black"/>
+      <rect x="132" y="116" width="8" height="8" fill="black"/>
+      <rect x="84" y="132" width="8" height="8" fill="black"/>
+      <rect x="100" y="132" width="8" height="8" fill="black"/>
+      <rect x="116" y="132" width="8" height="8" fill="black"/>
+      <rect x="132" y="132" width="8" height="8" fill="black"/>
+      <text x="110" y="212" text-anchor="middle" font-size="11" font-family="Arial" fill="#5a3521">Sample QR for Scan-to-Pay</text>
+    </svg>
+  `)}`;
+  const qrMarkup = `<img class="qr" alt="Sample Payment QR Code" src="${sampleQrDataUrl}" />`;
+
+  scanQrContentEl.innerHTML = `
+    <div class="scan-qr-meta">
+      <div><strong>Reference:</strong> ${escapeHtml(checkout?.reference || invoice?.reference || '-')}</div>
+      <div><strong>Amount:</strong> ${money(invoice?.total || checkout?.amount || 0)}</div>
+      <div><strong>Method:</strong> ${escapeHtml(getPaymentMethodLabel(invoice?.paymentMethod || checkout?.method || 'gcash'))}</div>
+      <div><strong>Status:</strong> ${escapeHtml(notice)}</div>
+    </div>
+    ${qrMarkup}
+  `;
+}
+
+async function startScanQrPaymentFlow() {
+  try {
+    const items = getCartItems();
+    if (!items.length) {
+      setStatus('Add at least one item first.');
+      return;
+    }
+
+    const { invoice } = await api('/api/invoices', {
+      method: 'POST',
+      body: JSON.stringify({
+        items,
+        paymentMethod: 'gcash',
+        discountAmount: getDiscountAmount()
+      })
+    });
+
+    state.activeInvoice = invoice;
+
+    const customerInfo = {};
+    const cName = (customerNameEl?.value || '').trim();
+    const cEmail = (customerEmailEl?.value || '').trim();
+    const cPhone = (customerPhoneEl?.value || '').trim();
+    if (cName) customerInfo.name = cName;
+    if (cEmail) customerInfo.email = cEmail;
+    if (cPhone) customerInfo.phone = cPhone;
+
+    const { checkout } = await api('/api/payments/ewallet/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
+    });
+
+    state.scanQrContext = {
+      invoiceId: invoice.id,
+      invoice,
+      checkout
+    };
+
+    renderScanQrContent({ checkout, invoice, notice: 'Waiting for customer proof of payment...' });
+    if (scanQrFinishBtn) scanQrFinishBtn.disabled = false;
+    openScanQrModal();
+    setStatus('Sample QR is ready. Ask customer to scan and pay, then confirm proof and click Finish.');
+  } catch (error) {
+    setStatus(`QR checkout error: ${error.message}`);
+  }
+}
+
+async function finishScanQrPayment() {
+  if (!state.scanQrContext?.invoiceId) {
+    setStatus('No active QR payment session.');
+    return;
+  }
+
+  let paidInvoice = null;
+  try {
+    const completeResult = await api(`/api/payments/ewallet/manual-complete/${state.scanQrContext.invoiceId}`, {
+      method: 'POST'
+    });
+    paidInvoice = completeResult?.invoice || null;
+  } catch (error) {
+    setStatus(`Cannot complete payment: ${error.message}`);
+    return;
+  }
+  if (!paidInvoice) return;
+
+  closeScanQrModal();
+  renderReceipt(paidInvoice);
+  await refreshSalesReport(activeSalesRange);
+  finalizeSuccessfulPayment(paidInvoice, 'E-Payment');
+  state.scanQrContext = null;
 }
 
 function renderSalesReport(report) {
@@ -615,6 +1360,7 @@ function renderSalesReport(report) {
 async function refreshSalesReport(range = activeSalesRange) {
   try {
     activeSalesRange = range;
+    saveUserUiState({ salesRange: activeSalesRange });
     const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
     renderSalesReport(report);
   } catch (error) {
@@ -1054,8 +1800,21 @@ function setupEventListeners() {
       await handleCheckout();
     });
   }
+  if (chooseScanQrBtn) {
+    chooseScanQrBtn.addEventListener('click', async () => {
+      closeEwalletModal();
+      setPaymentMethod('gcash');
+      await startScanQrPaymentFlow();
+    });
+  }
   if (cancelEwalletBtn) {
     cancelEwalletBtn.addEventListener('click', closeEwalletModal);
+  }
+  if (scanQrFinishBtn) {
+    scanQrFinishBtn.addEventListener('click', finishScanQrPayment);
+  }
+  if (scanQrCancelBtn) {
+    scanQrCancelBtn.addEventListener('click', closeScanQrModal);
   }
   if (discountInputEl) {
     discountInputEl.addEventListener('input', () => {
@@ -1119,8 +1878,14 @@ function setupEventListeners() {
   if (paymentSuccessDoneBtn) {
     paymentSuccessDoneBtn.addEventListener('click', closePaymentSuccessModal);
   }
+  if (receiptMinimizeBtn) {
+    receiptMinimizeBtn.addEventListener('click', togglePaymentReceiptCollapse);
+  }
   if (receiptPrintBtn) {
     receiptPrintBtn.addEventListener('click', printReceiptFromModal);
+  }
+  if (statusPrintReceiptBtn) {
+    statusPrintReceiptBtn.addEventListener('click', openLatestReceiptPreview);
   }
   if (adminReceiptPrintBtn) {
     adminReceiptPrintBtn.addEventListener('click', printAdminReceiptFromModal);
@@ -1146,7 +1911,9 @@ function setupEventListeners() {
     }
 
     if (e.key === 'Escape') {
+      closeSettingsMenu();
       closeEwalletModal();
+      closeScanQrModal();
       if (paymentSuccessModalEl?.classList.contains('open')) {
         closePaymentSuccessModal();
       }
@@ -1158,6 +1925,16 @@ function setupEventListeners() {
 }
 
 async function init() {
+  const persistedUiState = readUserUiState();
+  const persistedCategory = String(persistedUiState.activeCategory || '').trim().toLowerCase();
+  const allowedCategories = new Set(['main-dish', 'rice', 'burger', 'drinks', 'fries', 'dessert', 'sauces']);
+  if (allowedCategories.has(persistedCategory)) {
+    state.activeCategory = persistedCategory;
+  }
+  if (persistedUiState.salesRange === 'daily' || persistedUiState.salesRange === 'weekly') {
+    activeSalesRange = persistedUiState.salesRange;
+  }
+
   const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
   state.products = products;
   ensureConfettiAnimation();
@@ -1166,15 +1943,20 @@ async function init() {
   renderCart();
 
   setupEventListeners();
+  updateReceiptActionVisibility();
   if (cashPaymentBtn) cashPaymentBtn.disabled = true;
   if (ePaymentBtn) ePaymentBtn.disabled = true;
   setPaymentMethod('cash');
   setStatus('Select order type first: Dine In or Take Out.');
-  await refreshSalesReport('daily');
+  await refreshSalesReport(activeSalesRange);
+
+  if (persistedUiState.adminOpen && canAccessAdminFeatures()) {
+    await openAdminDashboard();
+  }
 }
 
-init().catch((error) => {
-  setStatus(`Startup error: ${error.message}`);
+bootstrap().catch((error) => {
+  setAuthMessage(`Authentication startup error: ${error.message}`);
 });
 
 

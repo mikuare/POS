@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const {
   listProducts,
@@ -16,7 +17,12 @@ const {
   getSalesReport,
   listAllInvoices
 } = require('./data/store');
-const { isSupabaseEnabled, getSupabaseMode } = require('./data/supabaseClient');
+const {
+  getSupabase,
+  isSupabaseEnabled,
+  getSupabaseMode,
+  supabaseUrl
+} = require('./data/supabaseClient');
 const MockProvider = require('./providers/mockProvider');
 const PaymongoProvider = require('./providers/paymongoProvider');
 
@@ -24,6 +30,11 @@ const app = express();
 const PORT = Number(process.env.PORT || 4000);
 const baseUrl = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
 const providerName = (process.env.PAYMENT_PROVIDER || 'paymongo').toLowerCase();
+const supabaseService = getSupabase();
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
+const supabaseAuthClient = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  : null;
 
 app.use(cors());
 app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
@@ -38,6 +49,78 @@ app.get('/assets/yummy', (req, res) => {
 const provider = providerName === 'paymongo'
   ? new PaymongoProvider({ baseUrl })
   : new MockProvider({ baseUrl });
+
+const AUTH_ROLES = ['administrations', 'supervisor', 'encharge'];
+const AUDIT_EVENTS = new Set([
+  'signup_success',
+  'signup_failed',
+  'login_success',
+  'login_failed',
+  'logout',
+  'admin_access_allowed',
+  'admin_access_denied'
+]);
+
+function normalizeRole(role) {
+  const normalized = String(role || '').trim().toLowerCase();
+  return AUTH_ROLES.includes(normalized) ? normalized : 'encharge';
+}
+
+function getRequestIp(req) {
+  const forwarded = req.get('x-forwarded-for');
+  if (forwarded) {
+    return String(forwarded).split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || null;
+}
+
+async function logAuthAudit({
+  userId = null,
+  userEmail = null,
+  eventType,
+  req = null,
+  metadata = {}
+}) {
+  if (!supabaseService || !AUDIT_EVENTS.has(eventType)) return;
+  try {
+    const payload = {
+      user_id: userId || null,
+      user_email: userEmail || null,
+      event_type: eventType,
+      event_source: 'web',
+      metadata: metadata || {}
+    };
+    if (req) {
+      payload.ip_address = getRequestIp(req);
+      payload.user_agent = req.get('user-agent') || null;
+    }
+    await supabaseService.from('auth_audit_logs').insert(payload);
+  } catch (error) {
+    console.warn('[AuthAudit] Failed to insert audit log:', error.message);
+  }
+}
+
+async function getAppUserByEmail(email) {
+  if (!supabaseService) return null;
+  const { data, error } = await supabaseService
+    .from('app_users')
+    .select('id, full_name, email, role, is_active, created_at, last_login_at')
+    .eq('email', email)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function getAppUserById(userId) {
+  if (!supabaseService) return null;
+  const { data, error } = await supabaseService
+    .from('app_users')
+    .select('id, full_name, email, role, is_active, created_at, last_login_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
 
 function isEWalletMethod(method) {
   const m = String(method || '').toLowerCase();
@@ -201,6 +284,265 @@ async function processPaymentWebhook(payload) {
 
   return { statusCode: 200, body: { ok: true, invoice } };
 }
+
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    if (!supabaseService) {
+      return res.status(503).json({ error: 'Supabase is not configured on server.' });
+    }
+
+    const fullName = String(req.body?.fullName || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    const role = normalizeRole(req.body?.role);
+
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ error: 'fullName, email, and password are required.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    const existingUser = await getAppUserByEmail(email);
+    if (existingUser) {
+      await logAuthAudit({
+        userId: existingUser.id,
+        userEmail: email,
+        eventType: 'signup_failed',
+        req,
+        metadata: { reason: 'Email already exists' }
+      });
+      return res.status(409).json({ error: 'Email is already registered. Please login instead.' });
+    }
+
+    const { data, error } = await supabaseService.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        role
+      }
+    });
+
+    if (error) {
+      const msg = String(error.message || '');
+      const isExisting = /already|exists|registered/i.test(msg);
+      await logAuthAudit({
+        userEmail: email,
+        eventType: 'signup_failed',
+        req,
+        metadata: { reason: msg }
+      });
+      return res.status(isExisting ? 409 : 400).json({
+        error: isExisting ? 'Email is already registered. Please login instead.' : msg
+      });
+    }
+
+    const createdUser = data?.user;
+    if (!createdUser) {
+      return res.status(500).json({ error: 'User was not created.' });
+    }
+
+    let appUser = await getAppUserById(createdUser.id);
+    if (!appUser) {
+      const { data: fallbackProfile, error: profileError } = await supabaseService
+        .from('app_users')
+        .upsert({
+          id: createdUser.id,
+          full_name: fullName,
+          email,
+          role,
+          is_active: true
+        }, { onConflict: 'id' })
+        .select('id, full_name, email, role, is_active, created_at, last_login_at')
+        .single();
+      if (profileError) throw profileError;
+      appUser = fallbackProfile;
+    }
+
+    await logAuthAudit({
+      userId: appUser.id,
+      userEmail: appUser.email,
+      eventType: 'signup_success',
+      req,
+      metadata: { role: appUser.role }
+    });
+
+    return res.status(201).json({
+      user: {
+        id: appUser.id,
+        fullName: appUser.full_name,
+        email: appUser.email,
+        role: appUser.role
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    if (!supabaseService || !supabaseAuthClient) {
+      return res.status(503).json({ error: 'Supabase auth is not configured on server.' });
+    }
+
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required.' });
+    }
+
+    const { data, error } = await supabaseAuthClient.auth.signInWithPassword({ email, password });
+    if (error || !data?.user || !data?.session) {
+      await logAuthAudit({
+        userEmail: email,
+        eventType: 'login_failed',
+        req,
+        metadata: { reason: error?.message || 'Invalid credentials' }
+      });
+      return res.status(401).json({ error: error?.message || 'Invalid credentials.' });
+    }
+
+    let appUser = await getAppUserById(data.user.id);
+    if (!appUser) {
+      const fallbackRole = normalizeRole(data.user.user_metadata?.role);
+      const fallbackName = String(data.user.user_metadata?.full_name || email.split('@')[0] || 'User');
+      const { data: fallbackProfile, error: profileError } = await supabaseService
+        .from('app_users')
+        .upsert({
+          id: data.user.id,
+          full_name: fallbackName,
+          email,
+          role: fallbackRole,
+          is_active: true
+        }, { onConflict: 'id' })
+        .select('id, full_name, email, role, is_active, created_at, last_login_at')
+        .single();
+      if (profileError) throw profileError;
+      appUser = fallbackProfile;
+    }
+
+    if (!appUser.is_active) {
+      await logAuthAudit({
+        userId: appUser.id,
+        userEmail: appUser.email,
+        eventType: 'login_failed',
+        req,
+        metadata: { reason: 'User is inactive' }
+      });
+      return res.status(403).json({ error: 'Account is inactive. Contact administrator.' });
+    }
+
+    await supabaseService
+      .from('app_users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', appUser.id);
+
+    await logAuthAudit({
+      userId: appUser.id,
+      userEmail: appUser.email,
+      eventType: 'login_success',
+      req,
+      metadata: { role: appUser.role }
+    });
+
+    return res.json({
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at
+      },
+      user: {
+        id: appUser.id,
+        fullName: appUser.full_name,
+        email: appUser.email,
+        role: appUser.role
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/session', async (req, res) => {
+  try {
+    if (!supabaseService) {
+      return res.status(503).json({ error: 'Supabase is not configured on server.' });
+    }
+
+    const authHeader = req.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    const accessToken = String(req.body?.accessToken || bearerToken || '');
+
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Missing access token.' });
+    }
+
+    const { data, error } = await supabaseService.auth.getUser(accessToken);
+    if (error || !data?.user) {
+      return res.status(401).json({ error: error?.message || 'Invalid session.' });
+    }
+
+    const appUser = await getAppUserById(data.user.id);
+    if (!appUser || !appUser.is_active) {
+      return res.status(403).json({ error: 'Account is inactive or missing profile.' });
+    }
+
+    return res.json({
+      user: {
+        id: appUser.id,
+        fullName: appUser.full_name,
+        email: appUser.email,
+        role: appUser.role
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const userId = req.body?.userId || null;
+    const userEmail = req.body?.email || null;
+    await logAuthAudit({
+      userId,
+      userEmail,
+      eventType: 'logout',
+      req
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/audit', async (req, res) => {
+  try {
+    const eventType = String(req.body?.eventType || '').trim();
+    if (!AUDIT_EVENTS.has(eventType)) {
+      return res.status(400).json({ error: 'Invalid event type.' });
+    }
+    if (!eventType.startsWith('admin_access_')) {
+      return res.status(400).json({ error: 'This endpoint is limited to admin access events.' });
+    }
+
+    await logAuthAudit({
+      userId: req.body?.userId || null,
+      userEmail: req.body?.email || null,
+      eventType,
+      req,
+      metadata: req.body?.metadata || {}
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
 
 app.get('/health', (_req, res) => {
   res.json({
@@ -518,6 +860,44 @@ async function verifyEwalletPaymentHandler(req, res) {
 
 app.post('/api/payments/ewallet/verify/:invoiceId', verifyEwalletPaymentHandler);
 app.post('/api/payments/gcash/verify/:invoiceId', verifyEwalletPaymentHandler);
+
+app.post('/api/payments/ewallet/manual-complete/:invoiceId', async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const invoice = await getInvoice(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (invoice.status === 'PAID') {
+      return res.json({ invoice, alreadyPaid: true });
+    }
+    if (!isEWalletMethod(invoice.paymentMethod)) {
+      return res.status(400).json({ error: 'Invoice payment method is not an e-wallet (gcash/paymaya)' });
+    }
+
+    const session = await getGcashSessionByInvoiceId(invoiceId);
+    const paidInvoice = await setInvoicePaid(invoiceId, {
+      method: invoice.paymentMethod,
+      provider: session?.provider || providerName || 'manual',
+      providerReference: session?.reference || `MANUAL-${Date.now()}`,
+      recipientGcashNumber: invoice.paymentMethod === 'gcash' ? (session?.merchant?.gcashNumber || '') : '',
+      paidAt: new Date().toISOString(),
+      amountPaid: invoice.total,
+      change: 0,
+      success: true,
+      successMessage: 'Payment manually confirmed by encharge'
+    });
+
+    if (session) {
+      session.status = 'PAID';
+      await saveGcashSession(session);
+    }
+
+    return res.json({ invoice: paidInvoice, manual: true });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
 
 app.get('/checkout/:reference', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'checkout.html'));
