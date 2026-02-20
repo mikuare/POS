@@ -575,14 +575,19 @@ app.get('/api/products', (_req, res) => {
 
 app.post('/api/invoices', async (req, res) => {
   try {
-    const { items, paymentMethod, discountAmount } = req.body;
+    const { items, paymentMethod, discountAmount, orderType } = req.body;
     if (!['cash', 'gcash', 'paymaya'].includes((paymentMethod || '').toLowerCase())) {
       return res.status(400).json({ error: 'paymentMethod must be cash, gcash, or paymaya' });
+    }
+    const normalizedOrderType = String(orderType || '').toLowerCase();
+    if (!['dine-in', 'take-out'].includes(normalizedOrderType)) {
+      return res.status(400).json({ error: 'orderType must be dine-in or take-out' });
     }
     const invoice = await createInvoice({
       items: items || [],
       paymentMethod: paymentMethod.toLowerCase(),
-      discountAmount: Number(discountAmount || 0)
+      discountAmount: Number(discountAmount || 0),
+      orderType: normalizedOrderType
     });
     return res.status(201).json({ invoice });
   } catch (error) {

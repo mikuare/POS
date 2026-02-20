@@ -64,6 +64,7 @@ function toDbInvoice(invoice) {
     id: invoice.id,
     reference: invoice.reference,
     status: invoice.status,
+    order_type: invoice.orderType || null,
     payment_method: invoice.paymentMethod,
     total_amount: invoice.total,
     created_at: invoice.createdAt,
@@ -78,6 +79,7 @@ function toAppInvoice(dbInvoice, lineItems, payment) {
     createdAt: dbInvoice.created_at,
     updatedAt: dbInvoice.updated_at,
     status: dbInvoice.status,
+    orderType: dbInvoice.order_type || null,
     paymentMethod: dbInvoice.payment_method,
     subtotal: Number(dbInvoice.total_amount),
     discount: 0,
@@ -156,7 +158,7 @@ async function persistInvoice(invoice) {
   }
 }
 
-async function createInvoice({ items, paymentMethod, discountAmount = 0 }) {
+async function createInvoice({ items, paymentMethod, discountAmount = 0, orderType = null }) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Invoice must contain at least one item');
   }
@@ -193,6 +195,7 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0 }) {
     createdAt: now,
     updatedAt: now,
     status: 'PENDING',
+    orderType: orderType || null,
     paymentMethod,
     subtotal,
     discount,
@@ -808,7 +811,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
   if (isSupabaseEnabled()) {
     let query = supabase
       .from('pos_invoices')
-      .select('id,reference,total_amount,payment_method,status,created_at,updated_at')
+      .select('id,reference,total_amount,payment_method,status,order_type,created_at,updated_at')
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -860,6 +863,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
         id: inv.id,
         reference: inv.reference,
         status: inv.status,
+        orderType: inv.order_type || null,
         paymentMethod: inv.payment_method,
         subtotal: Number(inv.total_amount),
         discount: 0,
@@ -906,6 +910,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
       id: inv.id,
       reference: inv.reference,
       status: inv.status,
+      orderType: inv.orderType || null,
       paymentMethod: inv.paymentMethod,
       subtotal: inv.subtotal ?? inv.total,
       discount: inv.discount || 0,

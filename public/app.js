@@ -1330,7 +1330,8 @@ async function startScanQrPaymentFlow() {
       body: JSON.stringify({
         items,
         paymentMethod: 'gcash',
-        discountAmount: getDiscountAmount()
+        discountAmount: getDiscountAmount(),
+        orderType: state.orderType
       })
     });
 
@@ -1683,7 +1684,7 @@ async function handleCheckout() {
 
     const { invoice } = await api('/api/invoices', {
       method: 'POST',
-      body: JSON.stringify({ items, paymentMethod, discountAmount })
+      body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
     });
 
     state.activeInvoice = invoice;
