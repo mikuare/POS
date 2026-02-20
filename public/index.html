@@ -81,6 +81,7 @@
         <div class="settings-menu-wrap">
           <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
           <div id="settingsMenu" class="settings-menu" aria-hidden="true">
+            <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Admin Dashboard</button>
             <button id="logoutBtn" type="button">Logout</button>
           </div>
         </div>
@@ -300,6 +301,13 @@
             <h2>Admin Dashboard</h2>
             <button id="adminCloseBtn" class="secondary">Close</button>
           </div>
+          <div class="admin-nav">
+            <button id="adminNavOverviewBtn" class="secondary admin-nav-btn active" type="button">Overview</button>
+            <button id="adminNavInventoryBtn" class="secondary admin-nav-btn" type="button">Inventory</button>
+            <button id="adminNavKitSpecBtn" class="secondary admin-nav-btn" type="button">Kit Specification</button>
+          </div>
+
+          <div id="adminPanelOverview" class="admin-panel active">
           <div class="admin-grid">
           <section class="card full-width">
             <h2>Sales Summary</h2>
@@ -310,6 +318,28 @@
             </div>
             <div id="salesSummary" class="status">Loading sales report...</div>
             <div id="salesList" class="sales-list"></div>
+          </section>
+
+          <section class="card full-width">
+            <h2>Sales: Detailed Output</h2>
+            <div id="salesDetailedGrid" class="sales-detailed-grid">
+              <div class="stat-item">
+                <span class="stat-label">Daily Sales</span>
+                <span class="stat-value" id="detailDailySales">PHP 0.00</span>
+                <span class="stat-label" id="detailDailyMeta">0 transactions</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Monthly Sales</span>
+                <span class="stat-value" id="detailMonthlySales">PHP 0.00</span>
+                <span class="stat-label" id="detailMonthlyMeta">0 transactions</span>
+              </div>
+            </div>
+            <div class="card" style="margin-top:10px;">
+              <h3 style="margin-bottom:8px;">Top Sales per Product</h3>
+              <div id="topProductsList" class="sales-list">
+                <p>Loading top products...</p>
+              </div>
+            </div>
           </section>
 
           <!-- Transaction Filters -->
@@ -372,6 +402,34 @@
             </div>
           </section>
           </div>
+          </div>
+
+          <div id="adminPanelInventory" class="admin-panel">
+            <section class="card full-width">
+              <h2>Inventory</h2>
+              <p>Track ingredient stocks and estimated usage per product based on paid sales.</p>
+              <form id="inventoryIngredientForm" class="row">
+                <input id="ingredientNameInput" type="text" placeholder="Ingredient name" required />
+                <input id="ingredientQtyInput" type="number" min="0" step="0.001" placeholder="Quantity" required />
+                <input id="ingredientPriceInput" type="number" min="0" step="0.01" placeholder="Unit price (PHP)" required />
+                <input id="ingredientUnitInput" type="text" placeholder="Base unit (pcs, kg, liter)" value="pcs" required />
+                <button id="ingredientAddBtn" type="submit">Add Ingredient</button>
+              </form>
+              <div id="inventoryAdminNote" class="status" style="display:none;">Only Administrations role can add ingredients. Other roles can view stocks.</div>
+              <div id="inventorySummary" class="status">Loading inventory summary...</div>
+              <div id="inventoryTableWrap" class="admin-transactions">
+                <p>Loading ingredients...</p>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelKitSpec" class="admin-panel">
+            <section class="card full-width">
+              <h2>Kit Specification</h2>
+              <p>Define product kit composition, required components, and standard quantity per kit.</p>
+              <div id="kitSpecModule" class="status">Kit Specification module page is ready for your setup.</div>
+            </section>
+          </div>
         </div>
       </div>
 
@@ -413,11 +471,11 @@
         <h2>Admin Login</h2>
         <div class="row">
           <label for="adminUsername">Username:</label>
-          <input id="adminUsername" type="text" value="admin" autocomplete="username" />
+          <input id="adminUsername" type="text" autocomplete="off" />
         </div>
         <div class="row">
           <label for="adminPassword">Password:</label>
-          <input id="adminPassword" type="password" value="P@ssw0rd" autocomplete="current-password" />
+          <input id="adminPassword" type="password" autocomplete="new-password" />
         </div>
         <div id="adminLoginError" class="admin-login-error"></div>
         <div class="row">

@@ -34,6 +34,11 @@ const statusReceiptActionsEl = document.getElementById('statusReceiptActions');
 const statusPrintReceiptBtn = document.getElementById('statusPrintReceiptBtn');
 const salesSummaryEl = document.getElementById('salesSummary');
 const salesListEl = document.getElementById('salesList');
+const detailDailySalesEl = document.getElementById('detailDailySales');
+const detailDailyMetaEl = document.getElementById('detailDailyMeta');
+const detailMonthlySalesEl = document.getElementById('detailMonthlySales');
+const detailMonthlyMetaEl = document.getElementById('detailMonthlyMeta');
+const topProductsListEl = document.getElementById('topProductsList');
 const salesDailyBtn = document.getElementById('salesDailyBtn');
 const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
@@ -93,6 +98,7 @@ const authLogoCanvasEl = document.getElementById('authLogoCanvas');
 const welcomeBannerEl = document.getElementById('welcomeBanner');
 const settingsToggleBtn = document.getElementById('settingsToggleBtn');
 const settingsMenuEl = document.getElementById('settingsMenu');
+const settingsAdminDashboardBtn = document.getElementById('settingsAdminDashboardBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const phDateTimeEl = document.getElementById('phDateTime');
 const welcomeRoleIconEl = document.getElementById('welcomeRoleIcon');
@@ -125,6 +131,21 @@ const adminLoginBtn = document.getElementById('adminLoginBtn');
 const adminCancelBtn = document.getElementById('adminCancelBtn');
 const adminLoginErrorEl = document.getElementById('adminLoginError');
 const adminCloseBtn = document.getElementById('adminCloseBtn');
+const adminNavOverviewBtn = document.getElementById('adminNavOverviewBtn');
+const adminNavInventoryBtn = document.getElementById('adminNavInventoryBtn');
+const adminNavKitSpecBtn = document.getElementById('adminNavKitSpecBtn');
+const adminPanelOverviewEl = document.getElementById('adminPanelOverview');
+const adminPanelInventoryEl = document.getElementById('adminPanelInventory');
+const adminPanelKitSpecEl = document.getElementById('adminPanelKitSpec');
+const inventoryIngredientFormEl = document.getElementById('inventoryIngredientForm');
+const ingredientNameInputEl = document.getElementById('ingredientNameInput');
+const ingredientQtyInputEl = document.getElementById('ingredientQtyInput');
+const ingredientPriceInputEl = document.getElementById('ingredientPriceInput');
+const ingredientUnitInputEl = document.getElementById('ingredientUnitInput');
+const ingredientAddBtn = document.getElementById('ingredientAddBtn');
+const inventoryAdminNoteEl = document.getElementById('inventoryAdminNote');
+const inventorySummaryEl = document.getElementById('inventorySummary');
+const inventoryTableWrapEl = document.getElementById('inventoryTableWrap');
 
 // -- Tab Elements --
 const tabBtns = document.querySelectorAll('.tab-btn');
@@ -264,9 +285,13 @@ function getTotalDue() {
 }
 
 async function api(path, options = {}) {
+  const mergedHeaders = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
+    ...options,
+    headers: mergedHeaders
   });
   const data = await res.json();
   if (!res.ok) {
@@ -348,6 +373,16 @@ function canAccessAdminFeatures() {
   return role === 'administrations' || role === 'supervisor';
 }
 
+function canManageInventory() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations';
+}
+
+function updateSettingsRoleItems() {
+  if (!settingsAdminDashboardBtn) return;
+  settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+}
+
 function fireAudit(eventType, metadata = {}) {
   if (!activeAuthSession?.email) return;
   api('/api/auth/audit', {
@@ -393,9 +428,11 @@ function updateWelcomeBanner() {
   }
   if (welcomeTextEl) {
     welcomeTextEl.textContent = `Welcome ${firstName}, have a nice day.`;
+    updateSettingsRoleItems();
     return;
   }
   welcomeBannerEl.textContent = `Welcome ${firstName}, have a nice day.`;
+  updateSettingsRoleItems();
 }
 
 function updatePhilippineDateTime() {
@@ -488,6 +525,7 @@ function setAuthMode(mode) {
     showSignupBtn.setAttribute('aria-selected', String(!showLogin));
   }
   setAuthMessage('');
+  updateSettingsRoleItems();
 }
 
 function unlockDashboard() {
@@ -638,6 +676,12 @@ function setupAuth() {
   }
   if (logoutBtn) {
     logoutBtn.addEventListener('click', handleLogout);
+  }
+  if (settingsAdminDashboardBtn) {
+    settingsAdminDashboardBtn.addEventListener('click', async () => {
+      closeSettingsMenu();
+      await openAdminLogin();
+    });
   }
   document.addEventListener('click', (e) => {
     if (!settingsMenuEl?.classList.contains('open')) return;
@@ -793,6 +837,24 @@ function switchTab(tabName) {
   }
 }
 
+function switchAdminPanel(panelName) {
+  const isOverview = panelName === 'overview';
+  const isInventory = panelName === 'inventory';
+  const isKit = panelName === 'kit-spec';
+
+  if (adminPanelOverviewEl) adminPanelOverviewEl.classList.toggle('active', isOverview);
+  if (adminPanelInventoryEl) adminPanelInventoryEl.classList.toggle('active', isInventory);
+  if (adminPanelKitSpecEl) adminPanelKitSpecEl.classList.toggle('active', isKit);
+
+  if (adminNavOverviewBtn) adminNavOverviewBtn.classList.toggle('active', isOverview);
+  if (adminNavInventoryBtn) adminNavInventoryBtn.classList.toggle('active', isInventory);
+  if (adminNavKitSpecBtn) adminNavKitSpecBtn.classList.toggle('active', isKit);
+
+  if (isInventory) {
+    refreshInventoryModule();
+  }
+}
+
 function openAdminLogin() {
   if (!canAccessAdminFeatures()) {
     fireAudit('admin_access_denied', { reason: 'role_blocked', role: activeAuthSession?.role || 'unknown' });
@@ -803,7 +865,7 @@ function openAdminLogin() {
   if (!adminLoginModalEl) return;
   document.body.classList.add('admin-login-open');
   if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
-  if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
+  if (adminPasswordEl) adminPasswordEl.value = '';
   if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
   if (adminUsernameEl) adminUsernameEl.focus();
 }
@@ -815,6 +877,7 @@ function closeAdminLogin() {
 async function openAdminDashboard() {
   document.body.classList.add('admin-open');
   saveUserUiState({ adminOpen: true });
+  switchAdminPanel('overview');
   await refreshAdminTransactions();
   await refreshSalesReport(activeSalesRange);
 }
@@ -909,11 +972,12 @@ function renderCart() {
   cartEl.innerHTML = '';
 
   const items = getCartItems();
+  const displayItems = [...items].reverse();
   if (!items.length) {
     cartEl.innerHTML = '<p>No Orders Yet</p>'; 
   } else {
     const byId = Object.fromEntries(state.products.map((p) => [p.id, p]));
-    items.forEach(({ productId, qty }) => {
+    displayItems.forEach(({ productId, qty }) => {
       const p = byId[productId];
       const row = document.createElement('div');
       row.className = 'cart-row';
@@ -1357,12 +1421,189 @@ function renderSalesReport(report) {
     .join('');
 }
 
+function renderDetailedSalesReport(report) {
+  if (detailDailySalesEl) detailDailySalesEl.textContent = money(report?.dailySales?.totalSales || 0);
+  if (detailDailyMetaEl) {
+    detailDailyMetaEl.textContent = `${Number(report?.dailySales?.totalTransactions || 0)} transactions | Avg ${money(report?.dailySales?.averageTicket || 0)}`;
+  }
+  if (detailMonthlySalesEl) detailMonthlySalesEl.textContent = money(report?.monthlySales?.totalSales || 0);
+  if (detailMonthlyMetaEl) {
+    detailMonthlyMetaEl.textContent = `${Number(report?.monthlySales?.totalTransactions || 0)} transactions | Avg ${money(report?.monthlySales?.averageTicket || 0)}`;
+  }
+
+  if (!topProductsListEl) return;
+  const rows = Array.isArray(report?.topSalesPerProduct) ? report.topSalesPerProduct : [];
+  if (!rows.length) {
+    topProductsListEl.innerHTML = '<p>No product sales yet.</p>';
+    return;
+  }
+
+  topProductsListEl.innerHTML = rows
+    .map((item) => `
+      <div class="top-product-row">
+        <span class="top-product-name">${escapeHtml(item.productName || 'Unknown Product')}</span>
+        <span class="top-product-qty">${Number(item.qtySold || 0)} sold</span>
+        <span class="top-product-sales">${money(item.totalSales || 0)}</span>
+      </div>
+    `)
+    .join('');
+}
+
+async function refreshDetailedSalesReport() {
+  try {
+    const report = await api('/api/reports/sales/detailed');
+    renderDetailedSalesReport(report);
+  } catch (error) {
+    if (topProductsListEl) {
+      topProductsListEl.innerHTML = `<p class="error">Detailed sales error: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+}
+
+function renderInventoryReport(report) {
+  function formatQty(value) {
+    return Number(value || 0).toFixed(2);
+  }
+
+  const totals = report?.totals || {};
+  const ingredients = Array.isArray(report?.ingredients) ? report.ingredients : [];
+
+  if (inventorySummaryEl) {
+    inventorySummaryEl.textContent = [
+      `Total Ingredients: ${Number(totals.totalIngredients || 0)}`,
+      `Total Inventory Value: ${money(totals.totalInventoryValue || 0)}`,
+      `Low Stock Items: ${Number(totals.lowStockCount || 0)}`
+    ].join('\n');
+  }
+
+  if (!inventoryTableWrapEl) return;
+  if (!ingredients.length) {
+    inventoryTableWrapEl.innerHTML = '<p>No ingredients yet. Add your first ingredient above.</p>';
+    return;
+  }
+
+  const rows = ingredients.map((x) => {
+    const usageRows = (x.usageByProduct || [])
+      .slice(0, 3)
+      .map((u) => `<li>${escapeHtml(u.productName)}: used ${formatQty(u.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</li>`)
+      .join('');
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(x.name)}</strong></td>
+        <td>${formatQty(x.qtyOnHand || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${money(x.unitPrice || 0)}</td>
+        <td>${money(x.inventoryValue || 0)}</td>
+        <td>${formatQty(x.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${formatQty(x.estimatedRemainingQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${x.lowStock ? '<span class="low-stock-badge">Low Stock</span>' : 'OK'}</td>
+        <td>${usageRows ? `<ul class="usage-list">${usageRows}</ul>` : 'No recipe mapping yet'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  inventoryTableWrapEl.innerHTML = `
+    <table class="inventory-table">
+      <thead>
+        <tr>
+          <th>Ingredient</th>
+          <th>Qty On Hand</th>
+          <th>Unit Price</th>
+          <th>Inventory Value</th>
+          <th>Estimated Used</th>
+          <th>Estimated Remaining</th>
+          <th>Status</th>
+          <th>Used in Products</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshInventoryModule() {
+  const isAdmin = canManageInventory();
+  if (inventoryIngredientFormEl) {
+    inventoryIngredientFormEl.style.display = isAdmin ? 'flex' : 'none';
+  }
+  if (inventoryAdminNoteEl) {
+    inventoryAdminNoteEl.style.display = isAdmin ? 'none' : 'block';
+  }
+
+  if (inventorySummaryEl) inventorySummaryEl.textContent = 'Loading inventory summary...';
+  if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '<p>Loading ingredients...</p>';
+
+  try {
+    const report = await api('/api/admin/inventory/report');
+    renderInventoryReport(report);
+  } catch (error) {
+    if (inventorySummaryEl) inventorySummaryEl.textContent = `Inventory error: ${error.message}`;
+    if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '';
+  }
+}
+
+async function handleIngredientSubmit(event) {
+  event.preventDefault();
+  if (!canManageInventory()) {
+    setStatus('Only Administrations role can add ingredients.');
+    return;
+  }
+
+  const name = String(ingredientNameInputEl?.value || '').trim();
+  const qtyOnHand = Number(ingredientQtyInputEl?.value || 0);
+  const unitPrice = Number(ingredientPriceInputEl?.value || 0);
+  const unit = String(ingredientUnitInputEl?.value || '').trim() || 'pcs';
+
+  if (!name) {
+    setStatus('Ingredient name is required.');
+    return;
+  }
+  if (!Number.isFinite(qtyOnHand) || qtyOnHand < 0) {
+    setStatus('Quantity must be a valid number >= 0.');
+    return;
+  }
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    setStatus('Unit price must be a valid number >= 0.');
+    return;
+  }
+
+  try {
+    if (ingredientAddBtn) {
+      ingredientAddBtn.disabled = true;
+      ingredientAddBtn.textContent = 'Adding...';
+    }
+
+    await api('/api/admin/inventory/ingredients', {
+      method: 'POST',
+      headers: {
+        'x-user-role': String(activeAuthSession?.role || '')
+      },
+      body: JSON.stringify({ name, qtyOnHand, unitPrice, unit })
+    });
+
+    if (ingredientNameInputEl) ingredientNameInputEl.value = '';
+    if (ingredientQtyInputEl) ingredientQtyInputEl.value = '';
+    if (ingredientPriceInputEl) ingredientPriceInputEl.value = '';
+    if (ingredientUnitInputEl) ingredientUnitInputEl.value = 'pcs';
+    await refreshInventoryModule();
+    setStatus(`Ingredient "${name}" added successfully.`);
+  } catch (error) {
+    setStatus(`Add ingredient failed: ${error.message}`);
+  } finally {
+    if (ingredientAddBtn) {
+      ingredientAddBtn.disabled = false;
+      ingredientAddBtn.textContent = 'Add Ingredient';
+    }
+  }
+}
+
 async function refreshSalesReport(range = activeSalesRange) {
   try {
     activeSalesRange = range;
     saveUserUiState({ salesRange: activeSalesRange });
     const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
     renderSalesReport(report);
+    await refreshDetailedSalesReport();
   } catch (error) {
     salesSummaryEl.textContent = `Sales report error: ${error.message}`;
     salesListEl.innerHTML = '';
@@ -1837,6 +2078,18 @@ function setupEventListeners() {
   salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange));
 
   // Admin events
+  if (adminNavOverviewBtn) {
+    adminNavOverviewBtn.addEventListener('click', () => switchAdminPanel('overview'));
+  }
+  if (adminNavInventoryBtn) {
+    adminNavInventoryBtn.addEventListener('click', () => switchAdminPanel('inventory'));
+  }
+  if (adminNavKitSpecBtn) {
+    adminNavKitSpecBtn.addEventListener('click', () => switchAdminPanel('kit-spec'));
+  }
+  if (inventoryIngredientFormEl) {
+    inventoryIngredientFormEl.addEventListener('submit', handleIngredientSubmit);
+  }
   adminRefreshBtn.addEventListener('click', refreshAdminTransactions);
   adminVerifyAllBtn.addEventListener('click', verifyAllPending);
   adminFilterEl.addEventListener('change', refreshAdminTransactions);

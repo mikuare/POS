@@ -517,6 +517,26 @@ body.admin-open #tab-admin {
   margin-bottom: 12px;
 }
 
+.admin-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-nav-btn.active {
+  background: #5a3521;
+  color: #ffffff;
+}
+
+.admin-panel {
+  display: none;
+}
+
+.admin-panel.active {
+  display: block;
+}
+
 .admin-login-backdrop {
   display: none;
   position: fixed;
@@ -1361,6 +1381,76 @@ select {
   margin-top: 12px;
 }
 
+.sales-detailed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.top-product-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.7fr 1fr;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #d8c1ae;
+  align-items: center;
+}
+
+.top-product-row:last-child {
+  border-bottom: none;
+}
+
+.top-product-name {
+  font-weight: 700;
+  color: #4a2d1d;
+}
+
+.top-product-qty {
+  font-weight: 700;
+  color: #7a4a2d;
+}
+
+.top-product-sales {
+  font-weight: 800;
+  color: #5a3521;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.inventory-table th,
+.inventory-table td {
+  border-bottom: 1px solid #d8c1ae;
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.inventory-table th {
+  color: #5a3521;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.low-stock-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #f4ddc8;
+  color: #7a4a2d;
+}
+
+.usage-list {
+  margin: 0;
+  padding-left: 16px;
+}
+
 .sales-row {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr;
@@ -1609,6 +1699,10 @@ select {
 }
 
 @media (max-width: 800px) {
+  .sales-detailed-grid {
+    grid-template-columns: 1fr;
+  }
+
   .user-topbar {
     flex-direction: column;
     align-items: flex-start;

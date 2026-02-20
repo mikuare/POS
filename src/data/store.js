@@ -51,6 +51,8 @@ const PRODUCTS = [
 
 const invoices = new Map();
 const gcashSessions = new Map();
+const inventoryIngredients = new Map();
+const productRecipes = new Map();
 const supabase = getSupabase();
 
 function listProducts() {
@@ -426,6 +428,247 @@ function summarizeSalesRows(rows) {
   };
 }
 
+function buildInventoryUsageFromInvoices({ paidInvoices, invoiceItems, recipesByProductId }) {
+  const paidInvoiceSet = new Set((paidInvoices || []).map((x) => x.id));
+  const productUnitsSold = new Map();
+
+  (invoiceItems || [])
+    .filter((item) => paidInvoiceSet.has(item.invoice_id))
+    .forEach((item) => {
+      const key = item.product_id;
+      productUnitsSold.set(key, (productUnitsSold.get(key) || 0) + Number(item.qty || 0));
+    });
+
+  const usageByIngredientId = new Map();
+
+  for (const [productId, recipes] of recipesByProductId.entries()) {
+    const soldUnits = Number(productUnitsSold.get(productId) || 0);
+    if (!soldUnits) continue;
+
+    recipes.forEach((recipe) => {
+      const ingredientId = recipe.ingredientId;
+      const estimatedUsedQty = soldUnits * Number(recipe.qtyPerProduct || 0);
+      if (!usageByIngredientId.has(ingredientId)) {
+        usageByIngredientId.set(ingredientId, {
+          estimatedUsedQty: 0,
+          usageByProduct: []
+        });
+      }
+      const bucket = usageByIngredientId.get(ingredientId);
+      bucket.estimatedUsedQty += estimatedUsedQty;
+      bucket.usageByProduct.push({
+        productId,
+        productName: recipe.productName,
+        qtyPerProduct: Number(recipe.qtyPerProduct || 0),
+        unitsSold: soldUnits,
+        estimatedUsedQty
+      });
+    });
+  }
+
+  return usageByIngredientId;
+}
+
+async function createInventoryIngredient({ name, qtyOnHand, unitPrice, reorderLevel = 0, unit = 'pcs' }) {
+  const ingredient = {
+    id: uuidv4(),
+    name: String(name || '').trim(),
+    qtyOnHand: Number(qtyOnHand || 0),
+    unitPrice: Number(unitPrice || 0),
+    reorderLevel: Number(reorderLevel || 0),
+    unit: String(unit || 'pcs').trim() || 'pcs',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (!ingredient.name) {
+    throw new Error('Ingredient name is required');
+  }
+  if (!Number.isFinite(ingredient.qtyOnHand) || ingredient.qtyOnHand < 0) {
+    throw new Error('qtyOnHand must be a number >= 0');
+  }
+  if (!Number.isFinite(ingredient.unitPrice) || ingredient.unitPrice < 0) {
+    throw new Error('unitPrice must be a number >= 0');
+  }
+
+  if (isSupabaseEnabled()) {
+    const { data, error } = await supabase
+      .from('inventory_ingredients')
+      .insert({
+        id: ingredient.id,
+        name: ingredient.name,
+        qty_on_hand: ingredient.qtyOnHand,
+        unit_price: ingredient.unitPrice,
+        reorder_level: ingredient.reorderLevel,
+        unit: ingredient.unit,
+        is_active: ingredient.isActive,
+        created_at: ingredient.createdAt,
+        updated_at: ingredient.updatedAt
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      if (String(error.message || '').toLowerCase().includes('duplicate')) {
+        throw new Error('Ingredient name already exists');
+      }
+      throw new Error(`Supabase create ingredient failed: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      qtyOnHand: Number(data.qty_on_hand || 0),
+      unitPrice: Number(data.unit_price || 0),
+      reorderLevel: Number(data.reorder_level || 0),
+      unit: data.unit || 'pcs',
+      isActive: Boolean(data.is_active),
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  if (Array.from(inventoryIngredients.values()).some((x) => String(x.name).toLowerCase() === ingredient.name.toLowerCase())) {
+    throw new Error('Ingredient name already exists');
+  }
+  inventoryIngredients.set(ingredient.id, ingredient);
+  return ingredient;
+}
+
+async function getInventoryReport() {
+  if (isSupabaseEnabled()) {
+    const [{ data: ingredients, error: ingredientErr }, { data: recipes, error: recipeErr }, { data: paidInvoices, error: invoiceErr }] = await Promise.all([
+      supabase
+        .from('inventory_ingredients')
+        .select('id,name,qty_on_hand,unit_price,reorder_level,unit,is_active,created_at,updated_at')
+        .eq('is_active', true)
+        .order('name', { ascending: true }),
+      supabase
+        .from('product_recipes')
+        .select('id,product_id,product_name,ingredient_id,qty_per_product'),
+      supabase
+        .from('pos_invoices')
+        .select('id')
+        .eq('status', 'PAID')
+    ]);
+
+    if (ingredientErr) throw new Error(`Supabase inventory query failed: ${ingredientErr.message}`);
+    if (recipeErr) throw new Error(`Supabase recipes query failed: ${recipeErr.message}`);
+    if (invoiceErr) throw new Error(`Supabase invoice query failed: ${invoiceErr.message}`);
+
+    const paidIds = (paidInvoices || []).map((x) => x.id);
+    let invoiceItems = [];
+    if (paidIds.length) {
+      const { data: items, error: itemErr } = await supabase
+        .from('pos_invoice_items')
+        .select('invoice_id,product_id,qty')
+        .in('invoice_id', paidIds);
+      if (itemErr) throw new Error(`Supabase invoice items query failed: ${itemErr.message}`);
+      invoiceItems = items || [];
+    }
+
+    const recipesByProductId = new Map();
+    (recipes || []).forEach((r) => {
+      const key = r.product_id;
+      if (!recipesByProductId.has(key)) recipesByProductId.set(key, []);
+      recipesByProductId.get(key).push({
+        productId: r.product_id,
+        productName: r.product_name,
+        ingredientId: r.ingredient_id,
+        qtyPerProduct: Number(r.qty_per_product || 0)
+      });
+    });
+
+    const usageByIngredientId = buildInventoryUsageFromInvoices({
+      paidInvoices: paidInvoices || [],
+      invoiceItems,
+      recipesByProductId
+    });
+
+    const rows = (ingredients || []).map((ing) => {
+      const usage = usageByIngredientId.get(ing.id) || { estimatedUsedQty: 0, usageByProduct: [] };
+      const qtyOnHand = Number(ing.qty_on_hand || 0);
+      const unitPrice = Number(ing.unit_price || 0);
+      const estimatedUsedQty = Number(usage.estimatedUsedQty || 0);
+      return {
+        id: ing.id,
+        name: ing.name,
+        qtyOnHand,
+        unitPrice,
+        reorderLevel: Number(ing.reorder_level || 0),
+        unit: ing.unit || 'pcs',
+        inventoryValue: qtyOnHand * unitPrice,
+        estimatedUsedQty,
+        estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
+        lowStock: qtyOnHand <= Number(ing.reorder_level || 0),
+        usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
+        createdAt: ing.created_at,
+        updatedAt: ing.updated_at
+      };
+    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const totals = rows.reduce((acc, row) => {
+      acc.totalIngredients += 1;
+      acc.totalInventoryValue += row.inventoryValue;
+      if (row.lowStock) acc.lowStockCount += 1;
+      return acc;
+    }, { totalIngredients: 0, totalInventoryValue: 0, lowStockCount: 0 });
+
+    return { ingredients: rows, totals };
+  }
+
+  const recipesByProductId = new Map();
+  Array.from(productRecipes.values()).forEach((r) => {
+    if (!recipesByProductId.has(r.productId)) recipesByProductId.set(r.productId, []);
+    recipesByProductId.get(r.productId).push(r);
+  });
+
+  const paidInvoices = Array.from(invoices.values()).filter((inv) => inv.status === 'PAID');
+  const invoiceItems = paidInvoices.flatMap((inv) => (inv.lineItems || []).map((item) => ({
+    invoice_id: inv.id,
+    product_id: item.productId,
+    qty: item.qty
+  })));
+
+  const usageByIngredientId = buildInventoryUsageFromInvoices({
+    paidInvoices: paidInvoices.map((inv) => ({ id: inv.id })),
+    invoiceItems,
+    recipesByProductId
+  });
+
+  const rows = Array.from(inventoryIngredients.values()).map((ing) => {
+    const usage = usageByIngredientId.get(ing.id) || { estimatedUsedQty: 0, usageByProduct: [] };
+    const qtyOnHand = Number(ing.qtyOnHand || 0);
+    const unitPrice = Number(ing.unitPrice || 0);
+    const estimatedUsedQty = Number(usage.estimatedUsedQty || 0);
+    return {
+      id: ing.id,
+      name: ing.name,
+      qtyOnHand,
+      unitPrice,
+      reorderLevel: Number(ing.reorderLevel || 0),
+        unit: ing.unit || 'pcs',
+        inventoryValue: qtyOnHand * unitPrice,
+        estimatedUsedQty,
+        estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
+        lowStock: qtyOnHand <= Number(ing.reorderLevel || 0),
+        usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
+        createdAt: ing.createdAt,
+        updatedAt: ing.updatedAt
+      };
+  }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  const totals = rows.reduce((acc, row) => {
+    acc.totalIngredients += 1;
+    acc.totalInventoryValue += row.inventoryValue;
+    if (row.lowStock) acc.lowStockCount += 1;
+    return acc;
+  }, { totalIngredients: 0, totalInventoryValue: 0, lowStockCount: 0 });
+
+  return { ingredients: rows, totals };
+}
+
 async function getSalesReport({ dateFrom, dateTo }) {
   const { fromIso, toIso } = normalizeDateRange({ dateFrom, dateTo });
 
@@ -498,6 +741,63 @@ async function getSalesReport({ dateFrom, dateTo }) {
     ...summary,
     transactions: salesRows
   };
+}
+
+async function getTopSalesPerProduct(limit = 10) {
+  const cappedLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
+
+  if (isSupabaseEnabled()) {
+    const { data: paidInvoices, error: invoiceError } = await supabase
+      .from('pos_invoices')
+      .select('id')
+      .eq('status', 'PAID');
+
+    if (invoiceError) {
+      throw new Error(`Supabase top-products invoice query failed: ${invoiceError.message}`);
+    }
+
+    const invoiceIds = (paidInvoices || []).map((x) => x.id);
+    if (!invoiceIds.length) return [];
+
+    const { data: itemRows, error: itemsError } = await supabase
+      .from('pos_invoice_items')
+      .select('product_name,qty,subtotal')
+      .in('invoice_id', invoiceIds);
+
+    if (itemsError) {
+      throw new Error(`Supabase top-products items query failed: ${itemsError.message}`);
+    }
+
+    const grouped = new Map();
+    (itemRows || []).forEach((row) => {
+      const key = row.product_name || 'Unknown Product';
+      const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
+      current.qtySold += Number(row.qty || 0);
+      current.totalSales += Number(row.subtotal || 0);
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values())
+      .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
+      .slice(0, cappedLimit);
+  }
+
+  const grouped = new Map();
+  Array.from(invoices.values())
+    .filter((inv) => inv.status === 'PAID')
+    .forEach((inv) => {
+      (inv.lineItems || []).forEach((item) => {
+        const key = item.name || 'Unknown Product';
+        const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
+        current.qtySold += Number(item.qty || 0);
+        current.totalSales += Number(item.subtotal || 0);
+        grouped.set(key, current);
+      });
+    });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
+    .slice(0, cappedLimit);
 }
 
 async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
@@ -658,6 +958,10 @@ module.exports = {
   getGcashSessionByReference,
   getGcashSessionByInvoiceId,
   getSalesReport,
+  getTopSalesPerProduct,
+  createInventoryIngredient,
+  getInventoryReport,
   listAllInvoices
 };
+
 

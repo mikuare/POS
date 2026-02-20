@@ -15,6 +15,9 @@ const {
   getGcashSessionByReference,
   getGcashSessionByInvoiceId,
   getSalesReport,
+  getTopSalesPerProduct,
+  createInventoryIngredient,
+  getInventoryReport,
   listAllInvoices
 } = require('./data/store');
 const {
@@ -64,6 +67,14 @@ const AUDIT_EVENTS = new Set([
 function normalizeRole(role) {
   const normalized = String(role || '').trim().toLowerCase();
   return AUTH_ROLES.includes(normalized) ? normalized : 'encharge';
+}
+
+function requireAdminRole(req, res, next) {
+  const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+  if (role !== 'administrations') {
+    return res.status(403).json({ error: 'Only Administrations role can manage Inventory.' });
+  }
+  return next();
 }
 
 function getRequestIp(req) {
@@ -608,6 +619,68 @@ app.get('/api/reports/sales', async (req, res) => {
       byMethod: report.byMethod,
       transactions: report.transactions
     });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/reports/sales/detailed', async (_req, res) => {
+  try {
+    const now = new Date();
+
+    const dailyStart = new Date(now);
+    dailyStart.setUTCHours(0, 0, 0, 0);
+    const dailyEnd = new Date(now);
+    dailyEnd.setUTCHours(23, 59, 59, 999);
+
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+
+    const [daily, monthly, topProducts] = await Promise.all([
+      getSalesReport({ dateFrom: dailyStart.toISOString(), dateTo: dailyEnd.toISOString() }),
+      getSalesReport({ dateFrom: monthStart.toISOString(), dateTo: monthEnd.toISOString() }),
+      getTopSalesPerProduct(10)
+    ]);
+
+    return res.json({
+      reportType: 'sales_detailed',
+      generatedAt: new Date().toISOString(),
+      dailySales: {
+        totalSales: daily.totalSales,
+        totalTransactions: daily.totalTransactions,
+        averageTicket: daily.averageTicket
+      },
+      monthlySales: {
+        totalSales: monthly.totalSales,
+        totalTransactions: monthly.totalTransactions,
+        averageTicket: monthly.averageTicket
+      },
+      topSalesPerProduct: topProducts
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/inventory/report', async (_req, res) => {
+  try {
+    const report = await getInventoryReport();
+    return res.json(report);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/inventory/ingredients', requireAdminRole, async (req, res) => {
+  try {
+    const ingredient = await createInventoryIngredient({
+      name: req.body?.name,
+      qtyOnHand: req.body?.qtyOnHand,
+      unitPrice: req.body?.unitPrice,
+      reorderLevel: req.body?.reorderLevel,
+      unit: req.body?.unit
+    });
+    return res.status(201).json({ ingredient });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
