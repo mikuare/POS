@@ -1462,7 +1462,17 @@ async function refreshDetailedSalesReport() {
 
 function renderInventoryReport(report) {
   function formatQty(value) {
-    return Number(value || 0).toFixed(2);
+    return Number(value || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function formatInventoryMoney(value) {
+    return `PHP ${Number(value || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   }
 
   const totals = report?.totals || {};
@@ -1471,7 +1481,7 @@ function renderInventoryReport(report) {
   if (inventorySummaryEl) {
     inventorySummaryEl.textContent = [
       `Total Ingredients: ${Number(totals.totalIngredients || 0)}`,
-      `Total Inventory Value: ${money(totals.totalInventoryValue || 0)}`,
+      `Total Inventory Value: ${formatInventoryMoney(totals.totalInventoryValue || 0)}`,
       `Low Stock Items: ${Number(totals.lowStockCount || 0)}`
     ].join('\n');
   }
@@ -1492,8 +1502,8 @@ function renderInventoryReport(report) {
       <tr>
         <td><strong>${escapeHtml(x.name)}</strong></td>
         <td>${formatQty(x.qtyOnHand || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
-        <td>${money(x.unitPrice || 0)}</td>
-        <td>${money(x.inventoryValue || 0)}</td>
+        <td>${formatInventoryMoney(x.unitPrice || 0)}</td>
+        <td>${formatInventoryMoney(x.inventoryValue || 0)}</td>
         <td>${formatQty(x.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
         <td>${formatQty(x.estimatedRemainingQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
         <td>${x.lowStock ? '<span class="low-stock-badge">Low Stock</span>' : 'OK'}</td>
