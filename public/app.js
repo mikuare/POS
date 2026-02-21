@@ -9,6 +9,7 @@
   orderType: null,
   cashPromptActive: false,
   discountAmount: 0,
+  productsRendered: false,
 };
 
 // -- POS Tab Elements --
@@ -917,32 +918,77 @@ function getCategoryName(category) {
   return categoryNames[category] || category;
 }
 
-function renderProducts() {
-  productsEl.innerHTML = '';
-  
-  // Filter products by active category
-  const filteredProducts = state.products.filter(
-    (p) => (p.category || '').toLowerCase() === state.activeCategory
+function preloadProductImages(products) {
+  const uniqueImages = Array.from(
+    new Set(
+      (products || [])
+        .map((p) => String(p?.image || '').trim())
+        .filter(Boolean)
+    )
   );
 
-  if (filteredProducts.length === 0) {
-    productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products in this category.</p>';
-    return;
+  uniqueImages.forEach((src) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+  });
+}
+
+function updateVisibleProducts() {
+  const activeCategory = String(state.activeCategory || '').toLowerCase();
+  let visibleCount = 0;
+
+  productsEl.querySelectorAll('.product-row').forEach((row) => {
+    const rowCategory = String(row.getAttribute('data-category') || '').toLowerCase();
+    const isVisible = rowCategory === activeCategory;
+    row.style.display = isVisible ? '' : 'none';
+    if (isVisible) visibleCount += 1;
+  });
+
+  const noProductsNotice = productsEl.querySelector('.no-products-message');
+  if (noProductsNotice) {
+    noProductsNotice.style.display = visibleCount ? 'none' : '';
+  }
+}
+
+function renderProducts() {
+  if (!state.productsRendered) {
+    productsEl.innerHTML = '';
+
+    if (!state.products.length) {
+      productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products available.</p>';
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    state.products.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'product-row';
+      row.setAttribute('data-category', String(p.category || '').toLowerCase());
+      row.innerHTML = `
+        <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
+        <div class="product-info">
+          <div class="product-name">${p.name}</div>
+          <div class="product-price">${money(p.price)}</div>
+        </div>
+        <button data-add="${p.id}">Add to Order</button>
+      `;
+      fragment.appendChild(row);
+    });
+
+    const noProductsNotice = document.createElement('p');
+    noProductsNotice.className = 'no-products-message';
+    noProductsNotice.style.textAlign = 'center';
+    noProductsNotice.style.color = '#6b7280';
+    noProductsNotice.style.padding = '20px';
+    noProductsNotice.textContent = 'No products in this category.';
+    fragment.appendChild(noProductsNotice);
+
+    productsEl.appendChild(fragment);
+    state.productsRendered = true;
   }
 
-  filteredProducts.forEach((p) => {
-    const row = document.createElement('div');
-    row.className = 'product-row';
-    row.innerHTML = `
-      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" />
-      <div class="product-info">
-        <div class="product-name">${p.name}</div>
-        <div class="product-price">${money(p.price)}</div>
-      </div>
-      <button data-add="${p.id}">Add to Order</button>
-    `;
-    productsEl.appendChild(row);
-  });
+  updateVisibleProducts();
 }
 
 function setPaymentMethod(method) {
@@ -2204,6 +2250,8 @@ async function init() {
   ensureConfettiAnimation();
   ensureYummyAnimations();
   renderProducts();
+  switchCategory(state.activeCategory);
+  preloadProductImages(state.products);
   renderCart();
 
   setupEventListeners();
