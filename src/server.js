@@ -63,10 +63,37 @@ const AUDIT_EVENTS = new Set([
   'admin_access_allowed',
   'admin_access_denied'
 ]);
+const APP_USER_CACHE_TTL_MS = 30 * 1000;
+const appUserByIdCache = new Map();
 
 function normalizeRole(role) {
   const normalized = String(role || '').trim().toLowerCase();
   return AUTH_ROLES.includes(normalized) ? normalized : 'encharge';
+}
+
+function getCachedAppUserById(userId) {
+  if (!userId) return null;
+  const cached = appUserByIdCache.get(userId);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    appUserByIdCache.delete(userId);
+    return null;
+  }
+  return cached.user;
+}
+
+function cacheAppUser(user) {
+  if (!user?.id) return;
+  appUserByIdCache.set(user.id, {
+    user,
+    expiresAt: Date.now() + APP_USER_CACHE_TTL_MS
+  });
+}
+
+function runInBackground(promiseLike, label = 'background-task') {
+  Promise.resolve(promiseLike).catch((error) => {
+    console.warn(`[${label}]`, error.message);
+  });
 }
 
 function requireAdminRole(req, res, next) {
@@ -119,17 +146,21 @@ async function getAppUserByEmail(email) {
     .eq('email', email)
     .maybeSingle();
   if (error) throw error;
+  if (data) cacheAppUser(data);
   return data;
 }
 
 async function getAppUserById(userId) {
   if (!supabaseService) return null;
+  const cached = getCachedAppUserById(userId);
+  if (cached) return cached;
   const { data, error } = await supabaseService
     .from('app_users')
     .select('id, full_name, email, role, is_active, created_at, last_login_at')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
+  if (data) cacheAppUser(data);
   return data;
 }
 
@@ -407,12 +438,12 @@ app.post('/api/auth/login', async (req, res) => {
 
     const { data, error } = await supabaseAuthClient.auth.signInWithPassword({ email, password });
     if (error || !data?.user || !data?.session) {
-      await logAuthAudit({
+      runInBackground(logAuthAudit({
         userEmail: email,
         eventType: 'login_failed',
         req,
         metadata: { reason: error?.message || 'Invalid credentials' }
-      });
+      }), 'auth-audit');
       return res.status(401).json({ error: error?.message || 'Invalid credentials.' });
     }
 
@@ -433,31 +464,32 @@ app.post('/api/auth/login', async (req, res) => {
         .single();
       if (profileError) throw profileError;
       appUser = fallbackProfile;
+      cacheAppUser(appUser);
     }
 
     if (!appUser.is_active) {
-      await logAuthAudit({
+      runInBackground(logAuthAudit({
         userId: appUser.id,
         userEmail: appUser.email,
         eventType: 'login_failed',
         req,
         metadata: { reason: 'User is inactive' }
-      });
+      }), 'auth-audit');
       return res.status(403).json({ error: 'Account is inactive. Contact administrator.' });
     }
 
-    await supabaseService
+    runInBackground(supabaseService
       .from('app_users')
       .update({ last_login_at: new Date().toISOString() })
-      .eq('id', appUser.id);
+      .eq('id', appUser.id), 'last-login-update');
 
-    await logAuthAudit({
+    runInBackground(logAuthAudit({
       userId: appUser.id,
       userEmail: appUser.email,
       eventType: 'login_success',
       req,
       metadata: { role: appUser.role }
-    });
+    }), 'auth-audit');
 
     return res.json({
       session: {

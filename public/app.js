@@ -10,6 +10,8 @@
   cashPromptActive: false,
   discountAmount: 0,
   productsRendered: false,
+  authBusy: false,
+  logoutBusy: false,
 };
 
 // -- POS Tab Elements --
@@ -478,17 +480,19 @@ function toggleSettingsMenu() {
 }
 
 async function handleLogout() {
+  if (state.logoutBusy) return;
+  state.logoutBusy = true;
+
   const displayName = String(activeAuthSession?.name || 'User').trim() || 'User';
-  try {
-    await api('/api/auth/logout', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId: activeAuthSession?.userId || null,
-        email: activeAuthSession?.email || null
-      })
-    });
-  } catch (_error) {
-    // Continue logout locally even if network call fails
+  const logoutPayload = {
+    userId: activeAuthSession?.userId || null,
+    email: activeAuthSession?.email || null
+  };
+
+  // Do local logout immediately so the UI feels responsive.
+  if (state.poller) {
+    clearInterval(state.poller);
+    state.poller = null;
   }
 
   closeSettingsMenu();
@@ -505,6 +509,14 @@ async function handleLogout() {
     tone: 'success'
   });
   if (loginEmailEl) loginEmailEl.focus();
+
+  // Notify server in background without blocking UI.
+  api('/api/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify(logoutPayload)
+  }).catch(() => {});
+
+  state.logoutBusy = false;
 }
 
 function setAuthMessage(message, isSuccess = false) {
@@ -548,8 +560,27 @@ function startAppOnce() {
   });
 }
 
+function setFormSubmitBusy(formEl, busy, busyText = 'Please wait...') {
+  if (!formEl) return;
+  const submitBtn = formEl.querySelector('button[type="submit"]');
+  if (!submitBtn) return;
+
+  if (busy) {
+    if (!submitBtn.dataset.originalText) {
+      submitBtn.dataset.originalText = submitBtn.textContent || 'Submit';
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = busyText;
+    return;
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = submitBtn.dataset.originalText || submitBtn.textContent;
+}
+
 async function handleLoginSubmit(event) {
   event.preventDefault();
+  if (state.authBusy) return;
   const email = normalizeEmail(loginEmailEl?.value);
   const password = String(loginPasswordEl?.value || '');
 
@@ -559,6 +590,8 @@ async function handleLoginSubmit(event) {
   }
 
   try {
+    state.authBusy = true;
+    setFormSubmitBusy(loginFormEl, true, 'Signing in...');
     const result = await api('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
@@ -582,11 +615,15 @@ async function handleLoginSubmit(event) {
   } catch (error) {
     clearActiveSession();
     setAuthMessage(`Login failed: ${error.message}`);
+  } finally {
+    state.authBusy = false;
+    setFormSubmitBusy(loginFormEl, false);
   }
 }
 
 async function handleSignupSubmit(event) {
   event.preventDefault();
+  if (state.authBusy) return;
   const name = String(signupNameEl?.value || '').trim();
   const email = normalizeEmail(signupEmailEl?.value);
   const role = String(signupRoleEl?.value || '').trim().toLowerCase();
@@ -606,6 +643,8 @@ async function handleSignupSubmit(event) {
   }
 
   try {
+    state.authBusy = true;
+    setFormSubmitBusy(signupFormEl, true, 'Creating account...');
     await api('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify({
@@ -653,6 +692,9 @@ async function handleSignupSubmit(event) {
       return;
     }
     setAuthMessage(`Sign up failed: ${error.message}`);
+  } finally {
+    state.authBusy = false;
+    setFormSubmitBusy(signupFormEl, false);
   }
 }
 
@@ -708,7 +750,16 @@ function startAuthLogoRender() {
     authLogoCanvasEl.height = height;
   }
 
+  function shouldProcessFrame() {
+    return document.body.classList.contains('auth-locked') || document.body.classList.contains('auth-checking');
+  }
+
   function renderFrame() {
+    if (!shouldProcessFrame()) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+
     if (!authLogoVideoEl.videoWidth || !authLogoVideoEl.videoHeight) {
       requestAnimationFrame(renderFrame);
       return;
@@ -792,6 +843,7 @@ async function bootstrap() {
     };
     unlockDashboard();
     startAppOnce();
+    document.body.classList.remove('auth-checking');
 
     try {
       const sessionResult = await api('/api/auth/session', {
@@ -810,8 +862,6 @@ async function bootstrap() {
       clearActiveSession();
       lockDashboard();
       if (loginEmailEl) loginEmailEl.focus();
-    } finally {
-      document.body.classList.remove('auth-checking');
     }
     return;
   }
@@ -2270,11 +2320,5 @@ async function init() {
 bootstrap().catch((error) => {
   setAuthMessage(`Authentication startup error: ${error.message}`);
 });
-
-
-
-
-
-
 
 
