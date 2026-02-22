@@ -178,6 +178,7 @@ const AUTH_SESSION_KEY = 'pos_active_user_v1';
 const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
 const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
 const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
+const CATALOG_CACHE_GLOBAL_KEY = 'pos_catalog_cache_v1_global';
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
 let appInitialized = false;
@@ -187,6 +188,51 @@ let phClockInterval = null;
 let toastTimer = null;
 let menuEditorWarmReady = false;
 let menuEditorWarmInFlight = false;
+const BOOTSTRAP_CATALOG_FALLBACK = {
+  categories: [
+    { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
+    { key: 'rice', name: 'Rice', image: '/Menu/Rice.png', sortOrder: 20 },
+    { key: 'burger', name: 'Burger', image: '/Menu/Burger.png', sortOrder: 30 },
+    { key: 'drinks', name: 'Drinks', image: '/Menu/Drinks.png', sortOrder: 40 },
+    { key: 'fries', name: 'Fries', image: '/Menu/Fries.png', sortOrder: 50 },
+    { key: 'dessert', name: 'Dessert', image: '/Menu/Dessert.png', sortOrder: 60 },
+    { key: 'sauces', name: 'Sauces', image: '/Menu/Sauce.png', sortOrder: 70 }
+  ],
+  products: [
+    { id: 'p1', name: 'Succulent Roast Beef', price: 249, category: 'main-dish', image: '/Main Dish/Succulent Roast Beef Slides with rice and beef sauce.png' },
+    { id: 'p2', name: 'Roasted Beef w Java Rice', price: 229, category: 'main-dish', image: '/Main Dish/roasted beef w java rice.png' },
+    { id: 'p3', name: 'Party Tray', price: 799, category: 'main-dish', image: '/Main Dish/Party Tray.png' },
+    { id: 'p4', name: 'Letchon Baka', price: 269, category: 'main-dish', image: '/Main Dish/Letchon Baka.png' },
+    { id: 'p5', name: 'Crispy Letchon Kawali', price: 219, category: 'main-dish', image: '/Main Dish/Crispy Letchon Kawali.png' },
+    { id: 'p6', name: 'Beef Steak with Hot Sauce', price: 239, category: 'main-dish', image: '/Main Dish/beef steak with hot sauce.png' },
+    { id: 'p7', name: 'Beef Caldereta', price: 229, category: 'main-dish', image: '/Main Dish/Beef Caldereta.png' },
+    { id: 'p20', name: 'Delicious Fried Rice', price: 79, category: 'rice', image: '/Rice/Delicious fried rice.png' },
+    { id: 'p21', name: 'Unli Rice', price: 59, category: 'rice', image: '/Rice/Unli Rice.png' },
+    { id: 'p22', name: 'Brown Rice Bowl', price: 69, category: 'rice', image: '/Rice/Steaming bowl of brown rice.png' },
+    { id: 'p23', name: 'Fluffy Rice Bowl', price: 65, category: 'rice', image: '/Rice/Steaming bowl of fluffy rice.png' },
+    { id: 'p30', name: 'Spicy Jalapeno Cheeseburger', price: 189, category: 'burger', image: '/Burger/Spicy jalapeño cheeseburger with fries.png' },
+    { id: 'p31', name: 'Gourmet Cheese Burger', price: 179, category: 'burger', image: '/Burger/Gourmet cheese burger.png' },
+    { id: 'p32', name: 'Crispy Chicken Sandwich', price: 169, category: 'burger', image: '/Burger/Crispy chicken sandwich with slaw Burger.png' },
+    { id: 'p33', name: 'BBQ Bacon Cheeseburger', price: 199, category: 'burger', image: '/Burger/BBQ bacon cheeseburger.png' },
+    { id: 'p40', name: 'Lemon-Lime Soda', price: 59, category: 'drinks', image: '/Drinks/Refreshing lemon-lime soda on wood.png' },
+    { id: 'p41', name: 'Iced Tea Citrus Mint', price: 69, category: 'drinks', image: '/Drinks/Iced tea with citrus and mint.png' },
+    { id: 'p42', name: 'Refreshing Soda Lemon', price: 55, category: 'drinks', image: '/Drinks/Refreshing soda with lemon wedges.png' },
+    { id: 'p43', name: 'Coke Float', price: 79, category: 'drinks', image: '/Drinks/Coke Float.png' },
+    { id: 'p44', name: 'Mango Juice', price: 85, category: 'drinks', image: '/Drinks/Refreshing mango juice with mint garnish.png' },
+    { id: 'p45', name: 'Citrus Iced Drink', price: 75, category: 'drinks', image: '/Drinks/Citrus iced drinks with mint garnish.png' },
+    { id: 'p46', name: 'Strawberry Lemonade', price: 89, category: 'drinks', image: '/Drinks/Refreshing strawberry lemonade.png' },
+    { id: 'p50', name: 'Loaded Bacon Cheese Fries', price: 139, category: 'fries', image: '/Fries/Loaded bacon cheese fries close-up.png' },
+    { id: 'p51', name: 'Crispy Fries', price: 99, category: 'fries', image: '/Fries/Crispy Fries with dipping sauce.png' },
+    { id: 'p52', name: 'Cajun Seasoned Fries', price: 119, category: 'fries', image: '/Fries/Cajun seasoned fries.png' },
+    { id: 'p60', name: 'Strawberry Cheesecake Slice', price: 109, category: 'dessert', image: '/Dessert/Delicious strawberry cheesecake slice.png' },
+    { id: 'p61', name: 'Leche Flan Slice', price: 89, category: 'dessert', image: '/Dessert/Delicious slice of leche flan.png' },
+    { id: 'p62', name: 'Chocolate Fudge Cake Slice', price: 119, category: 'dessert', image: '/Dessert/Delicious chocolate fudge cake slice.png' },
+    { id: 'p70', name: 'Spicy Vinegar Sauce', price: 25, category: 'sauces', image: '/Sauces/Spicy Vinegar sauce.png' },
+    { id: 'p71', name: 'Spicy BBQ Sauce', price: 30, category: 'sauces', image: '/Sauces/Spicy BBQ sauce.png' },
+    { id: 'p72', name: 'Gravy Sauce', price: 25, category: 'sauces', image: '/Sauces/Gravy Sauce.png' },
+    { id: 'p73', name: 'Baka Sauce', price: 35, category: 'sauces', image: '/Sauces/Baka Sauce.png' }
+  ]
+};
 const GENERIC_CATEGORY_ICON = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="12" fill="#f4ece3" stroke="#d8c1ae" stroke-width="2"/><circle cx="32" cy="32" r="13" fill="#fffaf5" stroke="#a7724e" stroke-width="2"/><rect x="30.8" y="16" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="30.8" y="38" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="16" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/><rect x="38" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/></svg>')}`;
 
 // ------------------------------------------
@@ -406,8 +452,8 @@ function saveUserUiState(patch) {
 function readCatalogCache() {
   try {
     const raw = localStorage.getItem(getCatalogCacheKey());
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const globalRaw = localStorage.getItem(CATALOG_CACHE_GLOBAL_KEY);
+    const parsed = raw ? JSON.parse(raw) : (globalRaw ? JSON.parse(globalRaw) : null);
     if (!parsed || typeof parsed !== 'object') return null;
     const categories = Array.isArray(parsed.categories) ? parsed.categories : [];
     const products = Array.isArray(parsed.products) ? parsed.products : [];
@@ -420,14 +466,23 @@ function readCatalogCache() {
 
 function writeCatalogCache(payload) {
   try {
-    localStorage.setItem(getCatalogCacheKey(), JSON.stringify({
+    const snapshot = JSON.stringify({
       categories: Array.isArray(payload?.categories) ? payload.categories : [],
       products: Array.isArray(payload?.products) ? payload.products : [],
       updatedAt: new Date().toISOString()
-    }));
+    });
+    localStorage.setItem(getCatalogCacheKey(), snapshot);
+    localStorage.setItem(CATALOG_CACHE_GLOBAL_KEY, snapshot);
   } catch (_error) {
     // Ignore cache write issues.
   }
+}
+
+function getBootstrapCatalogFallback() {
+  return {
+    categories: BOOTSTRAP_CATALOG_FALLBACK.categories.map((x) => ({ ...x })),
+    products: BOOTSTRAP_CATALOG_FALLBACK.products.map((x) => ({ ...x }))
+  };
 }
 
 function hydrateCatalogState(cached, { keepCategory = true } = {}) {
@@ -2999,7 +3054,8 @@ async function init() {
     activeSalesRange = persistedUiState.salesRange;
   }
 
-  const hasCachedCatalog = hydrateCatalogState(readCatalogCache(), { keepCategory: true });
+  const cachedOrFallbackCatalog = readCatalogCache() || getBootstrapCatalogFallback();
+  const hasCachedCatalog = hydrateCatalogState(cachedOrFallbackCatalog, { keepCategory: true });
   if (hasCachedCatalog) {
     renderCategoryButtons();
     switchCategory(state.activeCategory);
