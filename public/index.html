@@ -82,6 +82,7 @@
           <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
           <div id="settingsMenu" class="settings-menu" aria-hidden="true">
             <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Admin Dashboard</button>
+            <button id="settingsEditMenuBtn" type="button" style="display:none;">Edit Menu</button>
             <button id="logoutBtn" type="button">Logout</button>
           </div>
         </div>
@@ -254,34 +255,7 @@
           <div class="right-panel">
             <div class="category-sidebar">
               <h3>Menu</h3>
-              <button class="category-btn active" data-category="main-dish">
-                <img class="category-icon" src="/Menu/Main Dish.png" alt="Main Dish" />
-                <span class="category-label">Main Dish</span>
-              </button>
-              <button class="category-btn" data-category="rice">
-                <img class="category-icon" src="/Menu/Rice.png" alt="Rice" />
-                <span class="category-label">Rice</span>
-              </button>
-              <button class="category-btn" data-category="burger">
-                <img class="category-icon" src="/Menu/Burger.png" alt="Burger" />
-                <span class="category-label">Burger</span>
-              </button>
-              <button class="category-btn" data-category="drinks">
-                <img class="category-icon" src="/Menu/Drinks.png" alt="Drinks" />
-                <span class="category-label">Drinks</span>
-              </button>
-              <button class="category-btn" data-category="fries">
-                <img class="category-icon" src="/Menu/Fries.png" alt="Fries" />
-                <span class="category-label">Fries</span>
-              </button>
-              <button class="category-btn" data-category="dessert">
-                <img class="category-icon" src="/Menu/Dessert.png" alt="Dessert" />
-                <span class="category-label">Dessert</span>
-              </button>
-              <button class="category-btn" data-category="sauces">
-                <img class="category-icon" src="/Menu/Sauce.png" alt="Sauces" />
-                <span class="category-label">Sauces</span>
-              </button>
+              <div id="categoryButtons"></div>
             </div>
 
             <div class="products-area">
@@ -482,6 +456,50 @@
           <button id="adminLoginBtn">Login</button>
           <button id="adminCancelBtn" class="secondary">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <div id="menuEditorModal" class="menu-editor-backdrop" aria-hidden="true">
+      <div class="menu-editor-card">
+        <div class="menu-editor-header">
+          <h2>Edit Menu</h2>
+          <button id="menuEditorCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <p class="menu-editor-note">Administrations and Supervisor can edit category/product name, image, and product price, plus add categories/products.</p>
+
+        <section class="card">
+          <h3>Add Category</h3>
+          <form id="menuCategoryForm" class="row">
+            <input id="menuCategoryNameInput" type="text" placeholder="Category name (e.g. Pasta)" required />
+            <input id="menuCategoryImageFileInput" type="file" accept="image/*" />
+            <button id="menuCategoryAddBtn" type="submit">Add Category</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h3>Add Product</h3>
+          <form id="menuProductForm" class="row">
+            <input id="menuProductNameInput" type="text" placeholder="Product name" required />
+            <input id="menuProductPriceInput" type="number" min="0" step="0.01" placeholder="Price (PHP)" required />
+            <select id="menuProductCategoryInput" required></select>
+            <input id="menuProductImageFileInput" type="file" accept="image/*" />
+            <button id="menuProductAddBtn" type="submit">Add Product</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h3>Edit Existing Categories</h3>
+          <div id="menuCategoryEditorList" class="menu-category-editor-list">
+            <p>Loading categories...</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Edit Existing Products</h3>
+          <div id="menuProductEditorList" class="menu-product-editor-list">
+            <p>Loading products...</p>
+          </div>
+        </section>
       </div>
     </div>
 

@@ -7,7 +7,14 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 
 const {
+  listMenuCategories,
   listProducts,
+  createMenuCategory,
+  updateMenuCategory,
+  deleteMenuCategory,
+  createMenuProduct,
+  updateMenuProduct,
+  deleteMenuProduct,
   createInvoice,
   getInvoice,
   setInvoicePaid,
@@ -40,7 +47,10 @@ const supabaseAuthClient = (supabaseUrl && supabaseAnonKey)
   : null;
 
 app.use(cors());
-app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
+app.use(express.json({
+  limit: '15mb',
+  verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); }
+}));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/assets/confetti', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'Confetti.json'));
@@ -100,6 +110,14 @@ function requireAdminRole(req, res, next) {
   const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
   if (role !== 'administrations') {
     return res.status(403).json({ error: 'Only Administrations role can manage Inventory.' });
+  }
+  return next();
+}
+
+function requireMenuManagerRole(req, res, next) {
+  const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+  if (role !== 'administrations' && role !== 'supervisor') {
+    return res.status(403).json({ error: 'Only Administrations and Supervisor roles can manage menu items.' });
   }
   return next();
 }
@@ -601,8 +619,97 @@ app.get('/api/config', (_req, res) => {
   res.json({});
 });
 
-app.get('/api/products', (_req, res) => {
-  res.json({ products: listProducts() });
+app.get('/api/products', async (_req, res) => {
+  try {
+    const [categories, products] = await Promise.all([listMenuCategories(), listProducts()]);
+    return res.json({ categories, products });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/menu/categories', async (_req, res) => {
+  try {
+    const categories = await listMenuCategories();
+    return res.json({ categories });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/menu/categories', requireMenuManagerRole, async (req, res) => {
+  try {
+    const category = await createMenuCategory({
+      name: req.body?.name,
+      key: req.body?.key,
+      image: req.body?.image,
+      sortOrder: req.body?.sortOrder
+    });
+    return res.status(201).json({ category });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (req, res) => {
+  try {
+    const category = await updateMenuCategory(req.params.categoryKey, {
+      name: req.body?.name,
+      image: req.body?.image,
+      sortOrder: req.body?.sortOrder
+    });
+    return res.json({ category });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (req, res) => {
+  try {
+    const category = await deleteMenuCategory(req.params.categoryKey);
+    return res.json({ deleted: true, category });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/menu/products', requireMenuManagerRole, async (req, res) => {
+  try {
+    const product = await createMenuProduct({
+      name: req.body?.name,
+      price: req.body?.price,
+      image: req.body?.image,
+      category: req.body?.category,
+      sortOrder: req.body?.sortOrder
+    });
+    return res.status(201).json({ product });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/menu/products/:productId', requireMenuManagerRole, async (req, res) => {
+  try {
+    const product = await updateMenuProduct(req.params.productId, {
+      name: req.body?.name,
+      price: req.body?.price,
+      image: req.body?.image,
+      category: req.body?.category,
+      sortOrder: req.body?.sortOrder
+    });
+    return res.json({ product });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/menu/products/:productId', requireMenuManagerRole, async (req, res) => {
+  try {
+    const product = await deleteMenuProduct(req.params.productId);
+    return res.json({ deleted: true, product });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 app.post('/api/invoices', async (req, res) => {
@@ -1011,6 +1118,13 @@ app.post('/api/payments/ewallet/manual-complete/:invoiceId', async (req, res) =>
 
 app.get('/checkout/:reference', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'checkout.html'));
+});
+
+app.use((error, _req, res, next) => {
+  if (error?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Uploaded image is too large. Please use a smaller image file.' });
+  }
+  return next(error);
 });
 
 app.listen(PORT, () => {

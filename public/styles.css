@@ -392,7 +392,7 @@ body.admin-open #tab-admin {
   background: #fff;
   border: 1px solid #d8c1ae;
   border-radius: 10px;
-  padding: 10px;
+  padding: 10px 10px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -401,7 +401,10 @@ body.admin-open #tab-admin {
   min-width: 220px;
   max-width: 240px;
   max-height: none;
-  overflow-y: auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .category-sidebar h3 {
@@ -595,6 +598,122 @@ body.admin-login-open .admin-login-backdrop {
 
 .admin-receipt-backdrop.open {
   display: flex;
+}
+
+.menu-editor-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 86;
+  background: rgba(63, 38, 23, 0.5);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+body.menu-editor-open .menu-editor-backdrop {
+  display: block;
+}
+
+.menu-editor-card {
+  width: min(1100px, 98vw);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  margin: 0 auto;
+  background: #fffaf5;
+  border: 2px solid #d8c1ae;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.menu-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-editor-note {
+  margin: 8px 0 12px;
+  color: #7b5a47;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.menu-product-editor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-category-editor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-category-editor-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d8c1ae;
+  border-radius: 8px;
+  background: #fef8f3;
+}
+
+.menu-category-image-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-category-image-wrap img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #d8c1ae;
+}
+
+.menu-product-editor-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 0.9fr 1.5fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d8c1ae;
+  border-radius: 8px;
+  background: #fef8f3;
+}
+
+.menu-product-editor-row img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #d8c1ae;
+}
+
+.menu-delete-btn {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.menu-delete-btn:hover {
+  background: #991b1b;
+}
+
+#categoryButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+  margin-bottom: 2px;
+  scroll-padding-bottom: 28px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .admin-receipt-card {
@@ -1336,6 +1455,16 @@ select {
 
 .status-receipt-actions {
   margin-top: 8px;
+}
+
+@media (max-width: 980px) {
+  .menu-category-editor-row {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-product-editor-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media print {

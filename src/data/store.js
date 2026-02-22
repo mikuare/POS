@@ -1,7 +1,7 @@
 ﻿const { v4: uuidv4 } = require('uuid');
 const { getSupabase, isSupabaseEnabled } = require('./supabaseClient');
 
-const PRODUCTS = [
+const DEFAULT_PRODUCTS = [
   // Main Dish
   { id: 'p1', name: 'Succulent Roast Beef', price: 249, category: 'main-dish', image: '/Main Dish/Succulent Roast Beef Slides with rice and beef sauce.png' },
   { id: 'p2', name: 'Roasted Beef w Java Rice', price: 229, category: 'main-dish', image: '/Main Dish/roasted beef w java rice.png' },
@@ -49,14 +49,609 @@ const PRODUCTS = [
   { id: 'p73', name: 'Baka Sauce', price: 35, category: 'sauces', image: '/Sauces/Baka Sauce.png' }
 ];
 
+const DEFAULT_MENU_CATEGORIES = [
+  { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
+  { key: 'rice', name: 'Rice', image: '/Menu/Rice.png', sortOrder: 20 },
+  { key: 'burger', name: 'Burger', image: '/Menu/Burger.png', sortOrder: 30 },
+  { key: 'drinks', name: 'Drinks', image: '/Menu/Drinks.png', sortOrder: 40 },
+  { key: 'fries', name: 'Fries', image: '/Menu/Fries.png', sortOrder: 50 },
+  { key: 'dessert', name: 'Dessert', image: '/Menu/Dessert.png', sortOrder: 60 },
+  { key: 'sauces', name: 'Sauces', image: '/Menu/Sauce.png', sortOrder: 70 }
+];
+
 const invoices = new Map();
 const gcashSessions = new Map();
 const inventoryIngredients = new Map();
 const productRecipes = new Map();
+const menuCategories = new Map(DEFAULT_MENU_CATEGORIES.map((x) => [x.key, x]));
 const supabase = getSupabase();
+const PG_INT_MAX = 2147483647;
 
-function listProducts() {
-  return PRODUCTS;
+function normalizeMenuCategoryKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+function getDefaultCategoryByKey(key) {
+  const normalized = normalizeMenuCategoryKey(key);
+  return DEFAULT_MENU_CATEGORIES.find((x) => x.key === normalized) || null;
+}
+
+function ensureMenuCategoryDefaultsFallback() {
+  if (menuCategories.size) return;
+  DEFAULT_MENU_CATEGORIES.forEach((x) => {
+    menuCategories.set(x.key, { ...x });
+  });
+}
+
+function listMenuCategoriesFallback() {
+  ensureMenuCategoryDefaultsFallback();
+  return Array.from(menuCategories.values())
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    .map((x) => ({ ...x }));
+}
+
+function listProductsFallback() {
+  return DEFAULT_PRODUCTS.map((p) => ({ ...p }));
+}
+
+function normalizeSortOrder(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  return Math.max(0, Math.min(PG_INT_MAX, rounded));
+}
+
+async function getNextCategorySortOrder() {
+  if (isSupabaseEnabled()) {
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .select('sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`Supabase category sort lookup failed: ${error.message}`);
+    const currentMax = Number(data?.[0]?.sort_order || 0);
+    return Math.min(PG_INT_MAX, currentMax + 10);
+  }
+
+  const currentMax = Math.max(0, ...Array.from(menuCategories.values()).map((x) => Number(x.sortOrder || 0)));
+  return Math.min(PG_INT_MAX, currentMax + 10);
+}
+
+async function getNextProductSortOrder(categoryKey = null) {
+  if (isSupabaseEnabled()) {
+    if (categoryKey) {
+      const { data: categoryData, error: categoryErr } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('category_key', categoryKey)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (categoryErr) throw new Error(`Supabase category sort lookup failed: ${categoryErr.message}`);
+      if (!categoryData) return 10;
+
+      const { data, error } = await supabase
+        .from('menu_products')
+        .select('sort_order')
+        .eq('category_id', categoryData.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+      if (error) throw new Error(`Supabase product sort lookup failed: ${error.message}`);
+      const currentMax = Number(data?.[0]?.sort_order || 0);
+      return Math.min(PG_INT_MAX, currentMax + 10);
+    }
+
+    const { data, error } = await supabase
+      .from('menu_products')
+      .select('sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`Supabase product sort lookup failed: ${error.message}`);
+    const currentMax = Number(data?.[0]?.sort_order || 0);
+    return Math.min(PG_INT_MAX, currentMax + 10);
+  }
+
+  const products = categoryKey
+    ? DEFAULT_PRODUCTS.filter((x) => String(x.category || '').toLowerCase() === String(categoryKey || '').toLowerCase())
+    : DEFAULT_PRODUCTS;
+  const currentMax = Math.max(0, products.length * 10);
+  return Math.min(PG_INT_MAX, currentMax + 10);
+}
+
+async function seedMenuCatalogIfEmpty() {
+  if (!isSupabaseEnabled()) return;
+
+  const [{ count: categoryCount, error: categoryCountErr }, { count: productCount, error: productCountErr }] = await Promise.all([
+    supabase.from('menu_categories').select('id', { count: 'exact', head: true }),
+    supabase.from('menu_products').select('id', { count: 'exact', head: true })
+  ]);
+
+  if (categoryCountErr) throw new Error(`Supabase menu category count failed: ${categoryCountErr.message}`);
+  if (productCountErr) throw new Error(`Supabase menu product count failed: ${productCountErr.message}`);
+
+  if ((categoryCount || 0) > 0 || (productCount || 0) > 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const categoryRows = DEFAULT_MENU_CATEGORIES.map((x) => ({
+    id: uuidv4(),
+    category_key: x.key,
+    category_name: x.name,
+    image_url: x.image,
+    sort_order: x.sortOrder,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  }));
+
+  const { data: insertedCategories, error: categoryInsertErr } = await supabase
+    .from('menu_categories')
+    .insert(categoryRows)
+    .select('id,category_key');
+
+  if (categoryInsertErr) throw new Error(`Supabase menu category seed failed: ${categoryInsertErr.message}`);
+
+  const categoryIdByKey = new Map((insertedCategories || []).map((x) => [x.category_key, x.id]));
+  const productRows = DEFAULT_PRODUCTS
+    .map((p, idx) => {
+      const categoryId = categoryIdByKey.get(p.category);
+      if (!categoryId) return null;
+      return {
+        id: p.id,
+        category_id: categoryId,
+        name: p.name,
+        price: Number(p.price || 0),
+        image_url: p.image || null,
+        sort_order: (idx + 1) * 10,
+        is_active: true,
+        created_at: now,
+        updated_at: now
+      };
+    })
+    .filter(Boolean);
+
+  if (!productRows.length) return;
+  const { error: productInsertErr } = await supabase.from('menu_products').insert(productRows);
+  if (productInsertErr) throw new Error(`Supabase menu product seed failed: ${productInsertErr.message}`);
+}
+
+async function listMenuCategories() {
+  if (!isSupabaseEnabled()) {
+    return listMenuCategoriesFallback();
+  }
+
+  await seedMenuCatalogIfEmpty();
+
+  const { data, error } = await supabase
+    .from('menu_categories')
+    .select('category_key,category_name,image_url,sort_order')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+    .order('category_name', { ascending: true });
+
+  if (error) throw new Error(`Supabase menu categories fetch failed: ${error.message}`);
+  return (data || []).map((x) => ({
+    key: x.category_key,
+    name: x.category_name,
+    image: x.image_url || getDefaultCategoryByKey(x.category_key)?.image || '',
+    sortOrder: Number(x.sort_order || 0)
+  }));
+}
+
+async function listProducts() {
+  if (!isSupabaseEnabled()) {
+    return listProductsFallback();
+  }
+
+  await seedMenuCatalogIfEmpty();
+
+  const { data, error } = await supabase
+    .from('menu_products')
+    .select(`
+      id,
+      name,
+      price,
+      image_url,
+      sort_order,
+      menu_categories!inner(category_key)
+    `)
+    .eq('is_active', true)
+    .eq('menu_categories.is_active', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) throw new Error(`Supabase products fetch failed: ${error.message}`);
+
+  return (data || []).map((x) => ({
+    id: x.id,
+    name: x.name,
+    price: Number(x.price || 0),
+    category: x.menu_categories?.category_key || 'main-dish',
+    image: x.image_url || '/Business Logo/Ruels Logo for business.png'
+  }));
+}
+
+async function createMenuCategory({ name, key, image, sortOrder }) {
+  const categoryName = String(name || '').trim();
+  if (!categoryName) {
+    throw new Error('Category name is required');
+  }
+
+  const categoryKey = normalizeMenuCategoryKey(key || categoryName);
+  if (!categoryKey) {
+    throw new Error('Category key is invalid');
+  }
+
+  const imageUrl = String(image || '').trim() || getDefaultCategoryByKey(categoryKey)?.image || null;
+  const safeSortOrder = normalizeSortOrder(sortOrder) ?? await getNextCategorySortOrder();
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+
+    const now = new Date().toISOString();
+    const payload = {
+      id: uuidv4(),
+      category_key: categoryKey,
+      category_name: categoryName,
+      image_url: imageUrl,
+      sort_order: safeSortOrder,
+      is_active: true,
+      created_at: now,
+      updated_at: now
+    };
+
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .insert(payload)
+      .select('category_key,category_name,image_url,sort_order')
+      .single();
+
+    if (error) {
+      if (String(error.message || '').toLowerCase().includes('duplicate')) {
+        throw new Error('Category key already exists');
+      }
+      throw new Error(`Supabase create category failed: ${error.message}`);
+    }
+
+    return {
+      key: data.category_key,
+      name: data.category_name,
+      image: data.image_url || imageUrl || '',
+      sortOrder: Number(data.sort_order || 0)
+    };
+  }
+
+  ensureMenuCategoryDefaultsFallback();
+  if (menuCategories.has(categoryKey)) {
+    throw new Error('Category key already exists');
+  }
+
+  const category = { key: categoryKey, name: categoryName, image: imageUrl || '', sortOrder: safeSortOrder };
+  menuCategories.set(categoryKey, category);
+  return category;
+}
+
+async function updateMenuCategory(categoryKeyOrId, { name, image, sortOrder }) {
+  const key = normalizeMenuCategoryKey(categoryKeyOrId);
+  if (!key) throw new Error('Category key is required');
+
+  const patch = {};
+  if (name !== undefined) {
+    const nextName = String(name || '').trim();
+    if (!nextName) throw new Error('Category name cannot be empty');
+    patch.category_name = nextName;
+  }
+  if (image !== undefined) {
+    patch.image_url = String(image || '').trim() || null;
+  }
+  if (sortOrder !== undefined && sortOrder !== null) {
+    const v = normalizeSortOrder(sortOrder);
+    if (v === null) throw new Error('sortOrder must be a valid number');
+    patch.sort_order = v;
+  }
+
+  if (!Object.keys(patch).length) {
+    throw new Error('No category changes were provided');
+  }
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .update(patch)
+      .eq('category_key', key)
+      .eq('is_active', true)
+      .select('category_key,category_name,image_url,sort_order')
+      .maybeSingle();
+
+    if (error) throw new Error(`Supabase update category failed: ${error.message}`);
+    if (!data) throw new Error('Category not found');
+
+    return {
+      key: data.category_key,
+      name: data.category_name,
+      image: data.image_url || '',
+      sortOrder: Number(data.sort_order || 0)
+    };
+  }
+
+  ensureMenuCategoryDefaultsFallback();
+  const existing = menuCategories.get(key);
+  if (!existing) throw new Error('Category not found');
+  const next = { ...existing };
+  if (patch.category_name !== undefined) next.name = patch.category_name;
+  if (patch.image_url !== undefined) next.image = patch.image_url || '';
+  if (patch.sort_order !== undefined) next.sortOrder = patch.sort_order;
+  menuCategories.set(key, next);
+  return next;
+}
+
+async function deleteMenuCategory(categoryKeyOrId) {
+  const key = normalizeMenuCategoryKey(categoryKeyOrId);
+  if (!key) throw new Error('Category key is required');
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+
+    const { data: categoryRow, error: categoryFindErr } = await supabase
+      .from('menu_categories')
+      .select('id,category_key,category_name')
+      .eq('category_key', key)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (categoryFindErr) throw new Error(`Supabase category lookup failed: ${categoryFindErr.message}`);
+    if (!categoryRow) throw new Error('Category not found');
+
+    const { error: productDeactivateErr } = await supabase
+      .from('menu_products')
+      .update({ is_active: false })
+      .eq('category_id', categoryRow.id)
+      .eq('is_active', true);
+    if (productDeactivateErr) throw new Error(`Supabase category products delete failed: ${productDeactivateErr.message}`);
+
+    const { error: categoryDeactivateErr } = await supabase
+      .from('menu_categories')
+      .update({ is_active: false })
+      .eq('id', categoryRow.id)
+      .eq('is_active', true);
+    if (categoryDeactivateErr) throw new Error(`Supabase category delete failed: ${categoryDeactivateErr.message}`);
+
+    return {
+      key: categoryRow.category_key,
+      name: categoryRow.category_name
+    };
+  }
+
+  ensureMenuCategoryDefaultsFallback();
+  const existing = menuCategories.get(key);
+  if (!existing) throw new Error('Category not found');
+
+  menuCategories.delete(key);
+  for (let i = DEFAULT_PRODUCTS.length - 1; i >= 0; i -= 1) {
+    if (String(DEFAULT_PRODUCTS[i].category || '').toLowerCase() === key) {
+      DEFAULT_PRODUCTS.splice(i, 1);
+    }
+  }
+
+  return {
+    key: existing.key,
+    name: existing.name
+  };
+}
+
+async function createMenuProduct({ name, price, category, image, sortOrder }) {
+  const productName = String(name || '').trim();
+  if (!productName) {
+    throw new Error('Product name is required');
+  }
+
+  const productPrice = Number(price);
+  if (!Number.isFinite(productPrice) || productPrice < 0) {
+    throw new Error('Product price must be a number >= 0');
+  }
+
+  const categoryKey = normalizeMenuCategoryKey(category);
+  if (!categoryKey) {
+    throw new Error('Product category is required');
+  }
+
+  const imageUrl = String(image || '').trim() || '/Business Logo/Ruels Logo for business.png';
+  const safeSortOrder = normalizeSortOrder(sortOrder) ?? await getNextProductSortOrder(categoryKey);
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+
+    const { data: dbCategory, error: categoryErr } = await supabase
+      .from('menu_categories')
+      .select('id,category_key')
+      .eq('category_key', categoryKey)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (categoryErr) throw new Error(`Supabase category lookup failed: ${categoryErr.message}`);
+    if (!dbCategory) throw new Error('Category not found');
+
+    const now = new Date().toISOString();
+    const payload = {
+      id: uuidv4(),
+      category_id: dbCategory.id,
+      name: productName,
+      price: productPrice,
+      image_url: imageUrl,
+      sort_order: safeSortOrder,
+      is_active: true,
+      created_at: now,
+      updated_at: now
+    };
+
+    const { data, error } = await supabase
+      .from('menu_products')
+      .insert(payload)
+      .select(`
+        id,
+        name,
+        price,
+        image_url,
+        menu_categories!inner(category_key)
+      `)
+      .single();
+
+    if (error) throw new Error(`Supabase create product failed: ${error.message}`);
+
+    return {
+      id: data.id,
+      name: data.name,
+      price: Number(data.price || 0),
+      category: data.menu_categories?.category_key || categoryKey,
+      image: data.image_url || imageUrl
+    };
+  }
+
+  const categories = listMenuCategoriesFallback();
+  if (!categories.some((x) => x.key === categoryKey)) {
+    throw new Error('Category not found');
+  }
+
+  const newProduct = {
+    id: uuidv4(),
+    name: productName,
+    price: productPrice,
+    category: categoryKey,
+    image: imageUrl
+  };
+  DEFAULT_PRODUCTS.push(newProduct);
+  return newProduct;
+}
+
+async function updateMenuProduct(productId, { name, price, image, category, sortOrder }) {
+  const id = String(productId || '').trim();
+  if (!id) throw new Error('Product id is required');
+
+  const patch = {};
+  if (name !== undefined) {
+    const v = String(name || '').trim();
+    if (!v) throw new Error('Product name cannot be empty');
+    patch.name = v;
+  }
+  if (price !== undefined) {
+    const v = Number(price);
+    if (!Number.isFinite(v) || v < 0) throw new Error('Product price must be a number >= 0');
+    patch.price = v;
+  }
+  if (image !== undefined) {
+    patch.image_url = String(image || '').trim() || '/Business Logo/Ruels Logo for business.png';
+  }
+  if (sortOrder !== undefined && sortOrder !== null) {
+    const v = normalizeSortOrder(sortOrder);
+    if (v === null) throw new Error('sortOrder must be a valid number');
+    patch.sort_order = v;
+  }
+
+  const categoryKey = category !== undefined ? normalizeMenuCategoryKey(category) : null;
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+
+    if (category !== undefined) {
+      if (!categoryKey) throw new Error('Category is invalid');
+      const { data: dbCategory, error: categoryErr } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('category_key', categoryKey)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (categoryErr) throw new Error(`Supabase category lookup failed: ${categoryErr.message}`);
+      if (!dbCategory) throw new Error('Category not found');
+      patch.category_id = dbCategory.id;
+    }
+
+    if (!Object.keys(patch).length) {
+      throw new Error('No product changes were provided');
+    }
+
+    const { data, error } = await supabase
+      .from('menu_products')
+      .update(patch)
+      .eq('id', id)
+      .eq('is_active', true)
+      .select(`
+        id,
+        name,
+        price,
+        image_url,
+        menu_categories!inner(category_key)
+      `)
+      .maybeSingle();
+
+    if (error) throw new Error(`Supabase update product failed: ${error.message}`);
+    if (!data) throw new Error('Product not found');
+
+    return {
+      id: data.id,
+      name: data.name,
+      price: Number(data.price || 0),
+      category: data.menu_categories?.category_key || categoryKey || 'main-dish',
+      image: data.image_url || '/Business Logo/Ruels Logo for business.png'
+    };
+  }
+
+  const idx = DEFAULT_PRODUCTS.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error('Product not found');
+  if (category !== undefined) {
+    const categories = listMenuCategoriesFallback();
+    if (!categories.some((x) => x.key === categoryKey)) {
+      throw new Error('Category not found');
+    }
+  }
+
+  const next = { ...DEFAULT_PRODUCTS[idx] };
+  if (patch.name !== undefined) next.name = patch.name;
+  if (patch.price !== undefined) next.price = patch.price;
+  if (patch.image_url !== undefined) next.image = patch.image_url;
+  if (category !== undefined) next.category = categoryKey;
+  DEFAULT_PRODUCTS[idx] = next;
+  return next;
+}
+
+async function deleteMenuProduct(productId) {
+  const id = String(productId || '').trim();
+  if (!id) throw new Error('Product id is required');
+
+  if (isSupabaseEnabled()) {
+    await seedMenuCatalogIfEmpty();
+
+    const { data: existing, error: findErr } = await supabase
+      .from('menu_products')
+      .select('id,name')
+      .eq('id', id)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (findErr) throw new Error(`Supabase product lookup failed: ${findErr.message}`);
+    if (!existing) throw new Error('Product not found');
+
+    const { error } = await supabase
+      .from('menu_products')
+      .update({ is_active: false })
+      .eq('id', id)
+      .eq('is_active', true);
+    if (error) throw new Error(`Supabase delete product failed: ${error.message}`);
+
+    return { id: existing.id, name: existing.name };
+  }
+
+  const idx = DEFAULT_PRODUCTS.findIndex((x) => x.id === id);
+  if (idx === -1) throw new Error('Product not found');
+  const removed = DEFAULT_PRODUCTS[idx];
+  DEFAULT_PRODUCTS.splice(idx, 1);
+  return { id: removed.id, name: removed.name };
 }
 
 function toDbInvoice(invoice) {
@@ -163,10 +758,11 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
     throw new Error('Invoice must contain at least one item');
   }
 
+  const productCatalog = await listProducts();
   const now = new Date().toISOString();
   const lineItems = items
     .map((item) => {
-      const product = PRODUCTS.find((p) => p.id === item.productId);
+      const product = productCatalog.find((p) => p.id === item.productId);
       if (!product) {
         throw new Error(`Unknown product: ${item.productId}`);
       }
@@ -955,7 +1551,14 @@ async function getGcashSessionByInvoiceId(invoiceId) {
 }
 
 module.exports = {
+  listMenuCategories,
   listProducts,
+  createMenuCategory,
+  updateMenuCategory,
+  deleteMenuCategory,
+  createMenuProduct,
+  updateMenuProduct,
+  deleteMenuProduct,
   createInvoice,
   getInvoice,
   setInvoicePaid,

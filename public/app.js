@@ -1,4 +1,5 @@
 ﻿const state = {
+  categories: [],
   products: [],
   cart: {},
   activeInvoice: null,
@@ -102,6 +103,7 @@ const welcomeBannerEl = document.getElementById('welcomeBanner');
 const settingsToggleBtn = document.getElementById('settingsToggleBtn');
 const settingsMenuEl = document.getElementById('settingsMenu');
 const settingsAdminDashboardBtn = document.getElementById('settingsAdminDashboardBtn');
+const settingsEditMenuBtn = document.getElementById('settingsEditMenuBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const phDateTimeEl = document.getElementById('phDateTime');
 const welcomeRoleIconEl = document.getElementById('welcomeRoleIcon');
@@ -149,6 +151,21 @@ const ingredientAddBtn = document.getElementById('ingredientAddBtn');
 const inventoryAdminNoteEl = document.getElementById('inventoryAdminNote');
 const inventorySummaryEl = document.getElementById('inventorySummary');
 const inventoryTableWrapEl = document.getElementById('inventoryTableWrap');
+const categoryButtonsEl = document.getElementById('categoryButtons');
+const menuEditorModalEl = document.getElementById('menuEditorModal');
+const menuEditorCloseBtn = document.getElementById('menuEditorCloseBtn');
+const menuCategoryFormEl = document.getElementById('menuCategoryForm');
+const menuCategoryNameInputEl = document.getElementById('menuCategoryNameInput');
+const menuCategoryImageFileInputEl = document.getElementById('menuCategoryImageFileInput');
+const menuCategoryAddBtn = document.getElementById('menuCategoryAddBtn');
+const menuProductFormEl = document.getElementById('menuProductForm');
+const menuProductNameInputEl = document.getElementById('menuProductNameInput');
+const menuProductPriceInputEl = document.getElementById('menuProductPriceInput');
+const menuProductCategoryInputEl = document.getElementById('menuProductCategoryInput');
+const menuProductImageFileInputEl = document.getElementById('menuProductImageFileInput');
+const menuProductAddBtn = document.getElementById('menuProductAddBtn');
+const menuCategoryEditorListEl = document.getElementById('menuCategoryEditorList');
+const menuProductEditorListEl = document.getElementById('menuProductEditorList');
 
 // -- Tab Elements --
 const tabBtns = document.querySelectorAll('.tab-btn');
@@ -160,6 +177,7 @@ const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
 const AUTH_SESSION_KEY = 'pos_active_user_v1';
 const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
 const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
+const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
 let appInitialized = false;
@@ -167,6 +185,9 @@ let authLogoRenderStarted = false;
 let activeAuthSession = null;
 let phClockInterval = null;
 let toastTimer = null;
+let menuEditorWarmReady = false;
+let menuEditorWarmInFlight = false;
+const GENERIC_CATEGORY_ICON = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="12" fill="#f4ece3" stroke="#d8c1ae" stroke-width="2"/><circle cx="32" cy="32" r="13" fill="#fffaf5" stroke="#a7724e" stroke-width="2"/><rect x="30.8" y="16" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="30.8" y="38" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="16" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/><rect x="38" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/></svg>')}`;
 
 // ------------------------------------------
 // Utility Functions
@@ -296,7 +317,13 @@ async function api(path, options = {}) {
     ...options,
     headers: mergedHeaders
   });
-  const data = await res.json();
+  const rawText = await res.text();
+  let data = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch (_error) {
+    data = {};
+  }
   if (!res.ok) {
     throw new Error(data.error || 'Request failed');
   }
@@ -350,6 +377,11 @@ function getUserUiStateKey() {
   return `${UI_STATE_KEY_PREFIX}${userKey}`;
 }
 
+function getCatalogCacheKey() {
+  const userKey = activeAuthSession?.userId || activeAuthSession?.email || 'guest';
+  return `${CATALOG_CACHE_KEY_PREFIX}${userKey}`;
+}
+
 function readUserUiState() {
   try {
     const raw = localStorage.getItem(getUserUiStateKey());
@@ -371,6 +403,70 @@ function saveUserUiState(patch) {
   }
 }
 
+function readCatalogCache() {
+  try {
+    const raw = localStorage.getItem(getCatalogCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+    const products = Array.isArray(parsed.products) ? parsed.products : [];
+    if (!categories.length && !products.length) return null;
+    return { categories, products };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeCatalogCache(payload) {
+  try {
+    localStorage.setItem(getCatalogCacheKey(), JSON.stringify({
+      categories: Array.isArray(payload?.categories) ? payload.categories : [],
+      products: Array.isArray(payload?.products) ? payload.products : [],
+      updatedAt: new Date().toISOString()
+    }));
+  } catch (_error) {
+    // Ignore cache write issues.
+  }
+}
+
+function hydrateCatalogState(cached, { keepCategory = true } = {}) {
+  if (!cached || (!Array.isArray(cached.categories) && !Array.isArray(cached.products))) return false;
+
+  const nextCategories = Array.isArray(cached.categories) ? cached.categories : [];
+  const nextProducts = Array.isArray(cached.products) ? cached.products : [];
+
+  state.categories = nextCategories.map((x) => ({
+    key: String(x.key || '').trim().toLowerCase(),
+    name: String(x.name || '').trim() || String(x.key || ''),
+    image: String(x.image || '').trim() || getDefaultCategoryImage(x.key),
+    sortOrder: Number(x.sortOrder || 0)
+  }));
+  state.products = nextProducts.map((x) => ({
+    id: x.id,
+    name: x.name,
+    price: Number(x.price || 0),
+    category: String(x.category || '').trim().toLowerCase(),
+    image: x.image || '/Business Logo/Ruels Logo for business.png'
+  }));
+
+  if (!state.categories.length) {
+    state.categories = [{
+      key: 'main-dish',
+      name: 'Main Dish',
+      image: '/Menu/Main Dish.png',
+      sortOrder: 10
+    }];
+  }
+
+  const categoryKeys = new Set(state.categories.map((x) => x.key));
+  if (!keepCategory || !categoryKeys.has(String(state.activeCategory || '').toLowerCase())) {
+    state.activeCategory = state.categories[0].key;
+  }
+
+  return true;
+}
+
 function canAccessAdminFeatures() {
   const role = String(activeAuthSession?.role || '').toLowerCase();
   return role === 'administrations' || role === 'supervisor';
@@ -382,8 +478,12 @@ function canManageInventory() {
 }
 
 function updateSettingsRoleItems() {
-  if (!settingsAdminDashboardBtn) return;
-  settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+  if (settingsAdminDashboardBtn) {
+    settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+  }
+  if (settingsEditMenuBtn) {
+    settingsEditMenuBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+  }
 }
 
 function fireAudit(eventType, metadata = {}) {
@@ -726,6 +826,19 @@ function setupAuth() {
       await openAdminLogin();
     });
   }
+  if (settingsEditMenuBtn) {
+    settingsEditMenuBtn.addEventListener('click', () => {
+      closeSettingsMenu();
+      openMenuEditor();
+      if (!menuEditorWarmReady) {
+        warmMenuEditorInBackground({ force: true });
+      } else {
+        refreshMenuEditorData().catch((error) => {
+          setStatus(`Edit menu refresh failed: ${error.message}`);
+        });
+      }
+    });
+  }
   document.addEventListener('click', (e) => {
     if (!settingsMenuEl?.classList.contains('open')) return;
     if (e.target?.closest('.settings-menu-wrap')) return;
@@ -916,9 +1029,13 @@ function openAdminLogin() {
   if (!adminLoginModalEl) return;
   document.body.classList.add('admin-login-open');
   if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
-  if (adminPasswordEl) adminPasswordEl.value = '';
+  if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
   if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
-  if (adminUsernameEl) adminUsernameEl.focus();
+  if (adminLoginBtn) {
+    adminLoginBtn.focus();
+  } else if (adminUsernameEl) {
+    adminUsernameEl.focus();
+  }
 }
 
 function closeAdminLogin() {
@@ -956,16 +1073,51 @@ async function submitAdminLogin() {
 // ------------------------------------------
 
 function getCategoryName(category) {
-  const categoryNames = {
-    'main-dish': 'Main Dish',
-    'rice': 'Rice',
-    'burger': 'Burger',
-    'drinks': 'Drinks',
-    'fries': 'Fries',
-    'dessert': 'Dessert',
-    'sauces': 'Sauces'
+  const key = String(category || '').trim().toLowerCase();
+  const matched = (state.categories || []).find((x) => String(x.key || '').toLowerCase() === key);
+  if (matched?.name) return matched.name;
+  return category ? String(category) : 'Menu';
+}
+
+function normalizeMenuCategoryKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+function getDefaultCategoryImage(categoryKey) {
+  const defaultByKey = {
+    'main-dish': '/Menu/Main Dish.png',
+    rice: '/Menu/Rice.png',
+    burger: '/Menu/Burger.png',
+    drinks: '/Menu/Drinks.png',
+    fries: '/Menu/Fries.png',
+    dessert: '/Menu/Dessert.png',
+    sauces: '/Menu/Sauce.png'
   };
-  return categoryNames[category] || category;
+  const key = normalizeMenuCategoryKey(categoryKey);
+  return defaultByKey[key] || GENERIC_CATEGORY_ICON;
+}
+
+function renderCategoryButtons() {
+  if (!categoryButtonsEl) return;
+  const rows = (state.categories || [])
+    .map((category) => {
+      const key = String(category.key || '').toLowerCase();
+      const isActive = key === String(state.activeCategory || '').toLowerCase();
+      return `
+        <button class="category-btn ${isActive ? 'active' : ''}" data-category="${escapeHtml(key)}">
+          <img class="category-icon" src="${escapeHtml(category.image || getDefaultCategoryImage(key))}" alt="${escapeHtml(category.name || key)}" />
+          <span class="category-label">${escapeHtml(category.name || key)}</span>
+        </button>
+      `;
+    })
+    .join('');
+
+  categoryButtonsEl.innerHTML = rows || '<p class="status">No categories available.</p>';
 }
 
 function preloadProductImages(products) {
@@ -1002,42 +1154,38 @@ function updateVisibleProducts() {
 }
 
 function renderProducts() {
-  if (!state.productsRendered) {
-    productsEl.innerHTML = '';
+  productsEl.innerHTML = '';
 
-    if (!state.products.length) {
-      productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products available.</p>';
-      return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    state.products.forEach((p) => {
-      const row = document.createElement('div');
-      row.className = 'product-row';
-      row.setAttribute('data-category', String(p.category || '').toLowerCase());
-      row.innerHTML = `
-        <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
-        <div class="product-info">
-          <div class="product-name">${p.name}</div>
-          <div class="product-price">${money(p.price)}</div>
-        </div>
-        <button data-add="${p.id}">Add to Order</button>
-      `;
-      fragment.appendChild(row);
-    });
-
-    const noProductsNotice = document.createElement('p');
-    noProductsNotice.className = 'no-products-message';
-    noProductsNotice.style.textAlign = 'center';
-    noProductsNotice.style.color = '#6b7280';
-    noProductsNotice.style.padding = '20px';
-    noProductsNotice.textContent = 'No products in this category.';
-    fragment.appendChild(noProductsNotice);
-
-    productsEl.appendChild(fragment);
-    state.productsRendered = true;
+  if (!state.products.length) {
+    productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products available.</p>';
+    return;
   }
 
+  const fragment = document.createDocumentFragment();
+  state.products.forEach((p) => {
+    const row = document.createElement('div');
+    row.className = 'product-row';
+    row.setAttribute('data-category', String(p.category || '').toLowerCase());
+    row.innerHTML = `
+      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
+      <div class="product-info">
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">${money(p.price)}</div>
+      </div>
+      <button data-add="${p.id}">Add to Order</button>
+    `;
+    fragment.appendChild(row);
+  });
+
+  const noProductsNotice = document.createElement('p');
+  noProductsNotice.className = 'no-products-message';
+  noProductsNotice.style.textAlign = 'center';
+  noProductsNotice.style.color = '#6b7280';
+  noProductsNotice.style.padding = '20px';
+  noProductsNotice.textContent = 'No products in this category.';
+  fragment.appendChild(noProductsNotice);
+
+  productsEl.appendChild(fragment);
   updateVisibleProducts();
 }
 
@@ -1049,19 +1197,561 @@ function setPaymentMethod(method) {
 }
 
 function switchCategory(category) {
-  state.activeCategory = category;
-  saveUserUiState({ activeCategory: category });
-  
-  // Update active state on category buttons
+  const selected = String(category || '').toLowerCase();
+  if (!selected) return;
+  state.activeCategory = selected;
+  saveUserUiState({ activeCategory: selected });
+
   document.querySelectorAll('.category-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-category') === category);
+    btn.classList.toggle('active', btn.getAttribute('data-category') === selected);
   });
-  
-  // Update category title
-  categoryTitleEl.textContent = getCategoryName(category);
-  
-  // Re-render products
+
+  categoryTitleEl.textContent = getCategoryName(selected);
   renderProducts();
+}
+
+async function refreshCatalog({ keepCategory = true } = {}) {
+  const result = await api('/api/products');
+  const nextCategories = Array.isArray(result.categories) ? result.categories : [];
+  const nextProducts = Array.isArray(result.products) ? result.products : [];
+
+  state.categories = nextCategories.map((x) => ({
+    key: String(x.key || '').trim().toLowerCase(),
+    name: String(x.name || '').trim() || String(x.key || ''),
+    image: String(x.image || '').trim() || getDefaultCategoryImage(x.key),
+    sortOrder: Number(x.sortOrder || 0)
+  }));
+  state.products = nextProducts.map((x) => ({
+    id: x.id,
+    name: x.name,
+    price: Number(x.price || 0),
+    category: String(x.category || '').trim().toLowerCase(),
+    image: x.image || '/Business Logo/Ruels Logo for business.png'
+  }));
+
+  if (!state.categories.length) {
+    state.categories = [{
+      key: 'main-dish',
+      name: 'Main Dish',
+      image: '/Menu/Main Dish.png',
+      sortOrder: 10
+    }];
+  }
+
+  const categoryKeys = new Set(state.categories.map((x) => x.key));
+  if (!keepCategory || !categoryKeys.has(String(state.activeCategory || '').toLowerCase())) {
+    state.activeCategory = state.categories[0].key;
+  }
+
+  writeCatalogCache({ categories: state.categories, products: state.products });
+  renderCategoryButtons();
+  switchCategory(state.activeCategory);
+  renderCart();
+  preloadProductImages(state.products);
+}
+
+function openMenuEditor() {
+  if (!menuEditorModalEl) return;
+  if (!canAccessAdminFeatures()) {
+    setStatus('Edit Menu is allowed only for Administrations and Supervisor roles.');
+    return;
+  }
+  document.body.classList.add('menu-editor-open');
+}
+
+function closeMenuEditor() {
+  if (!menuEditorModalEl) return;
+  document.body.classList.remove('menu-editor-open');
+}
+
+function warmMenuEditorInBackground({ force = false } = {}) {
+  if (!canAccessAdminFeatures()) return;
+  if (!force && menuEditorWarmReady) return;
+  if (menuEditorWarmInFlight) return;
+
+  menuEditorWarmInFlight = true;
+  const runWarmup = async () => {
+    try {
+      fillMenuCategorySelectOptions();
+      renderMenuCategoryEditorRows();
+      renderMenuProductEditorRows();
+      await refreshMenuEditorData();
+      menuEditorWarmReady = true;
+    } catch (_error) {
+      // Keep silent in background warmup.
+    } finally {
+      menuEditorWarmInFlight = false;
+    }
+  };
+
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => {
+      runWarmup();
+    }, { timeout: 1200 });
+    return;
+  }
+
+  setTimeout(() => {
+    runWarmup();
+  }, 0);
+}
+
+function fillMenuCategorySelectOptions() {
+  if (!menuProductCategoryInputEl) return;
+  menuProductCategoryInputEl.innerHTML = (state.categories || [])
+    .map((x) => `<option value="${escapeHtml(x.key)}">${escapeHtml(x.name)}</option>`)
+    .join('');
+}
+
+function renderMenuCategoryEditorRows() {
+  if (!menuCategoryEditorListEl) return;
+  if (!state.categories.length) {
+    menuCategoryEditorListEl.innerHTML = '<p>No categories available.</p>';
+    return;
+  }
+
+  const rows = state.categories.map((c) => {
+    const imageSrc = String(c.image || getDefaultCategoryImage(c.key));
+    return `
+      <div class="menu-category-editor-row" data-category-key="${escapeHtml(c.key)}">
+        <input type="text" class="menu-edit-category-name" value="${escapeHtml(c.name)}" />
+        <div class="menu-category-image-wrap">
+          <input type="hidden" class="menu-current-category-image" value="${escapeHtml(imageSrc)}" />
+          <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(c.name)}" />
+          <input type="file" class="menu-edit-category-image-file" accept="image/*" />
+        </div>
+        <button type="button" class="menu-save-category-btn">Save Category</button>
+        <button type="button" class="menu-delete-btn menu-delete-category-btn">Delete</button>
+      </div>
+    `;
+  }).join('');
+
+  menuCategoryEditorListEl.innerHTML = rows;
+}
+
+function renderMenuProductEditorRows() {
+  if (!menuProductEditorListEl) return;
+  if (!state.products.length) {
+    menuProductEditorListEl.innerHTML = '<p>No products available.</p>';
+    return;
+  }
+
+  const categoryOptions = (state.categories || [])
+    .map((x) => `<option value="${escapeHtml(x.key)}">${escapeHtml(x.name)}</option>`)
+    .join('');
+
+  const rows = state.products.map((p) => {
+    const imageSrc = String(p.image || '/Business Logo/Ruels Logo for business.png');
+    return `
+      <div class="menu-product-editor-row" data-product-id="${escapeHtml(p.id)}">
+        <input type="text" class="menu-edit-name" value="${escapeHtml(p.name)}" />
+        <input type="number" class="menu-edit-price" min="0" step="0.01" value="${Number(p.price || 0).toFixed(2)}" />
+        <select class="menu-edit-category">${categoryOptions}</select>
+        <input type="hidden" class="menu-current-image" value="${escapeHtml(imageSrc)}" />
+        <div class="row">
+          <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(p.name)}" />
+          <input type="file" class="menu-edit-image-file" accept="image/*" />
+        </div>
+        <button type="button" class="menu-save-product-btn">Save</button>
+        <button type="button" class="menu-delete-btn menu-delete-product-btn">Delete</button>
+      </div>
+    `;
+  }).join('');
+
+  menuProductEditorListEl.innerHTML = rows;
+  menuProductEditorListEl.querySelectorAll('.menu-product-editor-row').forEach((row) => {
+    const productId = row.getAttribute('data-product-id');
+    const product = state.products.find((x) => x.id === productId);
+    const categorySelect = row.querySelector('.menu-edit-category');
+    if (categorySelect && product?.category) {
+      categorySelect.value = product.category;
+    }
+  });
+}
+
+async function readFileAsDataUrl(fileInputEl) {
+  const file = fileInputEl?.files?.[0];
+  if (!file) return '';
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Cannot read image file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function refreshMenuEditorData() {
+  await refreshCatalog({ keepCategory: true });
+  fillMenuCategorySelectOptions();
+  renderMenuCategoryEditorRows();
+  renderMenuProductEditorRows();
+  menuEditorWarmReady = true;
+}
+
+async function handleMenuCategorySubmit(event) {
+  event.preventDefault();
+  if (!canAccessAdminFeatures()) {
+    setStatus('Only Administrations and Supervisor can edit menu.');
+    return;
+  }
+
+  const name = String(menuCategoryNameInputEl?.value || '').trim();
+
+  if (!name) {
+    setStatus('Category name is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Category name is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Add new category "${name}"?`)) {
+      return;
+    }
+    const image = await readFileAsDataUrl(menuCategoryImageFileInputEl);
+    if (menuCategoryAddBtn) {
+      menuCategoryAddBtn.disabled = true;
+      menuCategoryAddBtn.textContent = 'Adding...';
+    }
+    await api('/api/menu/categories', {
+      method: 'POST',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({ name, image })
+    });
+    if (menuCategoryNameInputEl) menuCategoryNameInputEl.value = '';
+    if (menuCategoryImageFileInputEl) menuCategoryImageFileInputEl.value = '';
+    await refreshMenuEditorData();
+    setStatus(`Category "${name}" added.`);
+    showConfirmationToast({
+      title: 'Category added',
+      message: `"${name}" was added to menu categories.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Add category failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Add category failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    if (menuCategoryAddBtn) {
+      menuCategoryAddBtn.disabled = false;
+      menuCategoryAddBtn.textContent = 'Add Category';
+    }
+  }
+}
+
+async function handleMenuProductSubmit(event) {
+  event.preventDefault();
+  if (!canAccessAdminFeatures()) {
+    setStatus('Only Administrations and Supervisor can edit menu.');
+    return;
+  }
+
+  const name = String(menuProductNameInputEl?.value || '').trim();
+  const price = Number(menuProductPriceInputEl?.value || 0);
+  const category = String(menuProductCategoryInputEl?.value || '').trim().toLowerCase();
+
+  if (!name) {
+    setStatus('Product name is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product name is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    setStatus('Product price must be a number >= 0.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product price must be a number greater than or equal to 0.',
+      tone: 'warning',
+      duration: 2400
+    });
+    return;
+  }
+  if (!category) {
+    setStatus('Select a category for product.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Select a category for the product.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Add new product "${name}"?`)) {
+      return;
+    }
+    if (menuProductAddBtn) {
+      menuProductAddBtn.disabled = true;
+      menuProductAddBtn.textContent = 'Adding...';
+    }
+    const imageFromFile = await readFileAsDataUrl(menuProductImageFileInputEl);
+    await api('/api/menu/products', {
+      method: 'POST',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        price,
+        category,
+        image: imageFromFile
+      })
+    });
+    if (menuProductNameInputEl) menuProductNameInputEl.value = '';
+    if (menuProductPriceInputEl) menuProductPriceInputEl.value = '';
+    if (menuProductImageFileInputEl) menuProductImageFileInputEl.value = '';
+    await refreshMenuEditorData();
+    setStatus(`Product "${name}" added.`);
+    showConfirmationToast({
+      title: 'Product added',
+      message: `"${name}" was added successfully.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Add product failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Add product failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    if (menuProductAddBtn) {
+      menuProductAddBtn.disabled = false;
+      menuProductAddBtn.textContent = 'Add Product';
+    }
+  }
+}
+
+async function handleMenuCategoryEditorClick(event) {
+  const deleteBtn = event.target.closest('.menu-delete-category-btn');
+  if (deleteBtn) {
+    const row = event.target.closest('.menu-category-editor-row');
+    const categoryKey = String(row?.getAttribute('data-category-key') || '').trim().toLowerCase();
+    const categoryName = String(row?.querySelector('.menu-edit-category-name')?.value || categoryKey).trim();
+    if (!categoryKey) return;
+    if (!window.confirm(`Delete category "${categoryName}" and all products under it?`)) {
+      return;
+    }
+
+    try {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      await api(`/api/menu/categories/${encodeURIComponent(categoryKey)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': String(activeAuthSession?.role || '') }
+      });
+      await refreshMenuEditorData();
+      showConfirmationToast({
+        title: 'Category deleted',
+        message: `"${categoryName}" and its products were removed from menu.`,
+        tone: 'success'
+      });
+      setStatus(`Category "${categoryName}" deleted.`);
+    } catch (error) {
+      showConfirmationToast({
+        title: 'Delete category failed',
+        message: error.message,
+        tone: 'warning',
+        duration: 2600
+      });
+      setStatus(`Delete category failed: ${error.message}`);
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+    }
+    return;
+  }
+
+  const saveBtn = event.target.closest('.menu-save-category-btn');
+  if (!saveBtn) return;
+
+  const row = event.target.closest('.menu-category-editor-row');
+  const categoryKey = String(row?.getAttribute('data-category-key') || '').trim().toLowerCase();
+  if (!row || !categoryKey) return;
+
+  const name = String(row.querySelector('.menu-edit-category-name')?.value || '').trim();
+  const currentImage = String(row.querySelector('.menu-current-category-image')?.value || '').trim();
+  const imageFileInput = row.querySelector('.menu-edit-category-image-file');
+
+  if (!name) {
+    setStatus('Category name cannot be empty.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Category name cannot be empty.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Save changes for category "${name}"?`)) {
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    const imageFromFile = await readFileAsDataUrl(imageFileInput);
+    await api(`/api/menu/categories/${encodeURIComponent(categoryKey)}`, {
+      method: 'PUT',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        image: imageFromFile || currentImage
+      })
+    });
+    await refreshMenuEditorData();
+    setStatus(`Category "${name}" updated.`);
+    showConfirmationToast({
+      title: 'Category updated',
+      message: `"${name}" changes were saved.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Update category failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Update category failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Category';
+  }
+}
+
+async function handleMenuProductEditorClick(event) {
+  const deleteBtn = event.target.closest('.menu-delete-product-btn');
+  if (deleteBtn) {
+    const row = event.target.closest('.menu-product-editor-row');
+    const productId = row?.getAttribute('data-product-id');
+    const productName = String(row?.querySelector('.menu-edit-name')?.value || '').trim() || String(productId || '');
+    if (!productId) return;
+    if (!window.confirm(`Delete product "${productName}"?`)) {
+      return;
+    }
+
+    try {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      await api(`/api/menu/products/${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': String(activeAuthSession?.role || '') }
+      });
+      await refreshMenuEditorData();
+      showConfirmationToast({
+        title: 'Product deleted',
+        message: `"${productName}" was removed from menu.`,
+        tone: 'success'
+      });
+      setStatus(`Product "${productName}" deleted.`);
+    } catch (error) {
+      showConfirmationToast({
+        title: 'Delete product failed',
+        message: error.message,
+        tone: 'warning',
+        duration: 2600
+      });
+      setStatus(`Delete product failed: ${error.message}`);
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+    }
+    return;
+  }
+
+  const saveBtn = event.target.closest('.menu-save-product-btn');
+  if (!saveBtn) return;
+
+  const row = event.target.closest('.menu-product-editor-row');
+  const productId = row?.getAttribute('data-product-id');
+  if (!row || !productId) return;
+
+  const name = String(row.querySelector('.menu-edit-name')?.value || '').trim();
+  const price = Number(row.querySelector('.menu-edit-price')?.value || 0);
+  const category = String(row.querySelector('.menu-edit-category')?.value || '').trim().toLowerCase();
+  const currentImage = String(row.querySelector('.menu-current-image')?.value || '').trim();
+  const imageFileInput = row.querySelector('.menu-edit-image-file');
+
+  if (!name) {
+    setStatus('Product name cannot be empty.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product name cannot be empty.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    setStatus('Product price must be a number >= 0.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product price must be a number greater than or equal to 0.',
+      tone: 'warning',
+      duration: 2400
+    });
+    return;
+  }
+  if (!category) {
+    setStatus('Product category is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product category is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Save changes for product "${name}"?`)) {
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    const imageFromFile = await readFileAsDataUrl(imageFileInput);
+    await api(`/api/menu/products/${encodeURIComponent(productId)}`, {
+      method: 'PUT',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        price,
+        category,
+        image: imageFromFile || currentImage
+      })
+    });
+    await refreshMenuEditorData();
+    setStatus(`Product "${name}" updated.`);
+    showConfirmationToast({
+      title: 'Product updated',
+      message: `"${name}" changes were saved.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Update product failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Update product failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
 }
 
 function renderCart() {
@@ -2072,13 +2762,12 @@ function setupEventListeners() {
     btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
   });
 
-  // Category buttons
-  document.querySelectorAll('.category-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const category = btn.getAttribute('data-category');
-      switchCategory(category);
+  if (categoryButtonsEl) {
+    categoryButtonsEl.addEventListener('click', (e) => {
+      const category = e.target.closest('.category-btn')?.getAttribute('data-category');
+      if (category) switchCategory(category);
     });
-  });
+  }
 
   // POS events
   productsEl.addEventListener('click', onProductClick);
@@ -2253,6 +2942,21 @@ function setupEventListeners() {
   if (adminReceiptCloseBtn) {
     adminReceiptCloseBtn.addEventListener('click', closeAdminReceiptModal);
   }
+  if (menuEditorCloseBtn) {
+    menuEditorCloseBtn.addEventListener('click', closeMenuEditor);
+  }
+  if (menuCategoryFormEl) {
+    menuCategoryFormEl.addEventListener('submit', handleMenuCategorySubmit);
+  }
+  if (menuProductFormEl) {
+    menuProductFormEl.addEventListener('submit', handleMenuProductSubmit);
+  }
+  if (menuCategoryEditorListEl) {
+    menuCategoryEditorListEl.addEventListener('click', handleMenuCategoryEditorClick);
+  }
+  if (menuProductEditorListEl) {
+    menuProductEditorListEl.addEventListener('click', handleMenuProductEditorClick);
+  }
 
   if (adminPasswordEl) {
     adminPasswordEl.addEventListener('keydown', (e) => {
@@ -2277,6 +2981,7 @@ function setupEventListeners() {
       if (paymentSuccessModalEl?.classList.contains('open')) {
         closePaymentSuccessModal();
       }
+      closeMenuEditor();
       closeAdminReceiptModal();
       closeAdminLogin();
       closeAdminDashboard();
@@ -2287,22 +2992,33 @@ function setupEventListeners() {
 async function init() {
   const persistedUiState = readUserUiState();
   const persistedCategory = String(persistedUiState.activeCategory || '').trim().toLowerCase();
-  const allowedCategories = new Set(['main-dish', 'rice', 'burger', 'drinks', 'fries', 'dessert', 'sauces']);
-  if (allowedCategories.has(persistedCategory)) {
+  if (persistedCategory) {
     state.activeCategory = persistedCategory;
   }
   if (persistedUiState.salesRange === 'daily' || persistedUiState.salesRange === 'weekly') {
     activeSalesRange = persistedUiState.salesRange;
   }
 
-  const [{ products }] = await Promise.all([api('/api/products'), api('/api/config')]);
-  state.products = products;
+  const hasCachedCatalog = hydrateCatalogState(readCatalogCache(), { keepCategory: true });
+  if (hasCachedCatalog) {
+    renderCategoryButtons();
+    switchCategory(state.activeCategory);
+    renderCart();
+    preloadProductImages(state.products);
+  } else {
+    if (categoryButtonsEl) categoryButtonsEl.innerHTML = '<p class="status">Loading menu...</p>';
+    if (productsEl) productsEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading products...</p>';
+  }
+
+  const configPromise = api('/api/config').catch(() => ({}));
+  const catalogPromise = refreshCatalog({ keepCategory: true }).catch((error) => {
+    if (!hasCachedCatalog) {
+      setStatus(`Menu load error: ${error.message}`);
+    }
+  });
+
   ensureConfettiAnimation();
   ensureYummyAnimations();
-  renderProducts();
-  switchCategory(state.activeCategory);
-  preloadProductImages(state.products);
-  renderCart();
 
   setupEventListeners();
   updateReceiptActionVisibility();
@@ -2310,7 +3026,12 @@ async function init() {
   if (ePaymentBtn) ePaymentBtn.disabled = true;
   setPaymentMethod('cash');
   setStatus('Select order type first: Dine In or Take Out.');
+  await Promise.all([configPromise, catalogPromise]);
   await refreshSalesReport(activeSalesRange);
+
+  if (canAccessAdminFeatures()) {
+    warmMenuEditorInBackground();
+  }
 
   if (persistedUiState.adminOpen && canAccessAdminFeatures()) {
     await openAdminDashboard();
@@ -2320,5 +3041,3 @@ async function init() {
 bootstrap().catch((error) => {
   setAuthMessage(`Authentication startup error: ${error.message}`);
 });
-
-
