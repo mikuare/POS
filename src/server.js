@@ -1176,18 +1176,22 @@ app.use((error, _req, res, next) => {
   return next(error);
 });
 
-app.listen(PORT, () => {
-  console.log(`POS server running on ${baseUrl}`);
-  console.log(`Provider: ${providerName}`);
-  console.log(`Supabase: ${isSupabaseEnabled() ? `enabled (${getSupabaseMode()})` : 'disabled'}`);
-  
-  // Start periodic sync for offline queue (every 60 seconds)
-  if (isSupabaseEnabled()) {
-    setInterval(() => {
-      syncOfflineQueue().catch((err) => {
-        console.warn('[PeriodicSync] Failed:', err.message);
-      });
-    }, 60000);
-    console.log('Periodic sync: enabled (60s interval)');
-  }
-});
+if (require.main === module && process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`POS server running on ${baseUrl}`);
+    console.log(`Provider: ${providerName}`);
+    console.log(`Supabase: ${isSupabaseEnabled() ? `enabled (${getSupabaseMode()})` : 'disabled'}`);
+
+    // Start periodic sync for offline queue (every 60 seconds)
+    if (isSupabaseEnabled()) {
+      setInterval(() => {
+        syncOfflineQueue().catch((err) => {
+          console.warn('[PeriodicSync] Failed:', err.message);
+        });
+      }, 60000);
+      console.log('Periodic sync: enabled (60s interval)');
+    }
+  });
+}
+
+module.exports = app;
