@@ -1,5 +1,6 @@
-﻿const { v4: uuidv4 } = require('uuid');
+﻿const { v4: uuidv4, v5: uuidv5 } = require('uuid');
 const { getSupabase, isSupabaseEnabled } = require('./supabaseClient');
+const offlineQueue = require('./offlineQueue');
 
 const DEFAULT_PRODUCTS = [
   // Main Dish
@@ -59,6 +60,8 @@ const DEFAULT_MENU_CATEGORIES = [
   { key: 'sauces', name: 'Sauces', image: '/Menu/Sauce.png', sortOrder: 70 }
 ];
 
+// NOTE: Keeping the original in-memory maps for runtime behavior and fallback.
+// SQLite migration currently targets the offline sync queue layer only.
 const invoices = new Map();
 const gcashSessions = new Map();
 const inventoryIngredients = new Map();
@@ -66,6 +69,7 @@ const productRecipes = new Map();
 const menuCategories = new Map(DEFAULT_MENU_CATEGORIES.map((x) => [x.key, x]));
 const supabase = getSupabase();
 const PG_INT_MAX = 2147483647;
+const LINE_ITEM_UUID_NAMESPACE = '44f6ebf6-8e53-48a7-bf63-853f4ea6848b';
 
 function normalizeMenuCategoryKey(value) {
   return String(value || '')
@@ -228,22 +232,27 @@ async function listMenuCategories() {
     return listMenuCategoriesFallback();
   }
 
-  await seedMenuCatalogIfEmpty();
+  try {
+    await seedMenuCatalogIfEmpty();
 
-  const { data, error } = await supabase
-    .from('menu_categories')
-    .select('category_key,category_name,image_url,sort_order')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
-    .order('category_name', { ascending: true });
+    const { data, error } = await supabase
+      .from('menu_categories')
+      .select('category_key,category_name,image_url,sort_order')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('category_name', { ascending: true });
 
-  if (error) throw new Error(`Supabase menu categories fetch failed: ${error.message}`);
-  return (data || []).map((x) => ({
-    key: x.category_key,
-    name: x.category_name,
-    image: x.image_url || getDefaultCategoryByKey(x.category_key)?.image || '',
-    sortOrder: Number(x.sort_order || 0)
-  }));
+    if (error) throw new Error(`Supabase menu categories fetch failed: ${error.message}`);
+    return (data || []).map((x) => ({
+      key: x.category_key,
+      name: x.category_name,
+      image: x.image_url || getDefaultCategoryByKey(x.category_key)?.image || '',
+      sortOrder: Number(x.sort_order || 0)
+    }));
+  } catch (error) {
+    console.warn('[Offline] listMenuCategories Supabase failed, using fallback:', error.message);
+    return listMenuCategoriesFallback();
+  }
 }
 
 async function listProducts() {
@@ -251,32 +260,37 @@ async function listProducts() {
     return listProductsFallback();
   }
 
-  await seedMenuCatalogIfEmpty();
+  try {
+    await seedMenuCatalogIfEmpty();
 
-  const { data, error } = await supabase
-    .from('menu_products')
-    .select(`
-      id,
-      name,
-      price,
-      image_url,
-      sort_order,
-      menu_categories!inner(category_key)
-    `)
-    .eq('is_active', true)
-    .eq('menu_categories.is_active', true)
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
+    const { data, error } = await supabase
+      .from('menu_products')
+      .select(`
+        id,
+        name,
+        price,
+        image_url,
+        sort_order,
+        menu_categories!inner(category_key)
+      `)
+      .eq('is_active', true)
+      .eq('menu_categories.is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
 
-  if (error) throw new Error(`Supabase products fetch failed: ${error.message}`);
+    if (error) throw new Error(`Supabase products fetch failed: ${error.message}`);
 
-  return (data || []).map((x) => ({
-    id: x.id,
-    name: x.name,
-    price: Number(x.price || 0),
-    category: x.menu_categories?.category_key || 'main-dish',
-    image: x.image_url || '/Business Logo/Ruels Logo for business.png'
-  }));
+    return (data || []).map((x) => ({
+      id: x.id,
+      name: x.name,
+      price: Number(x.price || 0),
+      category: x.menu_categories?.category_key || 'main-dish',
+      image: x.image_url || '/Business Logo/Ruels Logo for business.png'
+    }));
+  } catch (error) {
+    console.warn('[Offline] listProducts Supabase failed, using fallback:', error.message);
+    return listProductsFallback();
+  }
 }
 
 async function createMenuCategory({ name, key, image, sortOrder }) {
@@ -685,8 +699,8 @@ function toAppInvoice(dbInvoice, lineItems, payment) {
 }
 
 function toDbLineItems(invoiceId, lineItems) {
-  return lineItems.map((item) => ({
-    id: uuidv4(),
+  return lineItems.map((item, index) => ({
+    id: item.lineId || uuidv5(`${invoiceId}:${item.productId}:${index}`, LINE_ITEM_UUID_NAMESPACE),
     invoice_id: invoiceId,
     product_id: item.productId,
     product_name: item.name,
@@ -698,12 +712,28 @@ function toDbLineItems(invoiceId, lineItems) {
 
 function toAppLineItems(dbItems) {
   return dbItems.map((item) => ({
+    lineId: item.id,
     productId: item.product_id,
     name: item.product_name,
     price: Number(item.unit_price),
     qty: Number(item.qty),
     subtotal: Number(item.subtotal)
   }));
+}
+
+function ensureInvoiceLineItemIds(invoice) {
+  if (!invoice || !Array.isArray(invoice.lineItems)) return invoice;
+  invoice.lineItems = invoice.lineItems.map((item, index) => ({
+    ...item,
+    lineId: item.lineId || uuidv5(`${invoice.id}:${item.productId}:${index}`, LINE_ITEM_UUID_NAMESPACE)
+  }));
+  return invoice;
+}
+
+function enqueueOfflineOpDeduped(type, payload, isDuplicate) {
+  const existing = offlineQueue.getAll().filter((op) => op.type === type && isDuplicate(op));
+  existing.forEach((op) => offlineQueue.remove(op.id));
+  offlineQueue.enqueue(type, payload);
 }
 
 function toAppPayment(dbPayment) {
@@ -725,31 +755,44 @@ function toAppPayment(dbPayment) {
   };
 }
 
-async function persistInvoice(invoice) {
-  if (!isSupabaseEnabled()) return;
+/**
+ * Internal: persist invoice to Supabase only. Throws on error.
+ * Used by persistInvoice() and syncOfflineQueue().
+ */
+async function _persistInvoiceToSupabase(invoice) {
+  ensureInvoiceLineItemIds(invoice);
 
   const { error: invoiceError } = await supabase
     .from('pos_invoices')
     .upsert(toDbInvoice(invoice), { onConflict: 'id' });
-
-  if (invoiceError) {
-    throw new Error(`Supabase invoice upsert failed: ${invoiceError.message}`);
-  }
+  if (invoiceError) throw new Error(`Supabase invoice upsert failed: ${invoiceError.message}`);
 
   const { error: deleteItemsError } = await supabase
     .from('pos_invoice_items')
     .delete()
     .eq('invoice_id', invoice.id);
-
-  if (deleteItemsError) {
-    throw new Error(`Supabase invoice-items cleanup failed: ${deleteItemsError.message}`);
-  }
+  if (deleteItemsError) throw new Error(`Supabase invoice-items cleanup failed: ${deleteItemsError.message}`);
 
   const dbItems = toDbLineItems(invoice.id, invoice.lineItems);
   const { error: itemsError } = await supabase.from('pos_invoice_items').insert(dbItems);
+  if (itemsError) throw new Error(`Supabase invoice-items insert failed: ${itemsError.message}`);
+}
 
-  if (itemsError) {
-    throw new Error(`Supabase invoice-items insert failed: ${itemsError.message}`);
+/**
+ * Persist invoice to Supabase. If Supabase is unreachable, queues for later sync.
+ * Never throws — the in-memory invoice is always kept.
+ */
+async function persistInvoice(invoice) {
+  if (!isSupabaseEnabled()) return;
+  try {
+    await _persistInvoiceToSupabase(invoice);
+  } catch (error) {
+    console.warn('[Offline] persistInvoice failed, queuing for sync:', error.message);
+    enqueueOfflineOpDeduped(
+      'persist_invoice',
+      { invoice },
+      (op) => op?.payload?.invoice?.id === invoice.id
+    );
   }
 }
 
@@ -785,8 +828,9 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
     ? Math.min(requestedDiscount, subtotal)
     : 0;
   const total = Math.max(0, subtotal - discount);
+  const invoiceId = uuidv4();
   const invoice = {
-    id: uuidv4(),
+    id: invoiceId,
     reference: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     createdAt: now,
     updatedAt: now,
@@ -796,7 +840,10 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
     subtotal,
     discount,
     total,
-    lineItems,
+    lineItems: lineItems.map((item, index) => ({
+      ...item,
+      lineId: uuidv5(`${invoiceId}:${item.productId}:${index}`, LINE_ITEM_UUID_NAMESPACE)
+    })),
     payment: null
   };
 
@@ -872,40 +919,41 @@ async function setInvoicePaid(invoiceId, paymentData) {
   invoices.set(invoiceId, invoice);
 
   if (isSupabaseEnabled()) {
-    const { error: invoiceError } = await supabase
-      .from('pos_invoices')
-      .update({
-        status: invoice.status,
-        updated_at: invoice.updatedAt
-      })
-      .eq('id', invoice.id);
+    try {
+      const { error: invoiceError } = await supabase
+        .from('pos_invoices')
+        .upsert(toDbInvoice(invoice), { onConflict: 'id' });
 
-    if (invoiceError) {
-      throw new Error(`Supabase invoice payment-status update failed: ${invoiceError.message}`);
-    }
+      if (invoiceError) throw new Error(`Supabase invoice upsert during payment failed: ${invoiceError.message}`);
 
-    const paymentRow = {
-      invoice_id: invoice.id,
-      method: paymentData.method,
-      provider: paymentData.provider || null,
-      provider_reference: paymentData.providerReference || null,
-      recipient_gcash_number: paymentData.recipientGcashNumber || null,
-      paid_at: paymentData.paidAt,
-      amount_paid: paymentData.amountPaid,
-      change_amount: paymentData.change || 0,
-      success: Boolean(paymentData.success),
-      success_message: paymentData.successMessage || null,
-      customer_name: paymentData.customerName || null,
-      customer_email: paymentData.customerEmail || null,
-      customer_phone: paymentData.customerPhone || null
-    };
+      const paymentRow = {
+        invoice_id: invoice.id,
+        method: paymentData.method,
+        provider: paymentData.provider || null,
+        provider_reference: paymentData.providerReference || null,
+        recipient_gcash_number: paymentData.recipientGcashNumber || null,
+        paid_at: paymentData.paidAt,
+        amount_paid: paymentData.amountPaid,
+        change_amount: paymentData.change || 0,
+        success: Boolean(paymentData.success),
+        success_message: paymentData.successMessage || null,
+        customer_name: paymentData.customerName || null,
+        customer_email: paymentData.customerEmail || null,
+        customer_phone: paymentData.customerPhone || null
+      };
 
-    const { error: paymentError } = await supabase
-      .from('pos_payments')
-      .upsert(paymentRow, { onConflict: 'invoice_id' });
+      const { error: paymentError } = await supabase
+        .from('pos_payments')
+        .upsert(paymentRow, { onConflict: 'invoice_id' });
 
-    if (paymentError) {
-      throw new Error(`Supabase payment upsert failed: ${paymentError.message}`);
+      if (paymentError) throw new Error(`Supabase payment upsert failed: ${paymentError.message}`);
+    } catch (error) {
+      console.warn('[Offline] setInvoicePaid Supabase sync failed, queuing:', error.message);
+      enqueueOfflineOpDeduped(
+        'set_invoice_paid',
+        { invoiceId, invoice, paymentData },
+        (op) => op?.payload?.invoiceId === invoiceId
+      );
     }
   }
 
@@ -953,12 +1001,18 @@ async function saveGcashSession(session) {
     return;
   }
 
-  const { error } = await supabase
-    .from('pos_gcash_sessions')
-    .upsert(toDbSession(session), { onConflict: 'reference' });
-
-  if (error) {
-    throw new Error(`Supabase GCash session upsert failed: ${error.message}`);
+  try {
+    const { error } = await supabase
+      .from('pos_gcash_sessions')
+      .upsert(toDbSession(session), { onConflict: 'reference' });
+    if (error) throw new Error(`Supabase GCash session upsert failed: ${error.message}`);
+  } catch (error) {
+    console.warn('[Offline] saveGcashSession Supabase sync failed, queuing:', error.message);
+    enqueueOfflineOpDeduped(
+      'save_gcash_session',
+      { session },
+      (op) => op?.payload?.session?.reference === session.reference
+    );
   }
 }
 
@@ -1137,86 +1191,91 @@ async function createInventoryIngredient({ name, qtyOnHand, unitPrice, reorderLe
 
 async function getInventoryReport() {
   if (isSupabaseEnabled()) {
-    const [{ data: ingredients, error: ingredientErr }, { data: recipes, error: recipeErr }, { data: paidInvoices, error: invoiceErr }] = await Promise.all([
-      supabase
-        .from('inventory_ingredients')
-        .select('id,name,qty_on_hand,unit_price,reorder_level,unit,is_active,created_at,updated_at')
-        .eq('is_active', true)
-        .order('name', { ascending: true }),
-      supabase
-        .from('product_recipes')
-        .select('id,product_id,product_name,ingredient_id,qty_per_product'),
-      supabase
-        .from('pos_invoices')
-        .select('id')
-        .eq('status', 'PAID')
-    ]);
+    try {
+      const [{ data: ingredients, error: ingredientErr }, { data: recipes, error: recipeErr }, { data: paidInvoices, error: invoiceErr }] = await Promise.all([
+        supabase
+          .from('inventory_ingredients')
+          .select('id,name,qty_on_hand,unit_price,reorder_level,unit,is_active,created_at,updated_at')
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
+        supabase
+          .from('product_recipes')
+          .select('id,product_id,product_name,ingredient_id,qty_per_product'),
+        supabase
+          .from('pos_invoices')
+          .select('id')
+          .eq('status', 'PAID')
+      ]);
 
-    if (ingredientErr) throw new Error(`Supabase inventory query failed: ${ingredientErr.message}`);
-    if (recipeErr) throw new Error(`Supabase recipes query failed: ${recipeErr.message}`);
-    if (invoiceErr) throw new Error(`Supabase invoice query failed: ${invoiceErr.message}`);
+      if (ingredientErr) throw new Error(`Supabase inventory query failed: ${ingredientErr.message}`);
+      if (recipeErr) throw new Error(`Supabase recipes query failed: ${recipeErr.message}`);
+      if (invoiceErr) throw new Error(`Supabase invoice query failed: ${invoiceErr.message}`);
 
-    const paidIds = (paidInvoices || []).map((x) => x.id);
-    let invoiceItems = [];
-    if (paidIds.length) {
-      const { data: items, error: itemErr } = await supabase
-        .from('pos_invoice_items')
-        .select('invoice_id,product_id,qty')
-        .in('invoice_id', paidIds);
-      if (itemErr) throw new Error(`Supabase invoice items query failed: ${itemErr.message}`);
-      invoiceItems = items || [];
-    }
+      const paidIds = (paidInvoices || []).map((x) => x.id);
+      let invoiceItems = [];
+      if (paidIds.length) {
+        const { data: items, error: itemErr } = await supabase
+          .from('pos_invoice_items')
+          .select('invoice_id,product_id,qty')
+          .in('invoice_id', paidIds);
+        if (itemErr) throw new Error(`Supabase invoice items query failed: ${itemErr.message}`);
+        invoiceItems = items || [];
+      }
 
-    const recipesByProductId = new Map();
-    (recipes || []).forEach((r) => {
-      const key = r.product_id;
-      if (!recipesByProductId.has(key)) recipesByProductId.set(key, []);
-      recipesByProductId.get(key).push({
-        productId: r.product_id,
-        productName: r.product_name,
-        ingredientId: r.ingredient_id,
-        qtyPerProduct: Number(r.qty_per_product || 0)
+      const recipesByProductId = new Map();
+      (recipes || []).forEach((r) => {
+        const key = r.product_id;
+        if (!recipesByProductId.has(key)) recipesByProductId.set(key, []);
+        recipesByProductId.get(key).push({
+          productId: r.product_id,
+          productName: r.product_name,
+          ingredientId: r.ingredient_id,
+          qtyPerProduct: Number(r.qty_per_product || 0)
+        });
       });
-    });
 
-    const usageByIngredientId = buildInventoryUsageFromInvoices({
-      paidInvoices: paidInvoices || [],
-      invoiceItems,
-      recipesByProductId
-    });
+      const usageByIngredientId = buildInventoryUsageFromInvoices({
+        paidInvoices: paidInvoices || [],
+        invoiceItems,
+        recipesByProductId
+      });
 
-    const rows = (ingredients || []).map((ing) => {
-      const usage = usageByIngredientId.get(ing.id) || { estimatedUsedQty: 0, usageByProduct: [] };
-      const qtyOnHand = Number(ing.qty_on_hand || 0);
-      const unitPrice = Number(ing.unit_price || 0);
-      const estimatedUsedQty = Number(usage.estimatedUsedQty || 0);
-      return {
-        id: ing.id,
-        name: ing.name,
-        qtyOnHand,
-        unitPrice,
-        reorderLevel: Number(ing.reorder_level || 0),
-        unit: ing.unit || 'pcs',
-        inventoryValue: qtyOnHand * unitPrice,
-        estimatedUsedQty,
-        estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
-        lowStock: qtyOnHand <= Number(ing.reorder_level || 0),
-        usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
-        createdAt: ing.created_at,
-        updatedAt: ing.updated_at
-      };
-    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      const rows = (ingredients || []).map((ing) => {
+        const usage = usageByIngredientId.get(ing.id) || { estimatedUsedQty: 0, usageByProduct: [] };
+        const qtyOnHand = Number(ing.qty_on_hand || 0);
+        const unitPrice = Number(ing.unit_price || 0);
+        const estimatedUsedQty = Number(usage.estimatedUsedQty || 0);
+        return {
+          id: ing.id,
+          name: ing.name,
+          qtyOnHand,
+          unitPrice,
+          reorderLevel: Number(ing.reorder_level || 0),
+          unit: ing.unit || 'pcs',
+          inventoryValue: qtyOnHand * unitPrice,
+          estimatedUsedQty,
+          estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
+          lowStock: qtyOnHand <= Number(ing.reorder_level || 0),
+          usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
+          createdAt: ing.created_at,
+          updatedAt: ing.updated_at
+        };
+      }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-    const totals = rows.reduce((acc, row) => {
-      acc.totalIngredients += 1;
-      acc.totalInventoryValue += row.inventoryValue;
-      if (row.lowStock) acc.lowStockCount += 1;
-      return acc;
-    }, { totalIngredients: 0, totalInventoryValue: 0, lowStockCount: 0 });
+      const totals = rows.reduce((acc, row) => {
+        acc.totalIngredients += 1;
+        acc.totalInventoryValue += row.inventoryValue;
+        if (row.lowStock) acc.lowStockCount += 1;
+        return acc;
+      }, { totalIngredients: 0, totalInventoryValue: 0, lowStockCount: 0 });
 
-    return { ingredients: rows, totals };
+      return { ingredients: rows, totals };
+    } catch (error) {
+      console.warn('[Offline] getInventoryReport Supabase failed, using in-memory:', error.message);
+    }
   }
 
+  // In-memory fallback
   const recipesByProductId = new Map();
   Array.from(productRecipes.values()).forEach((r) => {
     if (!recipesByProductId.has(r.productId)) recipesByProductId.set(r.productId, []);
@@ -1247,15 +1306,15 @@ async function getInventoryReport() {
       qtyOnHand,
       unitPrice,
       reorderLevel: Number(ing.reorderLevel || 0),
-        unit: ing.unit || 'pcs',
-        inventoryValue: qtyOnHand * unitPrice,
-        estimatedUsedQty,
-        estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
-        lowStock: qtyOnHand <= Number(ing.reorderLevel || 0),
-        usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
-        createdAt: ing.createdAt,
-        updatedAt: ing.updatedAt
-      };
+      unit: ing.unit || 'pcs',
+      inventoryValue: qtyOnHand * unitPrice,
+      estimatedUsedQty,
+      estimatedRemainingQty: Math.max(0, qtyOnHand - estimatedUsedQty),
+      lowStock: qtyOnHand <= Number(ing.reorderLevel || 0),
+      usageByProduct: usage.usageByProduct.sort((a, b) => b.estimatedUsedQty - a.estimatedUsedQty),
+      createdAt: ing.createdAt,
+      updatedAt: ing.updatedAt
+    };
   }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   const totals = rows.reduce((acc, row) => {
@@ -1268,55 +1327,55 @@ async function getInventoryReport() {
   return { ingredients: rows, totals };
 }
 
+
 async function getSalesReport({ dateFrom, dateTo }) {
   const { fromIso, toIso } = normalizeDateRange({ dateFrom, dateTo });
 
   if (isSupabaseEnabled()) {
-    const { data: invoices, error: invoicesError } = await supabase
-      .from('pos_invoices')
-      .select('id,reference,total_amount,payment_method,status,created_at')
-      .eq('status', 'PAID')
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso)
-      .order('created_at', { ascending: false });
+    try {
+      const { data: invoicesData, error: invoicesError } = await supabase
+        .from('pos_invoices')
+        .select('id,reference,total_amount,payment_method,status,created_at')
+        .eq('status', 'PAID')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: false });
 
-    if (invoicesError) {
-      throw new Error(`Supabase invoices report query failed: ${invoicesError.message}`);
-    }
+      if (invoicesError) throw new Error(`Supabase invoices report query failed: ${invoicesError.message}`);
 
-    const invoiceIds = (invoices || []).map((x) => x.id);
-    let payments = [];
+      const invoiceIds = (invoicesData || []).map((x) => x.id);
+      let payments = [];
 
-    if (invoiceIds.length) {
-      const { data: dbPayments, error: paymentsError } = await supabase
-        .from('pos_payments')
-        .select('invoice_id,method,amount_paid,change_amount,paid_at')
-        .in('invoice_id', invoiceIds);
-
-      if (paymentsError) {
-        throw new Error(`Supabase payments report query failed: ${paymentsError.message}`);
+      if (invoiceIds.length) {
+        const { data: dbPayments, error: paymentsError } = await supabase
+          .from('pos_payments')
+          .select('invoice_id,method,amount_paid,change_amount,paid_at')
+          .in('invoice_id', invoiceIds);
+        if (paymentsError) throw new Error(`Supabase payments report query failed: ${paymentsError.message}`);
+        payments = dbPayments || [];
       }
-      payments = dbPayments || [];
-    }
 
-    const paymentByInvoiceId = new Map(payments.map((p) => [p.invoice_id, p]));
-    const salesRows = (invoices || []).map((inv) => {
-      const p = paymentByInvoiceId.get(inv.id);
+      const paymentByInvoiceId = new Map(payments.map((p) => [p.invoice_id, p]));
+      const salesRows = (invoicesData || []).map((inv) => {
+        const p = paymentByInvoiceId.get(inv.id);
+        return {
+          invoiceId: inv.id,
+          reference: inv.reference,
+          method: p?.method || inv.payment_method,
+          amountPaid: Number(p?.amount_paid ?? inv.total_amount),
+          paidAt: p?.paid_at || inv.created_at
+        };
+      });
+
+      const summary = summarizeSalesRows(salesRows);
       return {
-        invoiceId: inv.id,
-        reference: inv.reference,
-        method: p?.method || inv.payment_method,
-        amountPaid: Number(p?.amount_paid ?? inv.total_amount),
-        paidAt: p?.paid_at || inv.created_at
+        range: { dateFrom: fromIso, dateTo: toIso },
+        ...summary,
+        transactions: salesRows
       };
-    });
-
-    const summary = summarizeSalesRows(salesRows);
-    return {
-      range: { dateFrom: fromIso, dateTo: toIso },
-      ...summary,
-      transactions: salesRows
-    };
+    } catch (error) {
+      console.warn('[Offline] getSalesReport Supabase failed, using in-memory:', error.message);
+    }
   }
 
   const salesRows = Array.from(invoices.values())
@@ -1346,39 +1405,39 @@ async function getTopSalesPerProduct(limit = 10) {
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
 
   if (isSupabaseEnabled()) {
-    const { data: paidInvoices, error: invoiceError } = await supabase
-      .from('pos_invoices')
-      .select('id')
-      .eq('status', 'PAID');
+    try {
+      const { data: paidInvoices, error: invoiceError } = await supabase
+        .from('pos_invoices')
+        .select('id')
+        .eq('status', 'PAID');
 
-    if (invoiceError) {
-      throw new Error(`Supabase top-products invoice query failed: ${invoiceError.message}`);
+      if (invoiceError) throw new Error(`Supabase top-products invoice query failed: ${invoiceError.message}`);
+
+      const invoiceIds = (paidInvoices || []).map((x) => x.id);
+      if (!invoiceIds.length) return [];
+
+      const { data: itemRows, error: itemsError } = await supabase
+        .from('pos_invoice_items')
+        .select('product_name,qty,subtotal')
+        .in('invoice_id', invoiceIds);
+
+      if (itemsError) throw new Error(`Supabase top-products items query failed: ${itemsError.message}`);
+
+      const grouped = new Map();
+      (itemRows || []).forEach((row) => {
+        const key = row.product_name || 'Unknown Product';
+        const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
+        current.qtySold += Number(row.qty || 0);
+        current.totalSales += Number(row.subtotal || 0);
+        grouped.set(key, current);
+      });
+
+      return Array.from(grouped.values())
+        .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
+        .slice(0, cappedLimit);
+    } catch (error) {
+      console.warn('[Offline] getTopSalesPerProduct Supabase failed, using in-memory:', error.message);
     }
-
-    const invoiceIds = (paidInvoices || []).map((x) => x.id);
-    if (!invoiceIds.length) return [];
-
-    const { data: itemRows, error: itemsError } = await supabase
-      .from('pos_invoice_items')
-      .select('product_name,qty,subtotal')
-      .in('invoice_id', invoiceIds);
-
-    if (itemsError) {
-      throw new Error(`Supabase top-products items query failed: ${itemsError.message}`);
-    }
-
-    const grouped = new Map();
-    (itemRows || []).forEach((row) => {
-      const key = row.product_name || 'Unknown Product';
-      const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
-      current.qtySold += Number(row.qty || 0);
-      current.totalSales += Number(row.subtotal || 0);
-      grouped.set(key, current);
-    });
-
-    return Array.from(grouped.values())
-      .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
-      .slice(0, cappedLimit);
   }
 
   const grouped = new Map();
@@ -1405,86 +1464,76 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
     : { fromIso: null, toIso: null };
 
   if (isSupabaseEnabled()) {
-    let query = supabase
-      .from('pos_invoices')
-      .select('id,reference,total_amount,payment_method,status,order_type,created_at,updated_at')
-      .order('created_at', { ascending: false });
+    try {
+      let query = supabase
+        .from('pos_invoices')
+        .select('id,reference,total_amount,payment_method,status,order_type,created_at,updated_at')
+        .order('created_at', { ascending: false });
 
-    if (status) {
-      query = query.eq('status', status);
-    }
+      if (status) query = query.eq('status', status);
+      if (fromIso && toIso) query = query.gte('created_at', fromIso).lte('created_at', toIso);
 
-    if (fromIso && toIso) {
-      query = query.gte('created_at', fromIso).lte('created_at', toIso);
-    }
+      const { data: invoicesData, error: invoicesError } = await query;
+      if (invoicesError) throw new Error(`Supabase invoices query failed: ${invoicesError.message}`);
 
-    const { data: invoicesData, error: invoicesError } = await query;
+      const invoiceIds = (invoicesData || []).map((x) => x.id);
+      let payments = [];
+      let dbGcashSessions = [];
 
-    if (invoicesError) {
-      throw new Error(`Supabase invoices query failed: ${invoicesError.message}`);
-    }
+      if (invoiceIds.length) {
+        const { data: dbPayments, error: paymentsError } = await supabase
+          .from('pos_payments')
+          .select('invoice_id,method,amount_paid,change_amount,paid_at,provider,provider_reference,customer_name,customer_email,customer_phone')
+          .in('invoice_id', invoiceIds);
+        if (paymentsError) throw new Error(`Supabase payments query failed: ${paymentsError.message}`);
+        payments = dbPayments || [];
 
-    const invoiceIds = (invoicesData || []).map((x) => x.id);
-    let payments = [];
-    let gcashSessions = [];
-
-    if (invoiceIds.length) {
-      const { data: dbPayments, error: paymentsError } = await supabase
-        .from('pos_payments')
-        .select('invoice_id,method,amount_paid,change_amount,paid_at,provider,provider_reference,customer_name,customer_email,customer_phone')
-        .in('invoice_id', invoiceIds);
-
-      if (paymentsError) {
-        throw new Error(`Supabase payments query failed: ${paymentsError.message}`);
+        const { data: dbSessions, error: sessionsError } = await supabase
+          .from('pos_gcash_sessions')
+          .select('invoice_id,reference,provider,checkout_url,status')
+          .in('invoice_id', invoiceIds);
+        if (!sessionsError) dbGcashSessions = dbSessions || [];
       }
-      payments = dbPayments || [];
 
-      const { data: dbSessions, error: sessionsError } = await supabase
-        .from('pos_gcash_sessions')
-        .select('invoice_id,reference,provider,checkout_url,status')
-        .in('invoice_id', invoiceIds);
+      const paymentByInvoiceId = new Map(payments.map((p) => [p.invoice_id, p]));
+      const sessionByInvoiceId = new Map(dbGcashSessions.map((s) => [s.invoice_id, s]));
 
-      if (!sessionsError) {
-        gcashSessions = dbSessions || [];
-      }
+      return (invoicesData || []).map((inv) => {
+        const payment = paymentByInvoiceId.get(inv.id);
+        const session = sessionByInvoiceId.get(inv.id);
+        return {
+          id: inv.id,
+          reference: inv.reference,
+          status: inv.status,
+          orderType: inv.order_type || null,
+          paymentMethod: inv.payment_method,
+          subtotal: Number(inv.total_amount),
+          discount: 0,
+          total: Number(inv.total_amount),
+          createdAt: inv.created_at,
+          updatedAt: inv.updated_at,
+          payment: payment ? {
+            method: payment.method,
+            amountPaid: Number(payment.amount_paid),
+            change: Number(payment.change_amount || 0),
+            paidAt: payment.paid_at,
+            provider: payment.provider,
+            providerReference: payment.provider_reference,
+            customerName: payment.customer_name || null,
+            customerEmail: payment.customer_email || null,
+            customerPhone: payment.customer_phone || null
+          } : null,
+          gcashSession: session ? {
+            reference: session.reference,
+            provider: session.provider,
+            checkoutUrl: session.checkout_url,
+            status: session.status
+          } : null
+        };
+      });
+    } catch (error) {
+      console.warn('[Offline] listAllInvoices Supabase failed, using in-memory:', error.message);
     }
-
-    const paymentByInvoiceId = new Map(payments.map((p) => [p.invoice_id, p]));
-    const sessionByInvoiceId = new Map(gcashSessions.map((s) => [s.invoice_id, s]));
-
-    return (invoicesData || []).map((inv) => {
-      const payment = paymentByInvoiceId.get(inv.id);
-      const session = sessionByInvoiceId.get(inv.id);
-      return {
-        id: inv.id,
-        reference: inv.reference,
-        status: inv.status,
-        orderType: inv.order_type || null,
-        paymentMethod: inv.payment_method,
-        subtotal: Number(inv.total_amount),
-        discount: 0,
-        total: Number(inv.total_amount),
-        createdAt: inv.created_at,
-        updatedAt: inv.updated_at,
-        payment: payment ? {
-          method: payment.method,
-          amountPaid: Number(payment.amount_paid),
-          change: Number(payment.change_amount || 0),
-          paidAt: payment.paid_at,
-          provider: payment.provider,
-          providerReference: payment.provider_reference,
-          customerName: payment.customer_name || null,
-          customerEmail: payment.customer_email || null,
-          customerPhone: payment.customer_phone || null
-        } : null,
-        gcashSession: session ? {
-          reference: session.reference,
-          provider: session.provider,
-          checkoutUrl: session.checkout_url,
-          status: session.status
-        } : null
-      };
-    });
   }
 
   // In-memory fallback
@@ -1550,6 +1599,113 @@ async function getGcashSessionByInvoiceId(invoiceId) {
   return session;
 }
 
+/**
+ * Sync all pending offline operations to Supabase.
+ * Returns { synced, failed, remaining } counts.
+ */
+async function syncOfflineQueue() {
+  if (!isSupabaseEnabled()) return { synced: 0, failed: 0, remaining: offlineQueue.getCount() };
+
+  const ops = offlineQueue.getAll();
+  if (!ops.length) return { synced: 0, failed: 0, remaining: 0 };
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const op of ops) {
+    try {
+      switch (op.type) {
+        case 'persist_invoice':
+          await _persistInvoiceToSupabase(op.payload.invoice);
+          break;
+        case 'set_invoice_paid': {
+          const { invoiceId, invoice, paymentData } = op.payload;
+          const invoiceForSync = invoice || {
+            id: invoiceId,
+            reference: `SYNC-${invoiceId}`,
+            status: 'PAID',
+            orderType: null,
+            paymentMethod: paymentData?.method || 'gcash',
+            total: Number(paymentData?.amountPaid || 0),
+            createdAt: paymentData?.paidAt || new Date().toISOString(),
+            updatedAt: paymentData?.paidAt || new Date().toISOString(),
+            lineItems: []
+          };
+          // Ensure invoice exists (and has latest state) before payment FK upsert.
+          const { error: invoiceError } = await supabase
+            .from('pos_invoices')
+            .upsert(toDbInvoice(invoiceForSync), { onConflict: 'id' });
+          if (invoiceError) throw new Error(`Supabase invoice upsert failed: ${invoiceError.message}`);
+
+          const paymentRow = {
+            invoice_id: invoiceId,
+            method: paymentData.method,
+            provider: paymentData.provider || null,
+            provider_reference: paymentData.providerReference || null,
+            recipient_gcash_number: paymentData.recipientGcashNumber || null,
+            paid_at: paymentData.paidAt,
+            amount_paid: paymentData.amountPaid,
+            change_amount: paymentData.change || 0,
+            success: Boolean(paymentData.success),
+            success_message: paymentData.successMessage || null,
+            customer_name: paymentData.customerName || null,
+            customer_email: paymentData.customerEmail || null,
+            customer_phone: paymentData.customerPhone || null
+          };
+          const { error: paymentError } = await supabase
+            .from('pos_payments')
+            .upsert(paymentRow, { onConflict: 'invoice_id' });
+          if (paymentError) throw new Error(`Supabase payment upsert failed: ${paymentError.message}`);
+          break;
+        }
+        case 'save_gcash_session': {
+          const { error: sessionError } = await supabase
+            .from('pos_gcash_sessions')
+            .upsert(toDbSession(op.payload.session), { onConflict: 'reference' });
+          if (sessionError) throw new Error(`Supabase GCash session upsert failed: ${sessionError.message}`);
+          break;
+        }
+        default:
+          console.warn('[Sync] Unknown operation type:', op.type);
+      }
+      offlineQueue.remove(op.id);
+      synced++;
+    } catch (error) {
+      console.warn(`[Sync] Failed to sync op ${op.id} (${op.type}):`, error.message);
+      offlineQueue.incrementRetry(op.id);
+      failed++;
+    }
+  }
+
+  return { synced, failed, remaining: offlineQueue.getCount() };
+}
+
+/**
+ * Get the count of pending offline operations.
+ */
+function getOfflineQueueCount() {
+  return offlineQueue.getCount();
+}
+
+/**
+ * Get offline queue summary.
+ * Returns operation count and unique invoice/order count.
+ */
+function getOfflineQueueSummary() {
+  const ops = offlineQueue.getAll();
+  const invoiceIds = new Set();
+
+  ops.forEach((op) => {
+    const invoiceId = op?.payload?.invoiceId || op?.payload?.invoice?.id || op?.payload?.session?.invoiceId || null;
+    if (invoiceId) invoiceIds.add(String(invoiceId));
+  });
+
+  return {
+    operations: ops.length,
+    invoices: invoiceIds.size
+  };
+}
+
 module.exports = {
   listMenuCategories,
   listProducts,
@@ -1569,7 +1725,8 @@ module.exports = {
   getTopSalesPerProduct,
   createInventoryIngredient,
   getInventoryReport,
-  listAllInvoices
+  listAllInvoices,
+  syncOfflineQueue,
+  getOfflineQueueCount,
+  getOfflineQueueSummary
 };
-
-

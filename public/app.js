@@ -13,6 +13,14 @@
   productsRendered: false,
   authBusy: false,
   logoutBusy: false,
+  connectivity: {
+    mode: 'checking',
+    queuedOperations: 0,
+    queuedInvoices: 0,
+    supabaseEnabled: true,
+    supabaseReachable: false,
+    serverReachable: false
+  }
 };
 
 // -- POS Tab Elements --
@@ -111,6 +119,10 @@ const welcomeTextEl = document.getElementById('welcomeText');
 const globalToastEl = document.getElementById('globalToast');
 const globalToastTitleEl = document.getElementById('globalToastTitle');
 const globalToastMessageEl = document.getElementById('globalToastMessage');
+const offlineStatusBarEl = document.getElementById('offlineStatusBar');
+const offlineStatusTextEl = document.getElementById('offlineStatusText');
+const offlineQueueCountEl = document.getElementById('offlineQueueCount');
+const offlineSyncBtn = document.getElementById('offlineSyncBtn');
 
 // -- Customer Info Elements --
 const customerNameEl = document.getElementById('customerName');
@@ -176,9 +188,11 @@ const ADMIN_DEFAULT_USERNAME = 'admin';
 const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
 const AUTH_SESSION_KEY = 'pos_active_user_v1';
 const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
+const AUTH_OFFLINE_CACHE_KEY = 'pos_offline_auth_cache_v1';
 const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
 const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
 const CATALOG_CACHE_GLOBAL_KEY = 'pos_catalog_cache_v1_global';
+const OFFLINE_AUTH_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
 let appInitialized = false;
@@ -186,6 +200,8 @@ let authLogoRenderStarted = false;
 let activeAuthSession = null;
 let phClockInterval = null;
 let toastTimer = null;
+let connectivityPoller = null;
+let syncTriggerBusy = false;
 let menuEditorWarmReady = false;
 let menuEditorWarmInFlight = false;
 const BOOTSTRAP_CATALOG_FALLBACK = {
@@ -264,6 +280,195 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function isEwalletAvailable() {
+  return state.connectivity.mode === 'online' || state.connectivity.mode === 'pending' || state.connectivity.mode === 'checking';
+}
+
+function updatePaymentActionAvailability() {
+  const hasOrderType = Boolean(state.orderType);
+  const ewalletAvailable = isEwalletAvailable();
+
+  if (cashPaymentBtn) cashPaymentBtn.disabled = !hasOrderType;
+  if (ePaymentBtn) ePaymentBtn.disabled = !hasOrderType || !ewalletAvailable;
+  if (chooseGcashBtn) chooseGcashBtn.disabled = !ewalletAvailable;
+  if (choosePaymayaBtn) choosePaymayaBtn.disabled = !ewalletAvailable;
+  if (chooseScanQrBtn) chooseScanQrBtn.disabled = !ewalletAvailable;
+
+  if (!ewalletAvailable && paymentMethodEl?.value !== 'cash') {
+    closeEwalletModal();
+    closeScanQrModal();
+    state.cashPromptActive = false;
+    setPaymentMethod('cash');
+  }
+}
+
+function renderConnectivityStatus() {
+  if (!offlineStatusBarEl || !offlineStatusTextEl || !offlineQueueCountEl) return;
+
+  const mode = String(state.connectivity.mode || 'checking');
+  const queuedOps = Math.max(0, Number(state.connectivity.queuedOperations || 0));
+  const queuedInvoices = Math.max(0, Number(state.connectivity.queuedInvoices || 0));
+  const modeClass = ['checking', 'offline', 'pending', 'online', 'server-offline'].includes(mode)
+    ? mode
+    : 'checking';
+
+  offlineStatusBarEl.classList.remove('checking', 'offline', 'pending', 'online', 'server-offline');
+  offlineStatusBarEl.classList.add(modeClass);
+
+  let statusText = 'Checking cloud sync status...';
+  if (mode === 'server-offline') {
+    statusText = 'Cannot reach local POS server. Keep this tab open and check server connection.';
+  } else if (mode === 'offline') {
+    statusText = 'Offline mode: sales continue locally and will sync when internet returns.';
+  } else if (mode === 'pending') {
+    statusText = 'Online: pending operations are waiting to sync.';
+  } else if (mode === 'online') {
+    statusText = 'Online and synced with cloud.';
+  }
+
+  offlineStatusTextEl.textContent = statusText;
+  if (queuedInvoices > 0 && queuedOps > 0) {
+    offlineQueueCountEl.textContent = `Pending sync: ${queuedInvoices} order(s) (${queuedOps} ops)`;
+  } else {
+    offlineQueueCountEl.textContent = `Pending sync: ${queuedOps} ops`;
+  }
+
+  if (offlineSyncBtn) {
+    const canSync = queuedOps > 0
+      && !syncTriggerBusy
+      && state.connectivity.serverReachable
+      && state.connectivity.supabaseEnabled
+      && state.connectivity.supabaseReachable;
+    offlineSyncBtn.disabled = !canSync;
+    offlineSyncBtn.textContent = syncTriggerBusy ? 'Syncing...' : 'Sync now';
+  }
+}
+
+function applyConnectivitySnapshot(snapshot, { showTransitionToast = true } = {}) {
+  const previousMode = String(state.connectivity.mode || 'checking');
+  const queuedOps = Math.max(0, Number(snapshot.queuedOperations || 0));
+  const queuedInvoices = Math.max(0, Number(snapshot.queuedInvoices || 0));
+  const browserOnline = navigator.onLine !== false;
+  let mode = 'checking';
+
+  if (!snapshot.serverReachable) {
+    mode = 'server-offline';
+  } else if (!snapshot.supabaseEnabled) {
+    mode = queuedOps > 0 ? 'pending' : 'online';
+  } else if (!browserOnline || !snapshot.supabaseReachable) {
+    mode = 'offline';
+  } else if (queuedOps > 0) {
+    mode = 'pending';
+  } else {
+    mode = 'online';
+  }
+
+  state.connectivity = {
+    mode,
+    queuedOperations: queuedOps,
+    queuedInvoices,
+    supabaseEnabled: Boolean(snapshot.supabaseEnabled),
+    supabaseReachable: Boolean(snapshot.supabaseReachable),
+    serverReachable: Boolean(snapshot.serverReachable)
+  };
+
+  renderConnectivityStatus();
+  updatePaymentActionAvailability();
+
+  if (!showTransitionToast || previousMode === mode) return;
+
+  if (mode === 'offline' || mode === 'server-offline') {
+    showConfirmationToast({
+      title: 'Offline mode',
+      message: 'Sales are saved locally and will sync automatically.',
+      tone: 'warning',
+      duration: 3200
+    });
+    return;
+  }
+
+  if ((previousMode === 'offline' || previousMode === 'server-offline') && (mode === 'online' || mode === 'pending')) {
+    showConfirmationToast({
+      title: 'Internet restored',
+      message: queuedOps > 0
+        ? `${queuedOps} operation(s) waiting for sync.`
+        : 'All sales are synced.',
+      tone: 'success',
+      duration: 2800
+    });
+  }
+}
+
+async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
+  try {
+    const response = await fetch('/api/connectivity', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Connectivity check failed');
+    }
+    const payload = await response.json();
+    applyConnectivitySnapshot({
+      serverReachable: true,
+      supabaseEnabled: Boolean(payload.supabaseEnabled),
+      supabaseReachable: Boolean(payload.supabaseReachable),
+      queuedOperations: Number(payload.queuedOperations || 0),
+      queuedInvoices: Number(payload.queuedInvoices || 0)
+    }, { showTransitionToast });
+  } catch (_error) {
+    applyConnectivitySnapshot({
+      serverReachable: false,
+      supabaseEnabled: state.connectivity.supabaseEnabled,
+      supabaseReachable: false,
+      queuedOperations: Number(state.connectivity.queuedOperations || 0),
+      queuedInvoices: Number(state.connectivity.queuedInvoices || 0)
+    }, { showTransitionToast });
+  }
+}
+
+function startConnectivityMonitor() {
+  if (connectivityPoller) return;
+  refreshConnectivityStatus({ showTransitionToast: false }).catch(() => {});
+  connectivityPoller = setInterval(() => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  }, 15000);
+}
+
+async function triggerOfflineSync() {
+  if (syncTriggerBusy) return;
+  syncTriggerBusy = true;
+  renderConnectivityStatus();
+
+  try {
+    const result = await api('/api/sync/trigger', { method: 'POST' });
+    const synced = Number(result.synced || 0);
+    const failed = Number(result.failed || 0);
+    const remaining = Number(result.remaining || 0);
+
+    showConfirmationToast({
+      title: failed > 0 ? 'Sync completed with warnings' : 'Sync completed',
+      message: `Synced: ${synced}, Failed: ${failed}, Remaining: ${remaining}`,
+      tone: failed > 0 ? 'warning' : 'success',
+      duration: 3200
+    });
+
+    await refreshConnectivityStatus({ showTransitionToast: false });
+    await refreshSalesReport(activeSalesRange);
+    if (document.body.classList.contains('admin-open')) {
+      await refreshAdminTransactions();
+    }
+  } catch (error) {
+    showConfirmationToast({
+      title: 'Sync failed',
+      message: error.message || 'Unable to sync pending operations.',
+      tone: 'warning',
+      duration: 3200
+    });
+    await refreshConnectivityStatus({ showTransitionToast: false });
+  } finally {
+    syncTriggerBusy = false;
+    renderConnectivityStatus();
+  }
+}
+
 function ensureConfettiAnimation() {
   if (confettiAnimation || !addToCartConfettiEl || !window.lottie) {
     return;
@@ -305,11 +510,14 @@ function playAddToCartConfetti() {
 function setOrderType(type) {
   state.orderType = type;
   state.cashPromptActive = false;
-  if (cashPaymentBtn) cashPaymentBtn.disabled = false;
-  if (ePaymentBtn) ePaymentBtn.disabled = false;
+  updatePaymentActionAvailability();
   if (amountTenderedEl) amountTenderedEl.value = '';
   setPaymentMethod('cash');
-  setStatus(`${getOrderTypeLabel(type)} selected. Choose Cash or E-Payment.`);
+  if (isEwalletAvailable()) {
+    setStatus(`${getOrderTypeLabel(type)} selected. Choose Cash or E-Payment.`);
+  } else {
+    setStatus(`${getOrderTypeLabel(type)} selected. Offline mode active: Cash only until internet is back.`);
+  }
 }
 
 function getOrderTypeLabel(type) {
@@ -416,6 +624,62 @@ function writeAccessToken(token) {
 
 function readAccessToken() {
   return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function readOfflineAuthCache() {
+  try {
+    const raw = localStorage.getItem(AUTH_OFFLINE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.email || !parsed.passwordHash) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function sha256Hex(input) {
+  const text = String(input || '');
+  if (!window.crypto?.subtle) return '';
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function cacheOfflineAuthCredential({ name, email, role, userId, password }) {
+  if (!email || !password) return;
+  const passwordHash = await sha256Hex(password);
+  if (!passwordHash) return;
+  const payload = {
+    name: String(name || '').trim() || 'User',
+    email: normalizeEmail(email),
+    role: String(role || 'encharge').toLowerCase(),
+    userId: userId || null,
+    passwordHash,
+    updatedAt: new Date().toISOString()
+  };
+  localStorage.setItem(AUTH_OFFLINE_CACHE_KEY, JSON.stringify(payload));
+}
+
+async function tryOfflineLogin(email, password) {
+  const cached = readOfflineAuthCache();
+  if (!cached) return null;
+  if (normalizeEmail(cached.email) !== normalizeEmail(email)) return null;
+
+  const updatedAtTs = new Date(cached.updatedAt || '').getTime();
+  if (!Number.isFinite(updatedAtTs) || (Date.now() - updatedAtTs) > OFFLINE_AUTH_MAX_AGE_MS) {
+    return null;
+  }
+
+  const inputHash = await sha256Hex(password);
+  if (!inputHash || inputHash !== cached.passwordHash) return null;
+
+  return {
+    name: cached.name || 'User',
+    email: cached.email,
+    role: cached.role || 'encharge',
+    userId: cached.userId || null
+  };
 }
 
 function getUserUiStateKey() {
@@ -759,6 +1023,13 @@ async function handleLoginSubmit(event) {
       userId: result.user.id
     });
     writeAccessToken(result.session?.accessToken || '');
+    await cacheOfflineAuthCredential({
+      name: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      userId: result.user.id,
+      password
+    });
     setAuthMessage('');
     showConfirmationToast({
       title: 'Login successful',
@@ -768,6 +1039,30 @@ async function handleLoginSubmit(event) {
     unlockDashboard();
     startAppOnce();
   } catch (error) {
+    const errorText = String(error?.message || '');
+    const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
+    if (isNetworkLike) {
+      try {
+        const offlineUser = await tryOfflineLogin(email, password);
+        if (offlineUser) {
+          writeActiveSession(offlineUser);
+          writeAccessToken('');
+          setAuthMessage('Offline login successful (cached credentials).', true);
+          showConfirmationToast({
+            title: 'Offline login',
+            message: `Welcome back ${offlineUser.name}.`,
+            tone: 'warning',
+            duration: 2800
+          });
+          unlockDashboard();
+          startAppOnce();
+          return;
+        }
+      } catch (_offlineError) {
+        // Fall through to regular error message.
+      }
+    }
+
     clearActiveSession();
     setAuthMessage(`Login failed: ${error.message}`);
   } finally {
@@ -822,6 +1117,13 @@ async function handleSignupSubmit(event) {
       userId: loginResult.user.id
     });
     writeAccessToken(loginResult.session?.accessToken || '');
+    await cacheOfflineAuthCredential({
+      name: loginResult.user.fullName,
+      email: loginResult.user.email,
+      role: loginResult.user.role,
+      userId: loginResult.user.id,
+      password
+    });
     setAuthMessage('Sign up successful. Redirecting to dashboard...', true);
     showConfirmationToast({
       title: 'Signup successful',
@@ -1026,10 +1328,14 @@ async function bootstrap() {
       };
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(activeAuthSession));
       unlockDashboard();
-    } catch (_error) {
-      clearActiveSession();
-      lockDashboard();
-      if (loginEmailEl) loginEmailEl.focus();
+    } catch (error) {
+      const errorText = String(error?.message || '');
+      const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
+      if (!isNetworkLike) {
+        clearActiveSession();
+        lockDashboard();
+        if (loginEmailEl) loginEmailEl.focus();
+      }
     }
     return;
   }
@@ -2871,6 +3177,10 @@ function setupEventListeners() {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
       }
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. E-Payment is temporarily unavailable.');
+        return;
+      }
       if (!getCartItems().length) {
         setStatus('Add at least one item first.');
         return;
@@ -2880,6 +3190,10 @@ function setupEventListeners() {
   }
   if (chooseGcashBtn) {
     chooseGcashBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. GCash checkout is unavailable.');
+        return;
+      }
       closeEwalletModal();
       setPaymentMethod('gcash');
       await handleCheckout();
@@ -2887,6 +3201,10 @@ function setupEventListeners() {
   }
   if (choosePaymayaBtn) {
     choosePaymayaBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. PayMaya checkout is unavailable.');
+        return;
+      }
       closeEwalletModal();
       setPaymentMethod('paymaya');
       await handleCheckout();
@@ -2894,6 +3212,10 @@ function setupEventListeners() {
   }
   if (chooseScanQrBtn) {
     chooseScanQrBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. QR checkout is unavailable.');
+        return;
+      }
       closeEwalletModal();
       setPaymentMethod('gcash');
       await startScanQrPaymentFlow();
@@ -3012,6 +3334,18 @@ function setupEventListeners() {
   if (menuProductEditorListEl) {
     menuProductEditorListEl.addEventListener('click', handleMenuProductEditorClick);
   }
+  if (offlineSyncBtn) {
+    offlineSyncBtn.addEventListener('click', () => {
+      triggerOfflineSync().catch(() => {});
+    });
+  }
+
+  window.addEventListener('online', () => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  });
+  window.addEventListener('offline', () => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  });
 
   if (adminPasswordEl) {
     adminPasswordEl.addEventListener('keydown', (e) => {
@@ -3078,8 +3412,8 @@ async function init() {
 
   setupEventListeners();
   updateReceiptActionVisibility();
-  if (cashPaymentBtn) cashPaymentBtn.disabled = true;
-  if (ePaymentBtn) ePaymentBtn.disabled = true;
+  startConnectivityMonitor();
+  updatePaymentActionAvailability();
   setPaymentMethod('cash');
   setStatus('Select order type first: Dine In or Take Out.');
   await Promise.all([configPromise, catalogPromise]);

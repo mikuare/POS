@@ -87,6 +87,13 @@
           </div>
         </div>
       </div>
+      <div id="offlineStatusBar" class="offline-status-bar checking" aria-live="polite">
+        <span id="offlineStatusText">Checking cloud sync status...</span>
+        <div class="offline-status-actions">
+          <span id="offlineQueueCount" class="offline-queue-count">Pending sync: 0</span>
+          <button id="offlineSyncBtn" class="secondary small" type="button" disabled>Sync now</button>
+        </div>
+      </div>
       <h1>POS System (Cash + GCash + PayMaya)</h1>
 
       <!-- Tab Navigation -->
@@ -507,6 +514,3 @@
     <script src="/app.js"></script>
   </body>
 </html>
-
-
-

@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+﻿﻿require('dotenv').config();
 
 const crypto = require('crypto');
 const path = require('path');
@@ -25,7 +25,10 @@ const {
   getTopSalesPerProduct,
   createInventoryIngredient,
   getInventoryReport,
-  listAllInvoices
+  listAllInvoices,
+  syncOfflineQueue,
+  getOfflineQueueCount,
+  getOfflineQueueSummary
 } = require('./data/store');
 const {
   getSupabase,
@@ -615,6 +618,50 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// ── Connectivity & Offline Sync ──
+app.get('/api/connectivity', async (_req, res) => {
+  try {
+    const queueSummary = getOfflineQueueSummary();
+    let supabaseReachable = false;
+    if (isSupabaseEnabled() && supabaseService) {
+      try {
+        // Lightweight ping to Supabase
+        const { error } = await supabaseService.from('pos_invoices').select('id', { count: 'exact', head: true }).limit(1);
+        supabaseReachable = !error;
+      } catch (_) {
+        supabaseReachable = false;
+      }
+    }
+    res.json({
+      online: true,
+      supabaseReachable,
+      supabaseEnabled: isSupabaseEnabled(),
+      queuedOperations: getOfflineQueueCount(),
+      queuedInvoices: queueSummary.invoices,
+      now: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/sync/trigger', async (_req, res) => {
+  try {
+    if (!isSupabaseEnabled()) {
+      return res.status(503).json({ error: 'Supabase is not configured.' });
+    }
+    const result = await syncOfflineQueue();
+    res.json({
+      success: true,
+      synced: result.synced,
+      failed: result.failed,
+      remaining: result.remaining
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/config', (_req, res) => {
   res.json({});
 });
@@ -1131,4 +1178,14 @@ app.listen(PORT, () => {
   console.log(`POS server running on ${baseUrl}`);
   console.log(`Provider: ${providerName}`);
   console.log(`Supabase: ${isSupabaseEnabled() ? `enabled (${getSupabaseMode()})` : 'disabled'}`);
+  
+  // Start periodic sync for offline queue (every 60 seconds)
+  if (isSupabaseEnabled()) {
+    setInterval(() => {
+      syncOfflineQueue().catch((err) => {
+        console.warn('[PeriodicSync] Failed:', err.message);
+      });
+    }, 60000);
+    console.log('Periodic sync: enabled (60s interval)');
+  }
 });

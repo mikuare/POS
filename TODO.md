@@ -1,50 +1,25 @@
-# POS System - 2-Panel Layout with Category Buttons
+# Offline Support Implementation TODO
 
-## Implementation Progress
+## Plan Summary
+Enable the POS system to work offline (no internet) with Supabase sync when internet returns.
 
-### Step 1: Update Product Data Structure ✅
-- [x] Add category field to products in store.js
-- [x] Organize products into 6 categories
-- [x] Add sample products for each category
+## Steps
 
-### Step 2: Update HTML Structure ✅
-- [x] Restructure POS Terminal tab into 2 main panels
-- [x] Create left panel for Cart/Checkout
-- [x] Create right panel with category buttons and product display
-- [x] Add category button elements
+- [ ] 1. Create `src/data/offlineQueue.js` — file-based JSON queue for pending Supabase operations
+- [ ] 2. Modify `src/data/store.js` — wrap Supabase calls with try-catch + offline queue fallback; add syncOfflineQueue()
+- [ ] 3. Modify `src/server.js` — add /api/connectivity, /api/sync/trigger endpoints; fix offline auth; periodic auto-sync
+- [ ] 4. Modify `public/index.html` — add #offlineBanner element
+- [ ] 5. Modify `public/styles.css` — add offline banner styles
+- [ ] 6. Modify `public/app.js` — offline detection, banner, session fix, disable e-wallet offline, enable scan QR offline, sync toast
 
-### Step 3: Update CSS Styling ✅
-- [x] Create 2-panel layout styles
-- [x] Style vertical category buttons
-- [x] Add active state for selected category
-- [x] Style product grid display
-- [x] Ensure responsive design
-
-### Step 4: Update JavaScript Logic ✅
-- [x] Add category state management
-- [x] Implement category filtering
-- [x] Add category button click handlers
-- [x] Update product rendering for categories
-- [x] Set default category on load
-
-### Step 5: Testing 🔄
-- [ ] Test category switching
-- [ ] Verify cart functionality
-- [ ] Test checkout flow
-- [ ] Check responsive design
-
-## Summary of Changes
-
-### Files Modified:
-1. **src/data/store.js** - Added 36 products across 6 categories (Main Dish, Burger, Dessert, Fries, Drinks & Soda, Sauce)
-2. **public/index.html** - Restructured layout into 2-panel design with category sidebar
-3. **public/styles.css** - Added new styles for 2-panel layout, category buttons, and product grid
-4. **public/app.js** - Added category filtering logic and state management
-
-### Key Features Implemented:
-- ✅ 2-panel layout (Left: Cart/Checkout, Right: Categories + Products)
-- ✅ Vertical category buttons on left side of right panel
-- ✅ Product filtering by category
-- ✅ Responsive design for mobile devices
-- ✅ Active state highlighting for selected category
-- ✅ Grid-based product display with hover effects
+## Offline Behavior Rules
+- ✅ Browse menu (cached catalog)
+- ✅ Add orders to cart
+- ✅ Cash payments (in-memory, queued for sync)
+- ✅ Scan QR to Pay (manual flow, no internet needed)
+- ✅ Print receipts
+- ✅ View sales report (in-memory fallback)
+- ✅ Stay logged in (cached session)
+- ✅ Login attempt shows helpful offline error message
+- ❌ GCash/PayMaya e-wallet — buttons DISABLED with message when offline
+- ✅ Auto-sync when internet returns with toast notification
