@@ -761,7 +761,7 @@ app.delete('/api/menu/products/:productId', requireMenuManagerRole, async (req, 
 
 app.post('/api/invoices', async (req, res) => {
   try {
-    const { items, paymentMethod, discountAmount, orderType } = req.body;
+    const { items, paymentMethod, discountAmount, orderType, clientInvoiceId, clientReference } = req.body;
     if (!['cash', 'gcash', 'paymaya'].includes((paymentMethod || '').toLowerCase())) {
       return res.status(400).json({ error: 'paymentMethod must be cash, gcash, or paymaya' });
     }
@@ -773,7 +773,9 @@ app.post('/api/invoices', async (req, res) => {
       items: items || [],
       paymentMethod: paymentMethod.toLowerCase(),
       discountAmount: Number(discountAmount || 0),
-      orderType: normalizedOrderType
+      orderType: normalizedOrderType,
+      invoiceId: clientInvoiceId || null,
+      reference: clientReference || null
     });
     return res.status(201).json({ invoice });
   } catch (error) {

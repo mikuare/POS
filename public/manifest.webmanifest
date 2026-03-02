@@ -1,0 +1,22 @@
+{
+  "name": "Ruel's POS",
+  "short_name": "RuelPOS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff7ed",
+  "theme_color": "#b45309",
+  "description": "Offline-capable POS system with background sync to cloud.",
+  "icons": [
+    {
+      "src": "/Business%20Logo/Ruels%20Logo%20for%20business.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/Business%20Logo/Ruels%20Logo%20for%20business.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

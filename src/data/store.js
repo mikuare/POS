@@ -796,7 +796,7 @@ async function persistInvoice(invoice) {
   }
 }
 
-async function createInvoice({ items, paymentMethod, discountAmount = 0, orderType = null }) {
+async function createInvoice({ items, paymentMethod, discountAmount = 0, orderType = null, invoiceId: requestedInvoiceId = null, reference: requestedReference = null }) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Invoice must contain at least one item');
   }
@@ -828,10 +828,15 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
     ? Math.min(requestedDiscount, subtotal)
     : 0;
   const total = Math.max(0, subtotal - discount);
-  const invoiceId = uuidv4();
+  const providedInvoiceId = String(requestedInvoiceId || '').trim();
+  const providedReference = String(requestedReference || '').trim();
+  const invoiceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(providedInvoiceId)
+    ? providedInvoiceId
+    : uuidv4();
+  const invoiceReference = providedReference || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const invoice = {
     id: invoiceId,
-    reference: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    reference: invoiceReference,
     createdAt: now,
     updatedAt: now,
     status: 'PENDING',

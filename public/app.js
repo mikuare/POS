@@ -193,6 +193,8 @@ const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
 const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
 const CATALOG_CACHE_GLOBAL_KEY = 'pos_catalog_cache_v1_global';
 const OFFLINE_AUTH_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+const OFFLINE_SYNC_INTERVAL_MS = 15000;
+const offlineOutbox = window.POSOfflineOutbox || null;
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
 let appInitialized = false;
@@ -400,6 +402,7 @@ function applyConnectivitySnapshot(snapshot, { showTransitionToast = true } = {}
 }
 
 async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
+  const clientSummary = await getClientOfflineSummary();
   try {
     const response = await fetch('/api/connectivity', { cache: 'no-store' });
     if (!response.ok) {
@@ -410,16 +413,16 @@ async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
       serverReachable: true,
       supabaseEnabled: Boolean(payload.supabaseEnabled),
       supabaseReachable: Boolean(payload.supabaseReachable),
-      queuedOperations: Number(payload.queuedOperations || 0),
-      queuedInvoices: Number(payload.queuedInvoices || 0)
+      queuedOperations: clientSummary.operations,
+      queuedInvoices: clientSummary.invoices
     }, { showTransitionToast });
   } catch (_error) {
     applyConnectivitySnapshot({
       serverReachable: false,
       supabaseEnabled: state.connectivity.supabaseEnabled,
       supabaseReachable: false,
-      queuedOperations: Number(state.connectivity.queuedOperations || 0),
-      queuedInvoices: Number(state.connectivity.queuedInvoices || 0)
+      queuedOperations: clientSummary.operations,
+      queuedInvoices: clientSummary.invoices
     }, { showTransitionToast });
   }
 }
@@ -428,8 +431,20 @@ function startConnectivityMonitor() {
   if (connectivityPoller) return;
   refreshConnectivityStatus({ showTransitionToast: false }).catch(() => {});
   connectivityPoller = setInterval(() => {
-    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
-  }, 15000);
+    refreshConnectivityStatus({ showTransitionToast: true })
+      .then(() => {
+        if (navigator.onLine && state.connectivity.serverReachable) {
+          return syncClientOfflineOutbox();
+        }
+        return null;
+      })
+      .then((result) => {
+        if (result && result.synced > 0) {
+          refreshConnectivityStatus({ showTransitionToast: false }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, OFFLINE_SYNC_INTERVAL_MS);
 }
 
 async function triggerOfflineSync() {
@@ -438,10 +453,25 @@ async function triggerOfflineSync() {
   renderConnectivityStatus();
 
   try {
-    const result = await api('/api/sync/trigger', { method: 'POST' });
-    const synced = Number(result.synced || 0);
-    const failed = Number(result.failed || 0);
-    const remaining = Number(result.remaining || 0);
+    const clientResult = await syncClientOfflineOutbox();
+    let serverSynced = 0;
+    let serverFailed = 0;
+    let serverRemaining = 0;
+
+    if (state.connectivity.serverReachable && state.connectivity.supabaseEnabled) {
+      try {
+        const serverResult = await api('/api/sync/trigger', { method: 'POST' });
+        serverSynced = Number(serverResult.synced || 0);
+        serverFailed = Number(serverResult.failed || 0);
+        serverRemaining = Number(serverResult.remaining || 0);
+      } catch (_error) {
+        // Client outbox sync already attempted; server queue sync is best-effort.
+      }
+    }
+
+    const synced = Number(clientResult.synced || 0) + serverSynced;
+    const failed = Number(clientResult.failed || 0) + serverFailed;
+    const remaining = Number(clientResult.remaining || 0) + serverRemaining;
 
     showConfirmationToast({
       title: failed > 0 ? 'Sync completed with warnings' : 'Sync completed',
@@ -582,6 +612,147 @@ async function api(path, options = {}) {
     throw new Error(data.error || 'Request failed');
   }
   return data;
+}
+
+function isNetworkLikeError(error) {
+  const txt = String(error?.message || '').toLowerCase();
+  return txt.includes('fetch') || txt.includes('network') || txt.includes('offline') || txt.includes('failed to fetch');
+}
+
+function createClientInvoiceReference(invoiceId) {
+  return `INV-${String(invoiceId).slice(0, 8).toUpperCase()}-${Date.now()}`;
+}
+
+function toOfflineInvoiceViewModel({ sale, invoiceId, reference, createdAt, paidAt }) {
+  const productsById = new Map((state.products || []).map((p) => [String(p.id), p]));
+  const lineItems = (sale?.items || []).map((item) => {
+    const p = productsById.get(String(item.productId));
+    const qty = Number(item.qty || 0);
+    const price = Number(p?.price || 0);
+    return {
+      productId: item.productId,
+      name: p?.name || `Product ${item.productId}`,
+      qty,
+      price,
+      subtotal: price * qty
+    };
+  });
+
+  const subtotal = lineItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+  const discount = Number(sale?.discountAmount || 0);
+  const total = Math.max(0, subtotal - discount);
+  const amountPaid = Number(sale?.amountTendered || total);
+  return {
+    id: invoiceId,
+    reference,
+    createdAt,
+    updatedAt: paidAt,
+    status: 'PAID',
+    orderType: sale?.orderType || state.orderType || 'dine-in',
+    paymentMethod: 'cash',
+    subtotal,
+    discount,
+    total,
+    lineItems,
+    payment: {
+      method: 'cash',
+      paidAt,
+      amountPaid,
+      change: Math.max(0, amountPaid - total),
+      success: true,
+      successMessage: 'Queued offline. Will sync when internet returns.'
+    }
+  };
+}
+
+async function getClientOfflineSummary() {
+  if (!offlineOutbox?.getSummary) return { operations: 0, invoices: 0 };
+  try {
+    const summary = await offlineOutbox.getSummary();
+    return {
+      operations: Number(summary?.operations || 0),
+      invoices: Number(summary?.invoices || 0)
+    };
+  } catch (_error) {
+    return { operations: 0, invoices: 0 };
+  }
+}
+
+async function queueOfflineCashSale({ items, amountTendered, discountAmount, orderType }) {
+  if (!offlineOutbox?.enqueueCashSale) {
+    throw new Error('Offline queue is not available in this browser.');
+  }
+
+  const createdAt = new Date().toISOString();
+  const invoiceId = (window.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.floor(Math.random() * 1000000)}`);
+  const reference = createClientInvoiceReference(invoiceId);
+  const payload = {
+    operationId: `cash-sale-${invoiceId}`,
+    invoiceId,
+    reference,
+    createdAt,
+    items: items.map((x) => ({ productId: x.productId, qty: Number(x.qty || 0) })),
+    amountTendered: Number(amountTendered || 0),
+    discountAmount: Number(discountAmount || 0),
+    orderType: String(orderType || 'dine-in')
+  };
+  await offlineOutbox.enqueueCashSale(payload);
+  const paidAt = new Date().toISOString();
+  return toOfflineInvoiceViewModel({ sale: payload, invoiceId, reference, createdAt, paidAt });
+}
+
+async function syncClientOfflineOutbox() {
+  if (!offlineOutbox?.listPendingSales) {
+    return { synced: 0, failed: 0, remaining: 0 };
+  }
+
+  const ops = await offlineOutbox.listPendingSales();
+  if (!Array.isArray(ops) || !ops.length) {
+    return { synced: 0, failed: 0, remaining: 0 };
+  }
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const op of ops) {
+    try {
+      const sale = op?.payload || {};
+      const createdInvoice = await api('/api/invoices', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: Array.isArray(sale.items) ? sale.items : [],
+          paymentMethod: 'cash',
+          discountAmount: Number(sale.discountAmount || 0),
+          orderType: String(sale.orderType || 'dine-in'),
+          clientInvoiceId: sale.invoiceId,
+          clientReference: sale.reference
+        })
+      });
+
+      await api('/api/payments/cash', {
+        method: 'POST',
+        body: JSON.stringify({
+          invoiceId: createdInvoice?.invoice?.id || sale.invoiceId,
+          amountTendered: Number(sale.amountTendered || 0)
+        })
+      });
+
+      await offlineOutbox.removeSale(op.id);
+      synced += 1;
+    } catch (error) {
+      failed += 1;
+      await offlineOutbox.incrementRetry(op.id).catch(() => {});
+      if (isNetworkLikeError(error)) break;
+    }
+  }
+
+  const summary = await getClientOfflineSummary();
+  return { synced, failed, remaining: summary.operations };
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
 function normalizeEmail(value) {
@@ -2829,13 +3000,6 @@ async function handleCheckout() {
     const paymentMethod = paymentMethodEl.value;
     const discountAmount = getDiscountAmount();
 
-    const { invoice } = await api('/api/invoices', {
-      method: 'POST',
-      body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
-    });
-
-    state.activeInvoice = invoice;
-
     if (paymentMethod === 'cash') {
       const tendered = Number(amountTenderedEl?.value || 0);
       if (tendered <= 0) {
@@ -2843,15 +3007,50 @@ async function handleCheckout() {
         if (amountTenderedEl) amountTenderedEl.focus();
         return;
       }
-      const paid = await api('/api/payments/cash', {
-        method: 'POST',
-        body: JSON.stringify({ invoiceId: invoice.id, amountTendered: tendered })
-      });
-      renderReceipt(paid.invoice);
-      await refreshSalesReport(activeSalesRange);
-      finalizeSuccessfulPayment(paid.invoice, 'Cash');
-      return;
+
+      try {
+        const { invoice } = await api('/api/invoices', {
+          method: 'POST',
+          body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+        });
+        state.activeInvoice = invoice;
+        const paid = await api('/api/payments/cash', {
+          method: 'POST',
+          body: JSON.stringify({ invoiceId: invoice.id, amountTendered: tendered })
+        });
+        renderReceipt(paid.invoice);
+        await refreshSalesReport(activeSalesRange);
+        finalizeSuccessfulPayment(paid.invoice, 'Cash');
+        return;
+      } catch (error) {
+        if (!isNetworkLikeError(error)) {
+          throw error;
+        }
+        const queuedInvoice = await queueOfflineCashSale({
+          items,
+          amountTendered: tendered,
+          discountAmount,
+          orderType: state.orderType
+        });
+        renderReceipt(queuedInvoice);
+        finalizeSuccessfulPayment(queuedInvoice, 'Cash');
+        await refreshConnectivityStatus({ showTransitionToast: false });
+        showConfirmationToast({
+          title: 'Saved offline',
+          message: 'Cash sale stored on this device and will sync automatically when online.',
+          tone: 'warning',
+          duration: 3400
+        });
+        return;
+      }
     }
+
+    const { invoice } = await api('/api/invoices', {
+      method: 'POST',
+      body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+    });
+
+    state.activeInvoice = invoice;
 
     // Collect customer info from the form
     const customerInfo = {};
@@ -3341,7 +3540,10 @@ function setupEventListeners() {
   }
 
   window.addEventListener('online', () => {
-    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+    refreshConnectivityStatus({ showTransitionToast: true })
+      .then(() => syncClientOfflineOutbox())
+      .then(() => refreshConnectivityStatus({ showTransitionToast: false }))
+      .catch(() => {});
   });
   window.addEventListener('offline', () => {
     refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
@@ -3409,6 +3611,7 @@ async function init() {
 
   ensureConfettiAnimation();
   ensureYummyAnimations();
+  registerServiceWorker();
 
   setupEventListeners();
   updateReceiptActionVisibility();
