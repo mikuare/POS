@@ -10,17 +10,23 @@ const anonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABL
 let supabase = null;
 let mode = 'disabled';
 
-if (supabaseUrl && serviceRoleKey) {
-  supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  mode = 'service_role';
-} else if (supabaseUrl && anonKey) {
-  // Fallback mode for testing; production server should use service_role key.
-  supabase = createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
-  mode = 'anon_or_publishable';
+try {
+  if (supabaseUrl && serviceRoleKey) {
+    supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    mode = 'service_role';
+  } else if (supabaseUrl && anonKey) {
+    // Fallback mode for testing; production server should use service_role key.
+    supabase = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    mode = 'anon_or_publishable';
+  }
+} catch (error) {
+  supabase = null;
+  mode = 'disabled';
+  console.warn('[Supabase] Client initialization failed. Running without Supabase:', error.message);
 }
 
 function getSupabase() {

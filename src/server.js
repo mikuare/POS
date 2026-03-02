@@ -45,9 +45,17 @@ const baseUrl = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
 const providerName = (process.env.PAYMENT_PROVIDER || 'paymongo').toLowerCase();
 const supabaseService = getSupabase();
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || '';
-const supabaseAuthClient = (supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-  : null;
+let supabaseAuthClient = null;
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabaseAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  } catch (error) {
+    console.warn('[SupabaseAuth] Client initialization failed:', error.message);
+    supabaseAuthClient = null;
+  }
+}
 
 app.use(cors());
 app.use(express.json({
