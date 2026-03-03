@@ -1,4 +1,6 @@
 (function attachOfflineOutbox(global) {
+  // Browser-side offline queue for installed/live PWA clients.
+  // Data is stored per device/browser profile via IndexedDB.
   const DB_NAME = 'pos-offline-db';
   const DB_VERSION = 1;
   const STORE_NAME = 'cash_sales_outbox';

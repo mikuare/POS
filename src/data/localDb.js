@@ -7,6 +7,8 @@ const sqliteDisabled =
   process.env.VERCEL === '1';
 
 try {
+  // SQLite is for persistent local/server runtimes only. In serverless (Vercel),
+  // this module is intentionally disabled and offline queue falls back elsewhere.
   if (!sqliteDisabled) {
     const Database = require('better-sqlite3');
     const DB_FILE = process.env.POS_LOCAL_DB_FILE

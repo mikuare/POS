@@ -684,15 +684,27 @@ async function getClientOfflineSummary() {
   }
 }
 
-function computeOfflineSaleTotal(sale) {
+function computeOfflineSaleBreakdown(sale) {
   const productsById = new Map((state.products || []).map((p) => [String(p.id), Number(p.price || 0)]));
+  const totalQty = (sale?.items || []).reduce((sum, item) => sum + Number(item?.qty || 0), 0);
+  const itemCount = Array.isArray(sale?.items) ? sale.items.length : 0;
+  const productNames = (sale?.items || []).map((item) => {
+    const productId = String(item?.productId || '');
+    const p = (state.products || []).find((x) => String(x.id) === productId);
+    return p?.name || `Product ${productId}`;
+  });
   const subtotal = (sale?.items || []).reduce((sum, item) => {
     const price = Number(productsById.get(String(item?.productId)) || 0);
     const qty = Number(item?.qty || 0);
     return sum + (price * qty);
   }, 0);
   const discount = Number(sale?.discountAmount || 0);
-  return Math.max(0, subtotal - discount);
+  const total = Math.max(0, subtotal - discount);
+  return { totalQty, itemCount, productNames, subtotal, total };
+}
+
+function computeOfflineSaleTotal(sale) {
+  return computeOfflineSaleBreakdown(sale).total;
 }
 
 async function renderOfflinePendingTransactions() {
@@ -746,15 +758,22 @@ async function queueOfflineCashSale({ items, amountTendered, discountAmount, ord
     throw new Error('Offline queue is not available in this browser.');
   }
 
+  // This write targets IndexedDB (client device), not server/local SQLite.
   const createdAt = new Date().toISOString();
   const invoiceId = (window.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.floor(Math.random() * 1000000)}`);
   const reference = createClientInvoiceReference(invoiceId);
+  const saleBreakdown = computeOfflineSaleBreakdown({ items, discountAmount });
   const payload = {
     operationId: `cash-sale-${invoiceId}`,
     invoiceId,
     reference,
     createdAt,
     items: items.map((x) => ({ productId: x.productId, qty: Number(x.qty || 0) })),
+    totalQty: Number(saleBreakdown.totalQty || 0),
+    itemCount: Number(saleBreakdown.itemCount || 0),
+    productNames: Array.isArray(saleBreakdown.productNames) ? saleBreakdown.productNames : [],
+    subtotalAmount: Number(saleBreakdown.subtotal || 0),
+    totalAmount: Number(saleBreakdown.total || 0),
     amountTendered: Number(amountTendered || 0),
     discountAmount: Number(discountAmount || 0),
     orderType: String(orderType || 'dine-in')
@@ -769,6 +788,7 @@ async function syncClientOfflineOutbox() {
     return { synced: 0, failed: 0, remaining: 0 };
   }
 
+  // Replays device-stored offline cash sales to the live API once reachable.
   const ops = await offlineOutbox.listPendingSales();
   if (!Array.isArray(ops) || !ops.length) {
     return { synced: 0, failed: 0, remaining: 0 };

@@ -61,6 +61,10 @@ For detailed setup instructions including:
 
 **👉 See [ENVIRONMENT_SETUP_GUIDE.md](ENVIRONMENT_SETUP_GUIDE.md)**
 
+For offline storage architecture (SQLite vs IndexedDB), sync flow, and how to reuse this pattern in another POS:
+
+**👉 See [OFFLINE_STORAGE_INTEGRATION_GUIDE.md](OFFLINE_STORAGE_INTEGRATION_GUIDE.md)**
+
 ## 💻 Available Scripts
 
 ```bash
