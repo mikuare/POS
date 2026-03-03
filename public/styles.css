@@ -296,6 +296,66 @@ body:not(.auth-locked) .auth-gate {
   border-color: #d0b49d;
 }
 
+.offline-pending-panel {
+  margin: -2px 0 10px;
+  padding: 10px 12px;
+  border: 1px dashed #caa78a;
+  border-radius: 10px;
+  background: #fff8f1;
+}
+
+.offline-pending-header {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #7a4a2d;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.offline-pending-list {
+  display: grid;
+  gap: 6px;
+}
+
+.offline-pending-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #e4cdb8;
+  border-radius: 8px;
+  background: #fffdf9;
+}
+
+.offline-pending-main {
+  display: grid;
+  gap: 3px;
+}
+
+.offline-pending-ref {
+  font-size: 12px;
+  font-weight: 800;
+  color: #5a3521;
+}
+
+.offline-pending-meta {
+  font-size: 12px;
+  color: #8a5b3c;
+}
+
+.offline-pending-total {
+  font-size: 13px;
+  font-weight: 800;
+  color: #7a4a2d;
+}
+
+.offline-pending-empty {
+  font-size: 12px;
+  color: #8a5b3c;
+}
+
 .welcome-banner {
   display: inline-flex;
   align-items: center;
@@ -2114,6 +2174,10 @@ select {
   .offline-status-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .offline-pending-item {
+    grid-template-columns: 1fr;
   }
 
   .payment-success-modal,

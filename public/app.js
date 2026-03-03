@@ -123,6 +123,8 @@ const offlineStatusBarEl = document.getElementById('offlineStatusBar');
 const offlineStatusTextEl = document.getElementById('offlineStatusText');
 const offlineQueueCountEl = document.getElementById('offlineQueueCount');
 const offlineSyncBtn = document.getElementById('offlineSyncBtn');
+const offlinePendingPanelEl = document.getElementById('offlinePendingPanel');
+const offlinePendingListEl = document.getElementById('offlinePendingList');
 
 // -- Customer Info Elements --
 const customerNameEl = document.getElementById('customerName');
@@ -319,7 +321,9 @@ function renderConnectivityStatus() {
 
   let statusText = 'Checking cloud sync status...';
   if (mode === 'server-offline') {
-    statusText = 'Cannot reach local POS server. Keep this tab open and check server connection.';
+    statusText = navigator.onLine
+      ? 'Cannot reach POS cloud server right now. Keep this tab open and retry sync shortly.'
+      : 'No internet connection. Sales are saved on this device and will sync when internet returns.';
   } else if (mode === 'offline') {
     statusText = 'Offline mode: sales continue locally and will sync when internet returns.';
   } else if (mode === 'pending') {
@@ -416,6 +420,7 @@ async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
       queuedOperations: clientSummary.operations,
       queuedInvoices: clientSummary.invoices
     }, { showTransitionToast });
+    await renderOfflinePendingTransactions();
   } catch (_error) {
     applyConnectivitySnapshot({
       serverReachable: false,
@@ -424,6 +429,7 @@ async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
       queuedOperations: clientSummary.operations,
       queuedInvoices: clientSummary.invoices
     }, { showTransitionToast });
+    await renderOfflinePendingTransactions();
   }
 }
 
@@ -676,6 +682,63 @@ async function getClientOfflineSummary() {
   } catch (_error) {
     return { operations: 0, invoices: 0 };
   }
+}
+
+function computeOfflineSaleTotal(sale) {
+  const productsById = new Map((state.products || []).map((p) => [String(p.id), Number(p.price || 0)]));
+  const subtotal = (sale?.items || []).reduce((sum, item) => {
+    const price = Number(productsById.get(String(item?.productId)) || 0);
+    const qty = Number(item?.qty || 0);
+    return sum + (price * qty);
+  }, 0);
+  const discount = Number(sale?.discountAmount || 0);
+  return Math.max(0, subtotal - discount);
+}
+
+async function renderOfflinePendingTransactions() {
+  if (!offlinePendingPanelEl || !offlinePendingListEl) return;
+  if (!offlineOutbox?.listPendingSales) {
+    offlinePendingPanelEl.style.display = 'none';
+    return;
+  }
+
+  let ops = [];
+  try {
+    ops = await offlineOutbox.listPendingSales();
+  } catch (_error) {
+    offlinePendingPanelEl.style.display = 'none';
+    return;
+  }
+
+  if (!Array.isArray(ops) || !ops.length) {
+    offlinePendingPanelEl.style.display = 'none';
+    offlinePendingListEl.innerHTML = '';
+    return;
+  }
+
+  const rows = ops.slice(0, 25).map((op) => {
+    const sale = op?.payload || {};
+    const ref = String(sale.reference || sale.invoiceId || op.id || '-');
+    const createdAt = formatDate(sale.createdAt || op.createdAt || new Date().toISOString());
+    const retries = Number(op.retries || 0);
+    const total = computeOfflineSaleTotal(sale);
+    return `
+      <div class="offline-pending-item">
+        <div class="offline-pending-main">
+          <div class="offline-pending-ref">${escapeHtml(ref)}</div>
+          <div class="offline-pending-meta">${escapeHtml(createdAt)} | Retry: ${retries}</div>
+        </div>
+        <div class="offline-pending-total">${money(total)}</div>
+      </div>
+    `;
+  });
+
+  if (ops.length > 25) {
+    rows.push(`<div class="offline-pending-empty">Showing latest 25 of ${ops.length} offline transactions.</div>`);
+  }
+
+  offlinePendingListEl.innerHTML = rows.join('');
+  offlinePendingPanelEl.style.display = 'block';
 }
 
 async function queueOfflineCashSale({ items, amountTendered, discountAmount, orderType }) {
