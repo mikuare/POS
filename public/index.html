@@ -16,7 +16,7 @@
       <div id="globalToastTitle" class="global-toast-title"></div>
       <div id="globalToastMessage" class="global-toast-message"></div>
     </div>
-    <section id="authGate" class="auth-gate" aria-label="Login or Sign Up">
+    <section id="authGate" class="auth-gate" aria-label="Login">
       <div class="auth-split">
         <aside class="auth-brand-panel">
           <div class="auth-brand-logo-wrap" aria-label="Ruel's Letchon Baka animated logo">
@@ -32,13 +32,12 @@
             <canvas id="authLogoCanvas" class="auth-brand-logo"></canvas>
           </div>
           <h1>Ruel's Letchon Baka</h1>
-          <p>Welcome back. Sign in or create an account to continue to the product dashboard.</p>
+          <p>Welcome back. Sign in to continue to the product dashboard.</p>
         </aside>
         <section class="auth-form-panel">
           <div class="auth-card">
-            <div class="auth-mode-switch" role="tablist" aria-label="Authentication mode">
-              <button id="showLoginBtn" class="auth-mode-btn active" type="button" role="tab" aria-selected="true">Login</button>
-              <button id="showSignupBtn" class="auth-mode-btn" type="button" role="tab" aria-selected="false">Sign Up</button>
+            <div class="auth-mode-switch" aria-label="Authentication mode">
+              <div class="auth-mode-label">Welcome to Ruel's Letchon Baka</div>
             </div>
 
             <form id="loginForm" class="auth-form" autocomplete="on">
@@ -48,23 +47,6 @@
               <label for="loginPassword">Password</label>
               <input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter password" />
               <button type="submit">Login to Dashboard</button>
-            </form>
-
-            <form id="signupForm" class="auth-form hidden" autocomplete="on">
-              <h2>Create Account</h2>
-              <label for="signupName">Full Name</label>
-              <input id="signupName" type="text" required autocomplete="name" placeholder="Your name" />
-              <label for="signupEmail">Email</label>
-              <input id="signupEmail" type="email" required autocomplete="email" placeholder="you@example.com" />
-              <label for="signupRole">Role</label>
-              <select id="signupRole" required>
-                <option value="administrations">Administrations</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="encharge" selected>Encharge</option>
-              </select>
-              <label for="signupPassword">Password</label>
-              <input id="signupPassword" type="password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters" />
-              <button type="submit">Sign Up and Continue</button>
             </form>
 
             <p id="authMessage" class="auth-message" aria-live="polite"></p>
@@ -78,13 +60,19 @@
         <div id="welcomeBanner" class="welcome-banner">
           <img id="welcomeRoleIcon" class="welcome-role-icon" src="/User Role/Encharge.png" alt="User role icon" />
           <span id="welcomeText">Welcome User, have a nice day.</span>
+          <span id="cashOnHandBadge" class="cash-on-hand-badge" style="display:none;">Cash On Hand: PHP 0.00</span>
         </div>
         <div id="phDateTime" class="ph-datetime" aria-live="polite">Philippines Time: --</div>
+        <button id="shiftMonitorToggleBtn" class="secondary shift-monitor-toggle-btn" type="button" title="Shift Monitor">
+          <span aria-hidden="true">📊</span>
+          <span>Monitor</span>
+        </button>
         <div class="settings-menu-wrap">
           <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
           <div id="settingsMenu" class="settings-menu" aria-hidden="true">
             <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Admin Dashboard</button>
             <button id="settingsEditMenuBtn" type="button" style="display:none;">Edit Menu</button>
+            <button id="settingsCashDrawerBtn" type="button" style="display:none;">Cash Drawer Control</button>
             <button id="logoutBtn" type="button">Logout</button>
           </div>
         </div>
@@ -136,8 +124,28 @@
                   <strong id="subtotalValue">PHP 0.00</strong>
                 </div>
                 <div class="total-row discount-row">
-                  <label for="discountInput">Discount</label>
-                  <input id="discountInput" type="number" min="0" step="0.01" value="0" />
+                  <label for="discountProfileSelect">Customer Discount</label>
+                  <select id="discountProfileSelect">
+                    <option value="">Regular Customer</option>
+                  </select>
+                </div>
+                <div id="discountSummaryCard" class="discount-summary-card">
+                  <div class="discount-summary-row">
+                    <span>Previous Total</span>
+                    <strong id="discountPreviousTotalValue">PHP 0.00</strong>
+                  </div>
+                  <div class="discount-summary-row">
+                    <span>Discount Applied</span>
+                    <strong id="discountAppliedLabel">Regular Customer (No discount)</strong>
+                  </div>
+                  <div class="discount-summary-row">
+                    <span>Deduction</span>
+                    <strong id="discountDeductionValue">PHP 0.00</strong>
+                  </div>
+                  <div class="discount-summary-row grand">
+                    <span>Customer Total</span>
+                    <strong id="discountCurrentTotalValue">PHP 0.00</strong>
+                  </div>
                 </div>
                 <div class="total-row total-due-row">
                   <span>Total Due</span>
@@ -164,6 +172,7 @@
               <div id="status" class="status">Ready.</div>
               <div id="statusReceiptActions" class="row status-receipt-actions" style="display:none;">
                 <button id="statusPrintReceiptBtn" class="secondary" type="button" disabled>Print Receipt</button>
+                <button id="statusHoldForVoidBtn" class="secondary" type="button" disabled>Hold for Void</button>
               </div>
 
               <div class="order-footer">
@@ -198,10 +207,10 @@
                 <div class="payment-success-card">
                   <div id="receiptPrintArea" class="receipt-print-area">
                     <div class="receipt-header">
-                      <img class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
-                      <h3>Ruel's Roast Beef</h3>
-                      <p>Location : Tres Martires, City of Baybay, 6521 Leyte</p>
-                      <p>Vat Registered TIN 342-231-312-00000</p>
+                      <img id="receiptLogo" class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+                      <h3 id="receiptStoreName" class="receipt-store-name">Ruel's Roast Beef</h3>
+                      <p id="receiptStoreAddress" class="receipt-store-address">Location : Tres Martires, City of Baybay, 6521 Leyte</p>
+                      <p id="receiptStoreTax" class="receipt-store-tax">Vat Registered TIN 342-231-312-00000</p>
                     </div>
                     <div class="receipt-meta">
                       <div><span>Receipt No:</span> <strong id="receiptRef">-</strong></div>
@@ -213,14 +222,17 @@
                     <div class="receipt-totals">
                       <div><span>Subtotal</span><strong id="receiptSubtotal">PHP 0.00</strong></div>
                       <div><span>Discount</span><strong id="receiptDiscount">PHP 0.00</strong></div>
+                      <div id="receiptDiscountProfileRow" style="display:none;"><span id="receiptDiscountProfileLabel">Customer Discount Type</span><strong id="receiptDiscountProfileValue">Students (10%)</strong></div>
                       <div class="total-due"><span>Total Due</span><strong id="receiptTotalDue">PHP 0.00</strong></div>
                       <div><span>Amount Paid</span><strong id="receiptAmountPaid">PHP 0.00</strong></div>
                       <div><span>Change</span><strong id="receiptChange">PHP 0.00</strong></div>
                     </div>
-                    <p class="receipt-footer">Thank you for dining with us!</p>
+                    <p id="receiptFooter" class="receipt-footer">Thank you for dining with us!</p>
+                    <div id="receiptExtraNote" class="receipt-extra-note" style="display:none;"></div>
                   </div>
                   <div class="receipt-actions">
                     <button id="receiptMinimizeBtn" class="secondary">Minimize</button>
+                    <button id="receiptHoldForVoidBtn" class="secondary" type="button">Hold for Void</button>
                     <button id="receiptPrintBtn">Print Receipt</button>
                     <button id="paymentSuccessDoneBtn" class="secondary">Cancel</button>
                   </div>
@@ -284,31 +296,38 @@
       <!-- Admin / Transactions Overlay -->
       <div id="tab-admin" class="tab-content admin-overlay">
         <div class="admin-shell">
-          <div class="admin-shell-header">
-            <h2>Admin Dashboard</h2>
-            <button id="adminCloseBtn" class="secondary">Close</button>
-          </div>
-          <div class="admin-nav">
-            <button id="adminNavOverviewBtn" class="secondary admin-nav-btn active" type="button">Overview</button>
-            <button id="adminNavInventoryBtn" class="secondary admin-nav-btn" type="button">Inventory</button>
-            <button id="adminNavKitSpecBtn" class="secondary admin-nav-btn" type="button">Kit Specification</button>
+          <div class="admin-shell-sticky">
+            <div class="admin-shell-header">
+              <h2>Admin Dashboard</h2>
+              <button id="adminCloseBtn" class="secondary">Close</button>
+            </div>
+            <div class="admin-nav">
+              <button id="adminNavOverviewBtn" class="secondary admin-nav-btn active" type="button">Overview</button>
+              <button id="adminNavInventoryBtn" class="secondary admin-nav-btn" type="button">Inventory</button>
+              <button id="adminNavKitSpecBtn" class="secondary admin-nav-btn" type="button">Kit Specification</button>
+              <button id="adminNavUsersBtn" class="secondary admin-nav-btn" type="button">User Management</button>
+              <button id="adminNavOperationsBtn" class="secondary admin-nav-btn" type="button">Operations</button>
+              <button id="adminNavReceiptTemplatesBtn" class="secondary admin-nav-btn" type="button">Receipt Templates</button>
+              <button id="adminNavReportsBtn" class="secondary admin-nav-btn" type="button">Reports</button>
+              <button id="adminNavOthersBtn" class="secondary admin-nav-btn" type="button">Others</button>
+            </div>
           </div>
 
           <div id="adminPanelOverview" class="admin-panel active">
           <div class="admin-grid">
           <section class="card full-width">
-            <h2>Sales Summary</h2>
+            <h2>Overview Dashboard</h2>
             <div class="row">
               <button id="salesDailyBtn" class="secondary">Today</button>
               <button id="salesWeeklyBtn" class="secondary">Last 7 Days</button>
               <button id="salesRefreshBtn">Refresh</button>
             </div>
-            <div id="salesSummary" class="status">Loading sales report...</div>
+            <div id="salesSummary" class="status">Loading overview dashboard...</div>
             <div id="salesList" class="sales-list"></div>
           </section>
 
           <section class="card full-width">
-            <h2>Sales: Detailed Output</h2>
+            <h2>Analysis and Mix</h2>
             <div id="salesDetailedGrid" class="sales-detailed-grid">
               <div class="stat-item">
                 <span class="stat-label">Daily Sales</span>
@@ -329,83 +348,120 @@
             </div>
           </section>
 
-          <!-- Transaction Filters -->
           <section class="card full-width">
-            <h2>All Transactions</h2>
-            <div class="row">
-              <label for="adminFilter">Filter:</label>
-              <select id="adminFilter">
-                <option value="">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="PAID">Paid</option>
-              </select>
-              <label for="adminRange">Range:</label>
-              <select id="adminRange">
-                <option value="daily">Today</option>
-                <option value="weekly">Last 7 Days</option>
-                <option value="">All Time</option>
-              </select>
-              <button id="adminRefreshBtn">Refresh</button>
-              <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
+            <div class="overview-transactions-shell">
+              <div class="overview-transactions-head">
+                <h2>All Transactions</h2>
+                <p>Review transaction filters and business health before checking the full transaction list below.</p>
+              </div>
+              <div class="overview-transactions-section">
+                <div class="row">
+                  <label for="adminFilter">Filter:</label>
+                  <select id="adminFilter">
+                    <option value="">All Statuses</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="PAID">Paid</option>
+                    <option value="HOLD_FOR_VOID">Hold for Void</option>
+                    <option value="VOIDED">Voided</option>
+                  </select>
+                  <label for="adminRange">Range:</label>
+                  <select id="adminRange">
+                    <option value="daily">Today</option>
+                    <option value="weekly">Last 7 Days</option>
+                    <option value="">All Time</option>
+                  </select>
+                  <button id="adminRefreshBtn">Refresh</button>
+                  <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
+                </div>
+              </div>
+              <div class="overview-transactions-section">
+                <div class="overview-transactions-subhead">
+                  <h3>Business Health</h3>
+                </div>
+                <div id="adminStats" class="admin-stats">
+                  <div class="stat-item">
+                    <span class="stat-label">Total Transactions</span>
+                    <span class="stat-value" id="statTotal">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Paid</span>
+                    <span class="stat-value paid" id="statPaid">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Pending</span>
+                    <span class="stat-value pending" id="statPending">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Total Revenue</span>
+                    <span class="stat-value" id="statRevenue">PHP 0.00</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Cash Sales</span>
+                    <span class="stat-value" id="statCash">PHP 0.00</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">E-Wallet Sales</span>
+                    <span class="stat-value" id="statGcash">PHP 0.00</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
-          <!-- Transaction Stats -->
-          <section class="card">
-            <h2>Quick Stats</h2>
-            <div id="adminStats" class="admin-stats">
-              <div class="stat-item">
-                <span class="stat-label">Total Transactions</span>
-                <span class="stat-value" id="statTotal">0</span>
+          <section class="card full-width">
+            <div class="overview-transactions-shell">
+              <div class="overview-transactions-head">
+                <h2>Transaction List</h2>
+                <p>Full transaction records for the selected filter and date range.</p>
               </div>
-              <div class="stat-item">
-                <span class="stat-label">Paid</span>
-                <span class="stat-value paid" id="statPaid">0</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Pending</span>
-                <span class="stat-value pending" id="statPending">0</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Total Revenue</span>
-                <span class="stat-value" id="statRevenue">PHP 0.00</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Cash Sales</span>
-                <span class="stat-value" id="statCash">PHP 0.00</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">E-Wallet Sales</span>
-                <span class="stat-value" id="statGcash">PHP 0.00</span>
+              <div id="adminTransactions" class="admin-transactions">
+                <p>Loading transactions...</p>
               </div>
             </div>
           </section>
 
-          <!-- Transaction List -->
-          <section class="card">
-            <h2>Transaction List</h2>
-            <div id="adminTransactions" class="admin-transactions">
-              <p>Loading transactions...</p>
+          <section class="card full-width">
+            <h2>Sales Operations Dashboard</h2>
+            <div id="salesOpsSummary" class="status">Loading sales operations dashboard...</div>
+            <div id="hourlySalesGraph" class="hourly-sales-graph">
+              <p>Loading hourly sales...</p>
             </div>
           </section>
+
           </div>
           </div>
 
           <div id="adminPanelInventory" class="admin-panel">
             <section class="card full-width">
-              <h2>Inventory</h2>
-              <p>Track ingredient stocks and estimated usage per product based on paid sales.</p>
-              <form id="inventoryIngredientForm" class="row">
-                <input id="ingredientNameInput" type="text" placeholder="Ingredient name" required />
-                <input id="ingredientQtyInput" type="number" min="0" step="0.001" placeholder="Quantity" required />
-                <input id="ingredientPriceInput" type="number" min="0" step="0.01" placeholder="Unit price (PHP)" required />
-                <input id="ingredientUnitInput" type="text" placeholder="Base unit (pcs, kg, liter)" value="pcs" required />
-                <button id="ingredientAddBtn" type="submit">Add Ingredient</button>
-              </form>
-              <div id="inventoryAdminNote" class="status" style="display:none;">Only Administrations role can add ingredients. Other roles can view stocks.</div>
               <div id="inventorySummary" class="status">Loading inventory summary...</div>
-              <div id="inventoryTableWrap" class="admin-transactions">
-                <p>Loading ingredients...</p>
+              <div class="inventory-workspace-panel">
+                <h2>Inventory</h2>
+                <p>Track ingredient stocks and estimated usage per product based on paid sales.</p>
+                <form id="inventoryIngredientForm" class="row">
+                  <input id="ingredientNameInput" type="text" placeholder="Ingredient name" required />
+                  <input id="ingredientQtyInput" type="number" min="0" step="0.001" placeholder="Quantity" required />
+                  <input id="ingredientPriceInput" type="number" min="0" step="0.01" placeholder="Unit price (PHP)" required />
+                  <input id="ingredientUnitInput" type="text" list="ingredientUnitSuggestions" placeholder="UOM / Unit of measure" required />
+                  <datalist id="ingredientUnitSuggestions">
+                    <option value="pcs"></option>
+                    <option value="kg"></option>
+                    <option value="g"></option>
+                    <option value="liter"></option>
+                    <option value="ml"></option>
+                    <option value="pack"></option>
+                    <option value="bottle"></option>
+                  </datalist>
+                  <button id="ingredientAddBtn" type="submit">Add Ingredient</button>
+                  <button id="inventoryBulkToggleBtn" class="secondary" type="button" aria-controls="inventoryBulkEditor" aria-expanded="false" style="display:none;">Bulk Edit</button>
+                </form>
+                <div id="inventoryAdminNote" class="status" style="display:none;">Only Administrations role can add ingredients. Other roles can view stocks.</div>
+                <div id="inventoryBulkEditor" class="inventory-bulk-shell" style="display:none;"></div>
+                <div id="inventoryAlertsWrap" class="admin-transactions">
+                  <p>Loading inventory alerts...</p>
+                </div>
+                <div id="inventoryTableWrap" class="admin-transactions">
+                  <p>Loading ingredients...</p>
+                </div>
               </div>
             </section>
           </div>
@@ -413,8 +469,551 @@
           <div id="adminPanelKitSpec" class="admin-panel">
             <section class="card full-width">
               <h2>Kit Specification</h2>
-              <p>Define product kit composition, required components, and standard quantity per kit.</p>
-              <div id="kitSpecModule" class="status">Kit Specification module page is ready for your setup.</div>
+              <p>Assign ingredients to each menu product so paid orders deduct inventory automatically.</p>
+              <div id="kitSpecSummary" class="status">Loading product kit coverage...</div>
+              <div class="kit-spec-workspace-panel">
+                <div class="kit-spec-workspace-grid">
+                  <section class="kit-spec-builder-card">
+                    <div class="kit-spec-panel-header">
+                      <span class="kit-spec-panel-eyebrow">Kit Builder</span>
+                      <h3>Add Kit Specs for Products</h3>
+                      <p>Select a category and product, then assign the exact ingredients and quantity used per order.</p>
+                    </div>
+                    <div id="kitSpecNote" class="status">Loading kit specification module...</div>
+                    <div id="kitSpecModeControl" class="kit-spec-mode-panel">
+                      <div class="kit-spec-mode-copy">
+                        <span class="kit-spec-mode-eyebrow">Order Requirement</span>
+                        <strong id="kitSpecModeLabel">Loading mode...</strong>
+                        <small id="kitSpecModeHint">Checking whether ordering requires kit specs and ingredient stock.</small>
+                      </div>
+                      <button id="kitSpecModeToggleBtn" class="secondary" type="button" style="display:none;">Loading...</button>
+                    </div>
+                    <div id="kitSpecControlBar" class="kit-spec-control-bar row">
+                      <label for="kitSpecCategorySelect">Category</label>
+                      <select id="kitSpecCategorySelect"></select>
+                      <label for="kitSpecProductSelect">Product</label>
+                      <select id="kitSpecProductSelect"></select>
+                      <button id="kitSpecAddRowBtn" class="secondary" type="button">Add Ingredient</button>
+                      <button id="kitSpecSaveBtn" type="button">Save Kit Spec</button>
+                    </div>
+                    <div id="kitSpecEditor" class="admin-transactions">
+                      <p>Select a product to configure its ingredients.</p>
+                    </div>
+                  </section>
+                  <section class="kit-spec-coverage-card">
+                    <div class="kit-spec-panel-header">
+                      <span class="kit-spec-panel-eyebrow">Coverage View</span>
+                      <h3>Kit Spec Coverage Details</h3>
+                      <p>Review configured, missing, and unused ingredient mappings in one place.</p>
+                    </div>
+                    <div id="kitSpecModule" class="admin-transactions">
+                      <p>Loading kit specification records...</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelUsers" class="admin-panel">
+            <section class="card full-width">
+              <h2>User Management</h2>
+              <p>View all POS user accounts, role assignments, and account status.</p>
+              <div id="adminUsersSummary" class="status">Loading users...</div>
+              <div class="user-management-workspace-panel">
+                <div class="user-management-workspace-grid">
+                  <section class="user-management-create-card">
+                    <div class="user-management-panel-header">
+                      <span class="user-management-panel-eyebrow">Account Setup</span>
+                      <h3>Create User</h3>
+                      <p>Add a new POS account with its initial role and temporary password.</p>
+                    </div>
+                    <p id="adminCreateUserNote" class="status">Only Administrations can create users.</p>
+                    <form id="adminCreateUserForm" class="user-create-form">
+                      <div class="user-create-field">
+                        <label for="adminCreateUserName">Full Name</label>
+                        <input id="adminCreateUserName" type="text" placeholder="Enter full name" required />
+                      </div>
+                      <div class="user-create-field">
+                        <label for="adminCreateUserEmail">Email</label>
+                        <input id="adminCreateUserEmail" type="email" placeholder="Email for login" required />
+                      </div>
+                      <div class="user-create-field">
+                        <label for="adminCreateUserPassword">Temporary Password</label>
+                        <input id="adminCreateUserPassword" type="password" minlength="6" placeholder="Initial password (min 6)" required />
+                      </div>
+                      <div class="user-create-field">
+                        <label for="adminCreateUserRole">Role</label>
+                        <select id="adminCreateUserRole" required>
+                          <option value="encharge">Encharge</option>
+                          <option value="supervisor">Supervisor</option>
+                          <option value="administrations">Administrations</option>
+                        </select>
+                      </div>
+                      <div class="user-create-actions">
+                        <button id="adminCreateUserBtn" type="submit">Create User</button>
+                      </div>
+                    </form>
+                  </section>
+                  <section class="user-management-directory-card">
+                    <div class="user-management-panel-header">
+                      <span class="user-management-panel-eyebrow">Directory</span>
+                      <h3>User Accounts</h3>
+                      <p>Review activity, update roles, and manage access for each account.</p>
+                    </div>
+                    <div id="adminUsersList" class="admin-transactions">
+                      <p>Loading users...</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelOperations" class="admin-panel">
+            <section class="card full-width">
+              <div class="operations-summary-shell">
+                <div class="operations-summary-header">
+                  <span class="operations-summary-eyebrow">Store Operations</span>
+                  <h3>Cashier and Shift Control Center</h3>
+                  <p>Monitor live cashier activity, review shift performance, and resolve discrepancies from one workspace.</p>
+                </div>
+                <div class="operations-summary-strip">
+                  <span><strong>Live View</strong> Cashiers and drawers currently in use</span>
+                  <span><strong>Shift Review</strong> Expected cash, end counts, and movement history</span>
+                  <span><strong>Alerts</strong> Differences that need reconciliation</span>
+                </div>
+              </div>
+              <div class="operations-workspace-panel">
+                <div class="operations-workspace-grid">
+                  <section class="operations-module-card monitoring">
+                    <div class="operations-panel-header">
+                      <div>
+                        <span class="operations-panel-eyebrow">Live Monitor</span>
+                        <h3>Cashier Monitoring</h3>
+                        <p>Track active cashiers, drawer status, and current activity in real time.</p>
+                      </div>
+                      <button id="cashierMonitoringRefreshBtn" class="secondary" type="button">Refresh</button>
+                    </div>
+                    <div id="cashierMonitoringList" class="admin-transactions operations-module-body">
+                      <p>Loading active cashiers...</p>
+                    </div>
+                  </section>
+
+                  <section class="operations-module-card shifts">
+                    <div class="operations-panel-header">
+                      <div>
+                        <span class="operations-panel-eyebrow">Shift Review</span>
+                        <h3>Shift Management</h3>
+                        <p>Review shift summaries, expected drawer totals, and recorded end-of-shift balances.</p>
+                      </div>
+                      <button id="shiftManagementRefreshBtn" class="secondary" type="button">Refresh</button>
+                    </div>
+                    <div id="shiftManagementSummary" class="status operations-status">Loading shift summary...</div>
+                    <div id="shiftManagementList" class="admin-transactions operations-module-body">
+                      <p>Loading shifts...</p>
+                    </div>
+                  </section>
+
+                  <section class="operations-module-card discrepancy">
+                    <div class="operations-panel-header">
+                      <div>
+                        <span class="operations-panel-eyebrow">Attention Queue</span>
+                        <h3>Discrepancy Alerts</h3>
+                        <p>Identify shortages, overages, and review items that need follow-up before closing.</p>
+                      </div>
+                      <button id="discrepancyRefreshBtn" class="secondary" type="button">Refresh</button>
+                    </div>
+                    <div id="discrepancySummary" class="status operations-status">Loading discrepancy alerts...</div>
+                    <div id="discrepancyAlertsList" class="admin-transactions operations-module-body">
+                      <p>Loading discrepancy alerts...</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelReceiptTemplates" class="admin-panel">
+            <section class="card full-width">
+              <div class="receipt-template-summary-shell">
+                <div class="receipt-template-summary-header">
+                  <span class="receipt-template-summary-eyebrow">Receipt Printing</span>
+                  <h3>Receipt Template Studio</h3>
+                  <p>Edit the print layout style, save multiple templates, and choose which one is used for transaction receipts.</p>
+                </div>
+              </div>
+              <div id="receiptTemplatesStatus" class="status">Loading receipt templates...</div>
+              <div class="receipt-template-workspace-panel">
+                <div class="receipt-template-workspace-grid">
+                  <section class="receipt-template-editor-card">
+                    <div class="receipt-template-panel-header">
+                      <span class="receipt-template-panel-eyebrow">Template Editor</span>
+                      <h3>Style Controls</h3>
+                      <p>Adjust layout width, fonts, colors, logo, spacing, and receipt copy.</p>
+                    </div>
+                    <p id="receiptTemplateAdminNote" class="status">Only Administrations can save or activate templates.</p>
+                    <form id="receiptTemplateForm" class="receipt-template-form">
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateNameInput">Template Name</label>
+                        <input id="receiptTemplateNameInput" type="text" placeholder="Enter template name" required />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateStoreNameInput">Store Name</label>
+                        <input id="receiptTemplateStoreNameInput" type="text" placeholder="Store name" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateStoreAddressInput">Store Address</label>
+                        <input id="receiptTemplateStoreAddressInput" type="text" placeholder="Store address" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateTaxLineInput">Tax / TIN Line</label>
+                        <input id="receiptTemplateTaxLineInput" type="text" placeholder="VAT or TIN line" />
+                      </div>
+                      <div class="receipt-template-field checkbox">
+                        <label for="receiptTemplateShowDiscountProfileInput">Show Customer Discount Type</label>
+                        <input id="receiptTemplateShowDiscountProfileInput" type="checkbox" checked />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateDiscountProfileLabelInput">Discount Type Label</label>
+                        <input id="receiptTemplateDiscountProfileLabelInput" type="text" placeholder="Customer Discount Type" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterMessageInput">Footer Message</label>
+                        <textarea id="receiptTemplateFooterMessageInput" rows="2" placeholder="Thank you message"></textarea>
+                        <small class="receipt-template-field-note">Press Enter to add another line in the footer.</small>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateExtraMessageInput">Extra Message Below Footer</label>
+                        <textarea id="receiptTemplateExtraMessageInput" rows="3" placeholder="Extra note, promo, reminder, return policy, etc."></textarea>
+                        <small class="receipt-template-field-note">This appears in a separate note box below the footer and grows automatically.</small>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateExtraMessageAlignSelect">Extra Message Position</label>
+                        <select id="receiptTemplateExtraMessageAlignSelect">
+                          <option value="left">Left</option>
+                          <option value="center">Center</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateExtraMessageStyleSelect">Extra Message Border Style</label>
+                        <select id="receiptTemplateExtraMessageStyleSelect">
+                          <option value="dashed">Dashed</option>
+                          <option value="solid">Solid</option>
+                          <option value="dotted">Dotted</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateExtraMessageOffsetXInput">Extra Message Move X (px)</label>
+                        <input id="receiptTemplateExtraMessageOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateExtraMessageOffsetYInput">Extra Message Move Y (px)</label>
+                        <input id="receiptTemplateExtraMessageOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateLogoUrlInput">Logo Image Path / URL</label>
+                        <input id="receiptTemplateLogoUrlInput" type="text" placeholder="/Business Logo/Ruels Logo for business.png" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateLogoFileInput">Upload Logo to This Browser</label>
+                        <input id="receiptTemplateLogoFileInput" type="file" accept="image/*" />
+                        <small id="receiptTemplateLogoStorageNote" class="receipt-template-field-note">No local uploaded logo stored for this template yet.</small>
+                      </div>
+                      <div class="receipt-template-field checkbox">
+                        <label for="receiptTemplateShowLogoInput">Show Logo</label>
+                        <input id="receiptTemplateShowLogoInput" type="checkbox" checked />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFontFamilySelect">Font Family</label>
+                        <select id="receiptTemplateFontFamilySelect">
+                          <option value="'Trebuchet MS', 'Arial', sans-serif">Trebuchet Sans</option>
+                          <option value="'Georgia', 'Times New Roman', serif">Georgia Serif</option>
+                          <option value="'Courier New', monospace">Courier Mono</option>
+                          <option value="'Verdana', 'Geneva', sans-serif">Verdana</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateHeaderAlignSelect">Header Position</label>
+                        <select id="receiptTemplateHeaderAlignSelect">
+                          <option value="left">Left</option>
+                          <option value="center">Center</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateHeaderOffsetXInput">Header Move X (px)</label>
+                        <input id="receiptTemplateHeaderOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateHeaderOffsetYInput">Header Move Y (px)</label>
+                        <input id="receiptTemplateHeaderOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateHeaderTopPaddingInput">Header Top Space (px)</label>
+                        <input id="receiptTemplateHeaderTopPaddingInput" type="number" min="0" max="48" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterAlignSelect">Footer Position</label>
+                        <select id="receiptTemplateFooterAlignSelect">
+                          <option value="left">Left</option>
+                          <option value="center">Center</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterOffsetXInput">Footer Move X (px)</label>
+                        <input id="receiptTemplateFooterOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterOffsetYInput">Footer Move Y (px)</label>
+                        <input id="receiptTemplateFooterOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterFontSizeInput">Footer Font Size (px)</label>
+                        <input id="receiptTemplateFooterFontSizeInput" type="number" min="10" max="24" step="1" value="12" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateFooterTopSpacingInput">Footer Top Space (px)</label>
+                        <input id="receiptTemplateFooterTopSpacingInput" type="number" min="0" max="48" step="1" value="12" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateMetaOffsetXInput">Meta Move X (px)</label>
+                        <input id="receiptTemplateMetaOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateMetaOffsetYInput">Meta Move Y (px)</label>
+                        <input id="receiptTemplateMetaOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateItemsOffsetXInput">Items Move X (px)</label>
+                        <input id="receiptTemplateItemsOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateItemsOffsetYInput">Items Move Y (px)</label>
+                        <input id="receiptTemplateItemsOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateTotalsOffsetXInput">Totals Move X (px)</label>
+                        <input id="receiptTemplateTotalsOffsetXInput" type="number" min="-120" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateTotalsOffsetYInput">Totals Move Y (px)</label>
+                        <input id="receiptTemplateTotalsOffsetYInput" type="number" min="-80" max="120" step="1" value="0" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplatePaperWidthInput">Paper Width (mm)</label>
+                        <input id="receiptTemplatePaperWidthInput" type="number" min="58" max="100" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplatePaddingInput">Padding (px)</label>
+                        <input id="receiptTemplatePaddingInput" type="number" min="0" max="32" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateBorderRadiusInput">Corner Radius (px)</label>
+                        <input id="receiptTemplateBorderRadiusInput" type="number" min="0" max="32" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateSectionGapInput">Section Gap (px)</label>
+                        <input id="receiptTemplateSectionGapInput" type="number" min="4" max="24" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateBaseFontSizeInput">Base Font Size (px)</label>
+                        <input id="receiptTemplateBaseFontSizeInput" type="number" min="10" max="20" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateTitleFontSizeInput">Store Name Size (px)</label>
+                        <input id="receiptTemplateTitleFontSizeInput" type="number" min="14" max="36" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateMetaFontSizeInput">Meta Font Size (px)</label>
+                        <input id="receiptTemplateMetaFontSizeInput" type="number" min="10" max="18" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateTotalFontSizeInput">Total Due Size (px)</label>
+                        <input id="receiptTemplateTotalFontSizeInput" type="number" min="12" max="28" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateLogoWidthInput">Logo Width (px)</label>
+                        <input id="receiptTemplateLogoWidthInput" type="number" min="32" max="180" step="1" />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateBorderStyleSelect">Outer Border Style</label>
+                        <select id="receiptTemplateBorderStyleSelect">
+                          <option value="dashed">Dashed</option>
+                          <option value="solid">Solid</option>
+                          <option value="dotted">Dotted</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateDividerStyleSelect">Divider Style</label>
+                        <select id="receiptTemplateDividerStyleSelect">
+                          <option value="dashed">Dashed</option>
+                          <option value="solid">Solid</option>
+                          <option value="dotted">Dotted</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                      <div class="receipt-template-field color">
+                        <label for="receiptTemplateTextColorInput">Text Color</label>
+                        <input id="receiptTemplateTextColorInput" type="color" />
+                      </div>
+                      <div class="receipt-template-field color">
+                        <label for="receiptTemplateAccentColorInput">Accent Color</label>
+                        <input id="receiptTemplateAccentColorInput" type="color" />
+                      </div>
+                      <div class="receipt-template-field color">
+                        <label for="receiptTemplateMutedColorInput">Muted Color</label>
+                        <input id="receiptTemplateMutedColorInput" type="color" />
+                      </div>
+                      <div class="receipt-template-field color">
+                        <label for="receiptTemplateBackgroundColorInput">Background Color</label>
+                        <input id="receiptTemplateBackgroundColorInput" type="color" />
+                      </div>
+                      <div class="receipt-template-field color">
+                        <label for="receiptTemplateBorderColorInput">Border Color</label>
+                        <input id="receiptTemplateBorderColorInput" type="color" />
+                      </div>
+                    </form>
+                    <div class="receipt-template-editor-actions">
+                      <button id="receiptTemplateSaveNewBtn" type="button">Save as New Template</button>
+                      <button id="receiptTemplateUpdateBtn" class="secondary" type="button">Update Selected</button>
+                      <button id="receiptTemplateLogoClearBtn" class="secondary" type="button">Clear Local Logo</button>
+                      <button id="receiptTemplateResetBtn" class="secondary" type="button">Reset Editor</button>
+                      <button id="receiptTemplateActivateBtn" class="secondary" type="button">Use for Transaction Receipts</button>
+                    </div>
+                  </section>
+                  <section class="receipt-template-preview-card">
+                    <div class="receipt-template-panel-header">
+                      <span class="receipt-template-panel-eyebrow">Live Preview</span>
+                      <h3>Receipt Preview</h3>
+                      <p>See how the selected template will look before using it for transactions. Drag any main block here to move it.</p>
+                    </div>
+                    <div id="receiptTemplatePreviewWrap" class="receipt-template-preview-wrap">
+                      <div id="receiptTemplatePreviewArea"></div>
+                    </div>
+                    <div class="receipt-template-panel-header compact">
+                      <span class="receipt-template-panel-eyebrow">Saved Templates</span>
+                      <h3>Template Library</h3>
+                    </div>
+                    <div id="receiptTemplateList" class="admin-transactions receipt-template-list">
+                      <p>Loading templates...</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelReports" class="admin-panel">
+            <section class="card full-width">
+              <div class="reports-summary-shell">
+                <div class="reports-summary-header">
+                  <span class="reports-summary-eyebrow">Business Reports</span>
+                  <h3>Operational Reports Center</h3>
+                  <p>Generate aligned reports for sales, transactions, shifts, discrepancies, and monthly closing.</p>
+                </div>
+              </div>
+              <div class="reports-workspace-panel">
+                <div class="reports-workspace-grid">
+                  <section class="reports-generator-card">
+                    <div class="reports-panel-header">
+                      <span class="reports-panel-eyebrow">Report Builder</span>
+                      <h3>Generate Reports</h3>
+                      <p>Select the report type you want to review, then export it for Excel or printing.</p>
+                    </div>
+                    <div class="row report-actions-row">
+                      <button id="reportDailySalesBtn" class="secondary" type="button">Daily Sales</button>
+                      <button id="reportMonthlyClosingBtn" class="secondary" type="button">Monthly Closing</button>
+                      <button id="reportShiftBtn" class="secondary" type="button">Cashier Shift</button>
+                      <button id="reportTransactionsBtn" class="secondary" type="button">Transactions</button>
+                      <button id="reportProductsBtn" class="secondary" type="button">Product Sales</button>
+                      <button id="reportDiscrepancyBtn" class="secondary" type="button">Discrepancy</button>
+                    </div>
+                    <div id="reportsStatus" class="status">Select a report type to generate.</div>
+                  </section>
+                  <section class="reports-preview-card">
+                    <div class="reports-panel-header">
+                      <span class="reports-panel-eyebrow">Preview</span>
+                      <h3>Generated Report</h3>
+                      <p>Review the summary and rows before exporting the file.</p>
+                    </div>
+                    <div class="row report-actions-row report-export-row">
+                      <button id="reportDownloadBtn" class="secondary" type="button" disabled>Download Excel</button>
+                      <button id="reportPrintBtn" class="secondary" type="button" disabled>Print Report</button>
+                    </div>
+                    <div id="reportsPreview" class="admin-transactions reports-preview-area">
+                      <p>No report generated yet.</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelOthers" class="admin-panel">
+            <section class="card full-width">
+              <div class="reports-summary-shell">
+                <div class="reports-summary-header">
+                  <span class="reports-summary-eyebrow">Other Admin Tools</span>
+                  <h3>Discounts and Monthly Closing</h3>
+                  <p>Manage customer discount types for the cashier dashboard, then track monthly expenses and closing summaries.</p>
+                </div>
+              </div>
+              <div class="reports-workspace-panel">
+                <div class="reports-generator-card">
+                  <div class="reports-panel-header">
+                    <span class="reports-panel-eyebrow">Customer Discounts</span>
+                    <h3>Discount Manager</h3>
+                    <p>Create, rename, delete, and adjust the percent for each customer discount type used by cashiers.</p>
+                  </div>
+                  <div id="discountConfigAdminNote" class="status">Loading discount settings...</div>
+                  <form id="discountProfileForm" class="row">
+                    <input id="discountProfileNameInput" type="text" placeholder="Discount name" maxlength="60" required />
+                    <select id="discountProfileTypeInput">
+                      <option value="percent">Percent</option>
+                      <option value="fixed">Minus Amount</option>
+                    </select>
+                    <input id="discountProfilePercentInput" type="number" min="0" step="0.01" placeholder="Value" required />
+                    <button id="discountProfileAddBtn" type="submit">Add Discount Type</button>
+                  </form>
+                  <div id="discountProfilesList" class="admin-transactions reports-preview-area">
+                    <p>Loading discount profiles...</p>
+                  </div>
+                </div>
+                <div class="reports-generator-card">
+                  <div class="row">
+                    <label for="monthlyClosingMonthInput">Month</label>
+                    <input id="monthlyClosingMonthInput" type="month" />
+                    <button id="monthlyClosingRefreshBtn" class="secondary" type="button">Refresh Closing</button>
+                  </div>
+                  <form id="monthlyExpenseForm" class="row">
+                    <input id="monthlyExpenseDateInput" type="date" required />
+                    <input id="monthlyExpenseCategoryInput" type="text" list="monthlyExpenseCategorySuggestions" placeholder="Expense category" required />
+                    <datalist id="monthlyExpenseCategorySuggestions">
+                      <option value="Rent"></option>
+                      <option value="Utilities"></option>
+                      <option value="Supplies"></option>
+                      <option value="Salary"></option>
+                      <option value="Transport"></option>
+                      <option value="Maintenance"></option>
+                      <option value="Miscellaneous"></option>
+                    </datalist>
+                    <input id="monthlyExpenseDescriptionInput" type="text" placeholder="Expense description" required />
+                    <input id="monthlyExpenseAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount (PHP)" required />
+                    <input id="monthlyExpenseNoteInput" type="text" placeholder="Optional note" />
+                    <button id="monthlyExpenseSaveBtn" type="submit">Add Expense</button>
+                  </form>
+                  <div id="monthlyClosingAdminNote" class="status">Loading monthly closing controls...</div>
+                  <div id="monthlyClosingSummary" class="status">Loading monthly closing summary...</div>
+                  <div id="monthlyExpenseList" class="admin-transactions reports-preview-area">
+                    <p>Loading monthly expenses...</p>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </div>
@@ -424,10 +1023,10 @@
         <div class="admin-receipt-card">
           <div id="adminReceiptPrintArea" class="receipt-print-area">
             <div class="receipt-header">
-              <img class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
-              <h3>Ruel's Roast Beef</h3>
-              <p>Location : Tres Martires, City of Baybay, 6521 Leyte</p>
-              <p>Vat Registered TIN 342-231-312-00000</p>
+              <img id="adminReceiptLogo" class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+              <h3 id="adminReceiptStoreName" class="receipt-store-name">Ruel's Roast Beef</h3>
+              <p id="adminReceiptStoreAddress" class="receipt-store-address">Location : Tres Martires, City of Baybay, 6521 Leyte</p>
+              <p id="adminReceiptStoreTax" class="receipt-store-tax">Vat Registered TIN 342-231-312-00000</p>
             </div>
             <div class="receipt-meta">
               <div><span>Receipt No:</span> <strong id="adminReceiptRef">-</strong></div>
@@ -439,11 +1038,13 @@
             <div class="receipt-totals">
               <div><span>Subtotal</span><strong id="adminReceiptSubtotal">PHP 0.00</strong></div>
               <div><span>Discount</span><strong id="adminReceiptDiscount">PHP 0.00</strong></div>
+              <div id="adminReceiptDiscountProfileRow" style="display:none;"><span id="adminReceiptDiscountProfileLabel">Customer Discount Type</span><strong id="adminReceiptDiscountProfileValue">Students (10%)</strong></div>
               <div class="total-due"><span>Total Due</span><strong id="adminReceiptTotalDue">PHP 0.00</strong></div>
               <div><span>Amount Paid</span><strong id="adminReceiptAmountPaid">PHP 0.00</strong></div>
               <div><span>Change</span><strong id="adminReceiptChange">PHP 0.00</strong></div>
             </div>
-            <p class="receipt-footer">Thank you for dining with us!</p>
+            <p id="adminReceiptFooter" class="receipt-footer">Thank you for dining with us!</p>
+            <div id="adminReceiptExtraNote" class="receipt-extra-note" style="display:none;"></div>
           </div>
           <div class="receipt-actions">
             <button id="adminReceiptPrintBtn">Print Receipt</button>
@@ -468,6 +1069,166 @@
         <div class="row">
           <button id="adminLoginBtn">Login</button>
           <button id="adminCancelBtn" class="secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="shiftMonitorModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card">
+        <div class="shift-monitor-header">
+          <h2>Shift Monitor</h2>
+          <button id="shiftMonitorCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <p>Track sales, payments, transaction count, and cash on hand for the current shift.</p>
+        <div id="shiftMonitorSummary" class="shift-monitor-summary">
+          <p>Loading shift summary...</p>
+        </div>
+        <div class="row">
+          <button id="shiftMonitorRefreshBtn" type="button">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="startShiftModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card start-shift-card">
+        <div class="shift-monitor-header">
+          <h2>Start Shift</h2>
+          <button id="startShiftSignOutBtn" class="secondary" type="button">Sign Out</button>
+        </div>
+        <p class="start-shift-reminder">Please count and double-check the cash in the drawer before entering the amount into the system. This cash drawer amount will be used for this shift.</p>
+        <div class="row">
+          <label for="startShiftDrawerSelect">Drawer Name</label>
+          <select id="startShiftDrawerSelect" required>
+            <option value="">Select drawer</option>
+          </select>
+        </div>
+        <div id="startShiftReferenceSummary" class="shift-monitor-summary">
+          <div class="shift-summary-line">
+            <span>Selected Drawer</span>
+            <strong id="startShiftDrawerName">No drawer selected</strong>
+          </div>
+          <div class="shift-summary-line">
+            <span>Previous Cash Drawer Balance</span>
+            <strong id="startShiftPreviousBalance">PHP 0.00</strong>
+          </div>
+          <div class="shift-summary-line">
+            <span>Previous Shift Ended</span>
+            <strong id="startShiftPreviousEndedAt">No previous shift recorded</strong>
+          </div>
+        </div>
+        <div id="startShiftReferenceStatus" class="status">Verify the displayed amount against the physical cash in the drawer. Use the previous balance if it matches, or enter a separate adjustment below before starting the shift.</div>
+        <div class="row">
+          <label for="startShiftCashInput">Cash on Hand / Cash Drawer Amount (PHP)</label>
+          <input id="startShiftCashInput" type="number" min="0" step="0.01" placeholder="Enter counted cash drawer amount" />
+        </div>
+        <div class="row">
+          <label for="startShiftAdjustmentInput">Cash Adjustment (PHP)</label>
+          <input id="startShiftAdjustmentInput" type="number" step="0.01" placeholder="Enter adjustment amount if needed" />
+        </div>
+        <div id="startShiftAdjustmentStatus" class="status">Choose how to prepare the drawer amount for this shift.</div>
+        <div class="row">
+          <button id="startShiftUsePreviousBtn" class="secondary" type="button">Use Previous Balance</button>
+          <button id="startShiftApplyAdjustmentBtn" class="secondary" type="button">Apply Adjustment</button>
+          <button id="startShiftConfirmBtn" type="button">Start Shift</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cashoutSummaryModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card">
+        <div class="shift-monitor-header">
+          <h2>Cashier Sign-out Summary</h2>
+          <button id="cashoutCancelBtn" class="secondary" type="button">Cancel</button>
+        </div>
+        <p>Enter ending cash before signing out. System will compare it with expected cash balance.</p>
+        <div id="cashoutSummary" class="shift-monitor-summary">
+          <p>Loading summary...</p>
+        </div>
+        <div class="row">
+          <label for="cashoutEndingCashInput">Ending Cash Balance (PHP)</label>
+          <input id="cashoutEndingCashInput" type="number" min="0" step="0.01" placeholder="Enter ending cash amount" required />
+        </div>
+        <div id="cashoutDiscrepancyStatus" class="status">Enter ending cash to compute discrepancy.</div>
+        <div class="row">
+          <button id="cashoutSaveReportBtn" class="secondary" type="button">Save Report</button>
+          <button id="cashoutPrintReportBtn" class="secondary" type="button">Print Summary</button>
+          <button id="cashoutConfirmBtn" type="button">Confirm Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="inventoryEditModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card">
+        <div class="shift-monitor-header">
+          <h2>Edit Ingredient</h2>
+          <button id="inventoryEditCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <p>Update the ingredient details here instead of adding a duplicate ingredient record.</p>
+        <div id="inventoryEditAssignedNote" class="status">Loading ingredient details...</div>
+        <form id="inventoryEditForm" class="auth-form">
+          <label for="inventoryEditNameInput">Ingredient Name</label>
+          <input id="inventoryEditNameInput" type="text" required />
+          <label for="inventoryEditQtyInput">Qty On Hand</label>
+          <input id="inventoryEditQtyInput" type="number" min="0" step="0.001" required />
+          <label for="inventoryEditPriceInput">Unit Price (PHP)</label>
+          <input id="inventoryEditPriceInput" type="number" min="0" step="0.01" required />
+          <label for="inventoryEditUnitInput">UOM / Unit of Measure</label>
+          <input id="inventoryEditUnitInput" type="text" list="ingredientUnitSuggestions" required />
+          <p id="inventoryEditStatus" class="auth-message" aria-live="polite"></p>
+          <div class="row">
+            <button id="inventoryEditSaveBtn" type="submit">Save Ingredient</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="inventoryDeleteModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card">
+        <div class="shift-monitor-header">
+          <h2>Delete Ingredient</h2>
+          <button id="inventoryDeleteCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <p id="inventoryDeleteMessage">Delete this ingredient?</p>
+        <div id="inventoryDeleteStatus" class="status">This action is only allowed when the ingredient is not assigned to any product.</div>
+        <div class="row">
+          <button id="inventoryDeleteConfirmBtn" type="button">Delete Ingredient</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="inventoryHistoryModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card inventory-history-card">
+        <div class="shift-monitor-header">
+          <h2>Ingredient History</h2>
+          <button id="inventoryHistoryCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <div id="inventoryHistorySummary" class="status">Loading ingredient history...</div>
+        <div id="inventoryHistoryTableWrap" class="admin-transactions">
+          <p>Loading movement history...</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="cashDrawerControlModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card cash-drawer-control-card">
+        <div class="shift-monitor-header">
+          <h2>Cash Drawer Control</h2>
+          <button id="cashDrawerControlCloseBtn" class="secondary" type="button">Close</button>
+        </div>
+        <p>Administrations can create named drawers, set the first amount in each drawer, and document every deduction.</p>
+        <div id="cashDrawerAdminNote" class="status">Loading cash drawer controls...</div>
+        <form id="cashDrawerCreateForm" class="row">
+          <input id="cashDrawerNameInput" type="text" placeholder="Drawer name" required />
+          <input id="cashDrawerInitialBalanceInput" type="number" min="0.01" step="0.01" placeholder="First amount in drawer (PHP)" required />
+          <button id="cashDrawerCreateBtn" type="submit">Create Drawer</button>
+        </form>
+        <small class="cash-drawer-form-hint">First drawer amount must be greater than 0 only.</small>
+        <div id="cashDrawerSummary" class="status">Loading cash drawer summary...</div>
+        <div id="cashDrawerList" class="admin-transactions">
+          <p>Loading drawers...</p>
+        </div>
+        <div id="cashDrawerMovementsList" class="admin-transactions">
+          <p>Loading cash drawer activity...</p>
         </div>
       </div>
     </div>

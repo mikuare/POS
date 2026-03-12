@@ -13,7 +13,7 @@ try {
     const Database = require('better-sqlite3');
     const DB_FILE = process.env.POS_LOCAL_DB_FILE
       ? path.resolve(process.env.POS_LOCAL_DB_FILE)
-      : path.join(__dirname, '../../pos-local.db');
+      : path.join(__dirname, '../../../../pos-local.db');
 
     db = new Database(DB_FILE);
     db.pragma('journal_mode = WAL');
@@ -32,24 +32,6 @@ try {
 
     CREATE INDEX IF NOT EXISTS idx_sync_outbox_enqueued_at
     ON sync_outbox(enqueued_at ASC);
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS receipt_templates (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      settings_json TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_receipt_templates_active
-    ON receipt_templates(is_active DESC, updated_at DESC);
     `);
   }
 } catch (error) {

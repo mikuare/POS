@@ -9,10 +9,18 @@
   activeCategory: 'main-dish',
   orderType: null,
   cashPromptActive: false,
+  selectedDiscountProfileId: '',
   discountAmount: 0,
   productsRendered: false,
   authBusy: false,
   logoutBusy: false,
+  startShiftBusy: false,
+  appConfig: {
+    enforceKitSpec: true
+  },
+  receiptTemplates: [],
+  activeReceiptTemplate: null,
+  receiptTemplateEditorId: null,
   connectivity: {
     mode: 'checking',
     queuedOperations: 0,
@@ -29,7 +37,11 @@ const cartEl = document.getElementById('cart');
 const addToCartConfettiEl = document.getElementById('addToCartConfetti');
 const yummyOrderEmojiEl = document.getElementById('yummyOrderEmoji');
 const subtotalValueEl = document.getElementById('subtotalValue');
-const discountInputEl = document.getElementById('discountInput');
+const discountProfileSelectEl = document.getElementById('discountProfileSelect');
+const discountPreviousTotalValueEl = document.getElementById('discountPreviousTotalValue');
+const discountAppliedLabelEl = document.getElementById('discountAppliedLabel');
+const discountDeductionValueEl = document.getElementById('discountDeductionValue');
+const discountCurrentTotalValueEl = document.getElementById('discountCurrentTotalValue');
 const totalDueValueEl = document.getElementById('totalDueValue');
 const statusEl = document.getElementById('status');
 const paymentMethodEl = document.getElementById('paymentMethod');
@@ -44,8 +56,10 @@ const cashRowEl = document.getElementById('cashRow');
 const gcashInfoEl = document.getElementById('gcashInfo');
 const statusReceiptActionsEl = document.getElementById('statusReceiptActions');
 const statusPrintReceiptBtn = document.getElementById('statusPrintReceiptBtn');
+const statusHoldForVoidBtn = document.getElementById('statusHoldForVoidBtn');
 const salesSummaryEl = document.getElementById('salesSummary');
 const salesListEl = document.getElementById('salesList');
+const salesDetailedGridEl = document.getElementById('salesDetailedGrid');
 const detailDailySalesEl = document.getElementById('detailDailySales');
 const detailDailyMetaEl = document.getElementById('detailDailyMeta');
 const detailMonthlySalesEl = document.getElementById('detailMonthlySales');
@@ -56,6 +70,10 @@ const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
 const categoryTitleEl = document.getElementById('categoryTitle');
 const paymentSuccessModalEl = document.getElementById('paymentSuccessModal');
+const receiptLogoEl = document.getElementById('receiptLogo');
+const receiptStoreNameEl = document.getElementById('receiptStoreName');
+const receiptStoreAddressEl = document.getElementById('receiptStoreAddress');
+const receiptStoreTaxEl = document.getElementById('receiptStoreTax');
 const receiptRefEl = document.getElementById('receiptRef');
 const receiptDateEl = document.getElementById('receiptDate');
 const receiptOrderTypeEl = document.getElementById('receiptOrderType');
@@ -63,15 +81,25 @@ const receiptPaymentMethodEl = document.getElementById('receiptPaymentMethod');
 const receiptItemsEl = document.getElementById('receiptItems');
 const receiptSubtotalEl = document.getElementById('receiptSubtotal');
 const receiptDiscountEl = document.getElementById('receiptDiscount');
+const receiptDiscountProfileRowEl = document.getElementById('receiptDiscountProfileRow');
+const receiptDiscountProfileLabelEl = document.getElementById('receiptDiscountProfileLabel');
+const receiptDiscountProfileValueEl = document.getElementById('receiptDiscountProfileValue');
 const receiptTotalDueEl = document.getElementById('receiptTotalDue');
 const receiptAmountPaidEl = document.getElementById('receiptAmountPaid');
 const receiptChangeEl = document.getElementById('receiptChange');
+const receiptFooterEl = document.getElementById('receiptFooter');
+const receiptExtraNoteEl = document.getElementById('receiptExtraNote');
 const receiptPrintBtn = document.getElementById('receiptPrintBtn');
+const receiptHoldForVoidBtn = document.getElementById('receiptHoldForVoidBtn');
 const receiptPrintAreaEl = document.getElementById('receiptPrintArea');
 const paymentSuccessDoneBtn = document.getElementById('paymentSuccessDoneBtn');
 const receiptMinimizeBtn = document.getElementById('receiptMinimizeBtn');
 const adminReceiptModalEl = document.getElementById('adminReceiptModal');
 const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
+const adminReceiptLogoEl = document.getElementById('adminReceiptLogo');
+const adminReceiptStoreNameEl = document.getElementById('adminReceiptStoreName');
+const adminReceiptStoreAddressEl = document.getElementById('adminReceiptStoreAddress');
+const adminReceiptStoreTaxEl = document.getElementById('adminReceiptStoreTax');
 const adminReceiptRefEl = document.getElementById('adminReceiptRef');
 const adminReceiptDateEl = document.getElementById('adminReceiptDate');
 const adminReceiptOrderTypeEl = document.getElementById('adminReceiptOrderType');
@@ -79,9 +107,14 @@ const adminReceiptPaymentMethodEl = document.getElementById('adminReceiptPayment
 const adminReceiptItemsEl = document.getElementById('adminReceiptItems');
 const adminReceiptSubtotalEl = document.getElementById('adminReceiptSubtotal');
 const adminReceiptDiscountEl = document.getElementById('adminReceiptDiscount');
+const adminReceiptDiscountProfileRowEl = document.getElementById('adminReceiptDiscountProfileRow');
+const adminReceiptDiscountProfileLabelEl = document.getElementById('adminReceiptDiscountProfileLabel');
+const adminReceiptDiscountProfileValueEl = document.getElementById('adminReceiptDiscountProfileValue');
 const adminReceiptTotalDueEl = document.getElementById('adminReceiptTotalDue');
 const adminReceiptAmountPaidEl = document.getElementById('adminReceiptAmountPaid');
 const adminReceiptChangeEl = document.getElementById('adminReceiptChange');
+const adminReceiptFooterEl = document.getElementById('adminReceiptFooter');
+const adminReceiptExtraNoteEl = document.getElementById('adminReceiptExtraNote');
 const adminReceiptPrintBtn = document.getElementById('adminReceiptPrintBtn');
 const adminReceiptCloseBtn = document.getElementById('adminReceiptCloseBtn');
 const eWalletModalEl = document.getElementById('eWalletModal');
@@ -94,25 +127,46 @@ const scanQrContentEl = document.getElementById('scanQrContent');
 const scanQrFinishBtn = document.getElementById('scanQrFinishBtn');
 const scanQrCancelBtn = document.getElementById('scanQrCancelBtn');
 const authGateEl = document.getElementById('authGate');
-const showLoginBtn = document.getElementById('showLoginBtn');
-const showSignupBtn = document.getElementById('showSignupBtn');
 const loginFormEl = document.getElementById('loginForm');
-const signupFormEl = document.getElementById('signupForm');
 const loginEmailEl = document.getElementById('loginEmail');
 const loginPasswordEl = document.getElementById('loginPassword');
-const signupNameEl = document.getElementById('signupName');
-const signupEmailEl = document.getElementById('signupEmail');
-const signupRoleEl = document.getElementById('signupRole');
-const signupPasswordEl = document.getElementById('signupPassword');
 const authMessageEl = document.getElementById('authMessage');
 const authLogoVideoEl = document.getElementById('authLogoVideo');
 const authLogoCanvasEl = document.getElementById('authLogoCanvas');
 const welcomeBannerEl = document.getElementById('welcomeBanner');
+const cashOnHandBadgeEl = document.getElementById('cashOnHandBadge');
 const settingsToggleBtn = document.getElementById('settingsToggleBtn');
 const settingsMenuEl = document.getElementById('settingsMenu');
 const settingsAdminDashboardBtn = document.getElementById('settingsAdminDashboardBtn');
 const settingsEditMenuBtn = document.getElementById('settingsEditMenuBtn');
+const settingsCashDrawerBtn = document.getElementById('settingsCashDrawerBtn');
 const logoutBtn = document.getElementById('logoutBtn');
+const shiftMonitorToggleBtn = document.getElementById('shiftMonitorToggleBtn');
+const shiftMonitorModalEl = document.getElementById('shiftMonitorModal');
+const shiftMonitorCloseBtn = document.getElementById('shiftMonitorCloseBtn');
+const shiftMonitorRefreshBtn = document.getElementById('shiftMonitorRefreshBtn');
+const shiftMonitorSummaryEl = document.getElementById('shiftMonitorSummary');
+const startShiftModalEl = document.getElementById('startShiftModal');
+const startShiftDrawerSelectEl = document.getElementById('startShiftDrawerSelect');
+const startShiftDrawerNameEl = document.getElementById('startShiftDrawerName');
+const startShiftPreviousBalanceEl = document.getElementById('startShiftPreviousBalance');
+const startShiftPreviousEndedAtEl = document.getElementById('startShiftPreviousEndedAt');
+const startShiftReferenceStatusEl = document.getElementById('startShiftReferenceStatus');
+const startShiftCashInputEl = document.getElementById('startShiftCashInput');
+const startShiftAdjustmentInputEl = document.getElementById('startShiftAdjustmentInput');
+const startShiftAdjustmentStatusEl = document.getElementById('startShiftAdjustmentStatus');
+const startShiftUsePreviousBtn = document.getElementById('startShiftUsePreviousBtn');
+const startShiftApplyAdjustmentBtn = document.getElementById('startShiftApplyAdjustmentBtn');
+const startShiftConfirmBtn = document.getElementById('startShiftConfirmBtn');
+const startShiftSignOutBtn = document.getElementById('startShiftSignOutBtn');
+const cashoutSummaryModalEl = document.getElementById('cashoutSummaryModal');
+const cashoutSummaryEl = document.getElementById('cashoutSummary');
+const cashoutEndingCashInputEl = document.getElementById('cashoutEndingCashInput');
+const cashoutDiscrepancyStatusEl = document.getElementById('cashoutDiscrepancyStatus');
+const cashoutSaveReportBtn = document.getElementById('cashoutSaveReportBtn');
+const cashoutPrintReportBtn = document.getElementById('cashoutPrintReportBtn');
+const cashoutConfirmBtn = document.getElementById('cashoutConfirmBtn');
+const cashoutCancelBtn = document.getElementById('cashoutCancelBtn');
 const phDateTimeEl = document.getElementById('phDateTime');
 const welcomeRoleIconEl = document.getElementById('welcomeRoleIcon');
 const welcomeTextEl = document.getElementById('welcomeText');
@@ -137,6 +191,7 @@ const adminRangeEl = document.getElementById('adminRange');
 const adminRefreshBtn = document.getElementById('adminRefreshBtn');
 const adminVerifyAllBtn = document.getElementById('adminVerifyAllBtn');
 const adminTransactionsEl = document.getElementById('adminTransactions');
+const adminStatsEl = document.getElementById('adminStats');
 const statTotalEl = document.getElementById('statTotal');
 const statPaidEl = document.getElementById('statPaid');
 const statPendingEl = document.getElementById('statPending');
@@ -153,18 +208,179 @@ const adminCloseBtn = document.getElementById('adminCloseBtn');
 const adminNavOverviewBtn = document.getElementById('adminNavOverviewBtn');
 const adminNavInventoryBtn = document.getElementById('adminNavInventoryBtn');
 const adminNavKitSpecBtn = document.getElementById('adminNavKitSpecBtn');
+const adminNavUsersBtn = document.getElementById('adminNavUsersBtn');
+const adminNavOperationsBtn = document.getElementById('adminNavOperationsBtn');
+const adminNavReceiptTemplatesBtn = document.getElementById('adminNavReceiptTemplatesBtn');
+const adminNavReportsBtn = document.getElementById('adminNavReportsBtn');
+const adminNavOthersBtn = document.getElementById('adminNavOthersBtn');
 const adminPanelOverviewEl = document.getElementById('adminPanelOverview');
 const adminPanelInventoryEl = document.getElementById('adminPanelInventory');
 const adminPanelKitSpecEl = document.getElementById('adminPanelKitSpec');
+const adminPanelUsersEl = document.getElementById('adminPanelUsers');
+const adminPanelOperationsEl = document.getElementById('adminPanelOperations');
+const adminPanelReceiptTemplatesEl = document.getElementById('adminPanelReceiptTemplates');
+const adminPanelReportsEl = document.getElementById('adminPanelReports');
+const adminPanelOthersEl = document.getElementById('adminPanelOthers');
+const adminUsersSummaryEl = document.getElementById('adminUsersSummary');
+const adminUsersListEl = document.getElementById('adminUsersList');
+const adminCreateUserNoteEl = document.getElementById('adminCreateUserNote');
+const adminCreateUserFormEl = document.getElementById('adminCreateUserForm');
+const adminCreateUserNameEl = document.getElementById('adminCreateUserName');
+const adminCreateUserEmailEl = document.getElementById('adminCreateUserEmail');
+const adminCreateUserPasswordEl = document.getElementById('adminCreateUserPassword');
+const adminCreateUserRoleEl = document.getElementById('adminCreateUserRole');
+const adminCreateUserBtnEl = document.getElementById('adminCreateUserBtn');
+const cashierMonitoringRefreshBtn = document.getElementById('cashierMonitoringRefreshBtn');
+const cashierMonitoringListEl = document.getElementById('cashierMonitoringList');
+const cashDrawerControlModalEl = document.getElementById('cashDrawerControlModal');
+const cashDrawerControlCloseBtnEl = document.getElementById('cashDrawerControlCloseBtn');
+const cashDrawerAdminNoteEl = document.getElementById('cashDrawerAdminNote');
+const cashDrawerCreateFormEl = document.getElementById('cashDrawerCreateForm');
+const cashDrawerNameInputEl = document.getElementById('cashDrawerNameInput');
+const cashDrawerInitialBalanceInputEl = document.getElementById('cashDrawerInitialBalanceInput');
+const cashDrawerCreateBtnEl = document.getElementById('cashDrawerCreateBtn');
+const cashDrawerSummaryEl = document.getElementById('cashDrawerSummary');
+const cashDrawerListEl = document.getElementById('cashDrawerList');
+const cashDrawerMovementsListEl = document.getElementById('cashDrawerMovementsList');
+const shiftManagementRefreshBtn = document.getElementById('shiftManagementRefreshBtn');
+const shiftManagementSummaryEl = document.getElementById('shiftManagementSummary');
+const shiftManagementListEl = document.getElementById('shiftManagementList');
+const discrepancyRefreshBtn = document.getElementById('discrepancyRefreshBtn');
+const discrepancySummaryEl = document.getElementById('discrepancySummary');
+const discrepancyAlertsListEl = document.getElementById('discrepancyAlertsList');
+const receiptTemplatesStatusEl = document.getElementById('receiptTemplatesStatus');
+const receiptTemplateAdminNoteEl = document.getElementById('receiptTemplateAdminNote');
+const receiptTemplateFormEl = document.getElementById('receiptTemplateForm');
+const receiptTemplateNameInputEl = document.getElementById('receiptTemplateNameInput');
+const receiptTemplateStoreNameInputEl = document.getElementById('receiptTemplateStoreNameInput');
+const receiptTemplateStoreAddressInputEl = document.getElementById('receiptTemplateStoreAddressInput');
+const receiptTemplateTaxLineInputEl = document.getElementById('receiptTemplateTaxLineInput');
+const receiptTemplateShowDiscountProfileInputEl = document.getElementById('receiptTemplateShowDiscountProfileInput');
+const receiptTemplateDiscountProfileLabelInputEl = document.getElementById('receiptTemplateDiscountProfileLabelInput');
+const receiptTemplateFooterMessageInputEl = document.getElementById('receiptTemplateFooterMessageInput');
+const receiptTemplateExtraMessageInputEl = document.getElementById('receiptTemplateExtraMessageInput');
+const receiptTemplateExtraMessageAlignSelectEl = document.getElementById('receiptTemplateExtraMessageAlignSelect');
+const receiptTemplateExtraMessageStyleSelectEl = document.getElementById('receiptTemplateExtraMessageStyleSelect');
+const receiptTemplateExtraMessageOffsetXInputEl = document.getElementById('receiptTemplateExtraMessageOffsetXInput');
+const receiptTemplateExtraMessageOffsetYInputEl = document.getElementById('receiptTemplateExtraMessageOffsetYInput');
+const receiptTemplateMetaOffsetXInputEl = document.getElementById('receiptTemplateMetaOffsetXInput');
+const receiptTemplateMetaOffsetYInputEl = document.getElementById('receiptTemplateMetaOffsetYInput');
+const receiptTemplateItemsOffsetXInputEl = document.getElementById('receiptTemplateItemsOffsetXInput');
+const receiptTemplateItemsOffsetYInputEl = document.getElementById('receiptTemplateItemsOffsetYInput');
+const receiptTemplateTotalsOffsetXInputEl = document.getElementById('receiptTemplateTotalsOffsetXInput');
+const receiptTemplateTotalsOffsetYInputEl = document.getElementById('receiptTemplateTotalsOffsetYInput');
+const receiptTemplateLogoUrlInputEl = document.getElementById('receiptTemplateLogoUrlInput');
+const receiptTemplateLogoFileInputEl = document.getElementById('receiptTemplateLogoFileInput');
+const receiptTemplateLogoStorageNoteEl = document.getElementById('receiptTemplateLogoStorageNote');
+const receiptTemplateShowLogoInputEl = document.getElementById('receiptTemplateShowLogoInput');
+const receiptTemplateFontFamilySelectEl = document.getElementById('receiptTemplateFontFamilySelect');
+const receiptTemplateHeaderAlignSelectEl = document.getElementById('receiptTemplateHeaderAlignSelect');
+const receiptTemplateHeaderOffsetXInputEl = document.getElementById('receiptTemplateHeaderOffsetXInput');
+const receiptTemplateHeaderOffsetYInputEl = document.getElementById('receiptTemplateHeaderOffsetYInput');
+const receiptTemplateHeaderTopPaddingInputEl = document.getElementById('receiptTemplateHeaderTopPaddingInput');
+const receiptTemplateFooterAlignSelectEl = document.getElementById('receiptTemplateFooterAlignSelect');
+const receiptTemplateFooterOffsetXInputEl = document.getElementById('receiptTemplateFooterOffsetXInput');
+const receiptTemplateFooterOffsetYInputEl = document.getElementById('receiptTemplateFooterOffsetYInput');
+const receiptTemplateFooterFontSizeInputEl = document.getElementById('receiptTemplateFooterFontSizeInput');
+const receiptTemplateFooterTopSpacingInputEl = document.getElementById('receiptTemplateFooterTopSpacingInput');
+const receiptTemplatePaperWidthInputEl = document.getElementById('receiptTemplatePaperWidthInput');
+const receiptTemplatePaddingInputEl = document.getElementById('receiptTemplatePaddingInput');
+const receiptTemplateBorderRadiusInputEl = document.getElementById('receiptTemplateBorderRadiusInput');
+const receiptTemplateSectionGapInputEl = document.getElementById('receiptTemplateSectionGapInput');
+const receiptTemplateBaseFontSizeInputEl = document.getElementById('receiptTemplateBaseFontSizeInput');
+const receiptTemplateTitleFontSizeInputEl = document.getElementById('receiptTemplateTitleFontSizeInput');
+const receiptTemplateMetaFontSizeInputEl = document.getElementById('receiptTemplateMetaFontSizeInput');
+const receiptTemplateTotalFontSizeInputEl = document.getElementById('receiptTemplateTotalFontSizeInput');
+const receiptTemplateLogoWidthInputEl = document.getElementById('receiptTemplateLogoWidthInput');
+const receiptTemplateBorderStyleSelectEl = document.getElementById('receiptTemplateBorderStyleSelect');
+const receiptTemplateDividerStyleSelectEl = document.getElementById('receiptTemplateDividerStyleSelect');
+const receiptTemplateTextColorInputEl = document.getElementById('receiptTemplateTextColorInput');
+const receiptTemplateAccentColorInputEl = document.getElementById('receiptTemplateAccentColorInput');
+const receiptTemplateMutedColorInputEl = document.getElementById('receiptTemplateMutedColorInput');
+const receiptTemplateBackgroundColorInputEl = document.getElementById('receiptTemplateBackgroundColorInput');
+const receiptTemplateBorderColorInputEl = document.getElementById('receiptTemplateBorderColorInput');
+const receiptTemplateSaveNewBtnEl = document.getElementById('receiptTemplateSaveNewBtn');
+const receiptTemplateUpdateBtnEl = document.getElementById('receiptTemplateUpdateBtn');
+const receiptTemplateLogoClearBtnEl = document.getElementById('receiptTemplateLogoClearBtn');
+const receiptTemplateResetBtnEl = document.getElementById('receiptTemplateResetBtn');
+const receiptTemplateActivateBtnEl = document.getElementById('receiptTemplateActivateBtn');
+const receiptTemplatePreviewAreaEl = document.getElementById('receiptTemplatePreviewArea');
+const receiptTemplateListEl = document.getElementById('receiptTemplateList');
+const salesOpsSummaryEl = document.getElementById('salesOpsSummary');
+const hourlySalesGraphEl = document.getElementById('hourlySalesGraph');
+const monthlyClosingMonthInputEl = document.getElementById('monthlyClosingMonthInput');
+const monthlyClosingRefreshBtnEl = document.getElementById('monthlyClosingRefreshBtn');
+const monthlyExpenseFormEl = document.getElementById('monthlyExpenseForm');
+const monthlyExpenseDateInputEl = document.getElementById('monthlyExpenseDateInput');
+const monthlyExpenseCategoryInputEl = document.getElementById('monthlyExpenseCategoryInput');
+const monthlyExpenseDescriptionInputEl = document.getElementById('monthlyExpenseDescriptionInput');
+const monthlyExpenseAmountInputEl = document.getElementById('monthlyExpenseAmountInput');
+const monthlyExpenseNoteInputEl = document.getElementById('monthlyExpenseNoteInput');
+const monthlyExpenseSaveBtnEl = document.getElementById('monthlyExpenseSaveBtn');
+const discountConfigAdminNoteEl = document.getElementById('discountConfigAdminNote');
+const discountProfileFormEl = document.getElementById('discountProfileForm');
+const discountProfileNameInputEl = document.getElementById('discountProfileNameInput');
+const discountProfileTypeInputEl = document.getElementById('discountProfileTypeInput');
+const discountProfilePercentInputEl = document.getElementById('discountProfilePercentInput');
+const discountProfilesListEl = document.getElementById('discountProfilesList');
+const monthlyClosingAdminNoteEl = document.getElementById('monthlyClosingAdminNote');
+const monthlyClosingSummaryEl = document.getElementById('monthlyClosingSummary');
+const monthlyExpenseListEl = document.getElementById('monthlyExpenseList');
+const reportDailySalesBtn = document.getElementById('reportDailySalesBtn');
+const reportMonthlyClosingBtn = document.getElementById('reportMonthlyClosingBtn');
+const reportShiftBtn = document.getElementById('reportShiftBtn');
+const reportTransactionsBtn = document.getElementById('reportTransactionsBtn');
+const reportProductsBtn = document.getElementById('reportProductsBtn');
+const reportDiscrepancyBtn = document.getElementById('reportDiscrepancyBtn');
+const reportDownloadBtn = document.getElementById('reportDownloadBtn');
+const reportPrintBtn = document.getElementById('reportPrintBtn');
+const reportsStatusEl = document.getElementById('reportsStatus');
+const reportsPreviewEl = document.getElementById('reportsPreview');
 const inventoryIngredientFormEl = document.getElementById('inventoryIngredientForm');
 const ingredientNameInputEl = document.getElementById('ingredientNameInput');
 const ingredientQtyInputEl = document.getElementById('ingredientQtyInput');
 const ingredientPriceInputEl = document.getElementById('ingredientPriceInput');
 const ingredientUnitInputEl = document.getElementById('ingredientUnitInput');
+const ingredientUnitSuggestionsEl = document.getElementById('ingredientUnitSuggestions');
 const ingredientAddBtn = document.getElementById('ingredientAddBtn');
+const inventoryBulkToggleBtnEl = document.getElementById('inventoryBulkToggleBtn');
 const inventoryAdminNoteEl = document.getElementById('inventoryAdminNote');
 const inventorySummaryEl = document.getElementById('inventorySummary');
+const inventoryBulkEditorEl = document.getElementById('inventoryBulkEditor');
+const inventoryAlertsWrapEl = document.getElementById('inventoryAlertsWrap');
 const inventoryTableWrapEl = document.getElementById('inventoryTableWrap');
+const inventoryEditModalEl = document.getElementById('inventoryEditModal');
+const inventoryEditCloseBtnEl = document.getElementById('inventoryEditCloseBtn');
+const inventoryEditFormEl = document.getElementById('inventoryEditForm');
+const inventoryEditAssignedNoteEl = document.getElementById('inventoryEditAssignedNote');
+const inventoryEditNameInputEl = document.getElementById('inventoryEditNameInput');
+const inventoryEditQtyInputEl = document.getElementById('inventoryEditQtyInput');
+const inventoryEditPriceInputEl = document.getElementById('inventoryEditPriceInput');
+const inventoryEditUnitInputEl = document.getElementById('inventoryEditUnitInput');
+const inventoryEditStatusEl = document.getElementById('inventoryEditStatus');
+const inventoryEditSaveBtnEl = document.getElementById('inventoryEditSaveBtn');
+const inventoryDeleteModalEl = document.getElementById('inventoryDeleteModal');
+const inventoryDeleteCloseBtnEl = document.getElementById('inventoryDeleteCloseBtn');
+const inventoryDeleteMessageEl = document.getElementById('inventoryDeleteMessage');
+const inventoryDeleteStatusEl = document.getElementById('inventoryDeleteStatus');
+const inventoryDeleteConfirmBtnEl = document.getElementById('inventoryDeleteConfirmBtn');
+const inventoryHistoryModalEl = document.getElementById('inventoryHistoryModal');
+const inventoryHistoryCloseBtnEl = document.getElementById('inventoryHistoryCloseBtn');
+const inventoryHistorySummaryEl = document.getElementById('inventoryHistorySummary');
+const inventoryHistoryTableWrapEl = document.getElementById('inventoryHistoryTableWrap');
+const kitSpecNoteEl = document.getElementById('kitSpecNote');
+const kitSpecCategorySelectEl = document.getElementById('kitSpecCategorySelect');
+const kitSpecProductSelectEl = document.getElementById('kitSpecProductSelect');
+const kitSpecControlBarEl = document.getElementById('kitSpecControlBar');
+const kitSpecAddRowBtnEl = document.getElementById('kitSpecAddRowBtn');
+const kitSpecSaveBtnEl = document.getElementById('kitSpecSaveBtn');
+const kitSpecEditorEl = document.getElementById('kitSpecEditor');
+const kitSpecSummaryEl = document.getElementById('kitSpecSummary');
+const kitSpecModuleEl = document.getElementById('kitSpecModule');
+const kitSpecModeControlEl = document.getElementById('kitSpecModeControl');
+const kitSpecModeLabelEl = document.getElementById('kitSpecModeLabel');
+const kitSpecModeHintEl = document.getElementById('kitSpecModeHint');
+const kitSpecModeToggleBtnEl = document.getElementById('kitSpecModeToggleBtn');
 const categoryButtonsEl = document.getElementById('categoryButtons');
 const menuEditorModalEl = document.getElementById('menuEditorModal');
 const menuEditorCloseBtn = document.getElementById('menuEditorCloseBtn');
@@ -208,6 +424,22 @@ let connectivityPoller = null;
 let syncTriggerBusy = false;
 let menuEditorWarmReady = false;
 let menuEditorWarmInFlight = false;
+let cashierShiftState = null;
+let latestShiftSummary = null;
+let startShiftContext = null;
+let latestAdminReport = null;
+let latestInventoryReportData = null;
+let activeInventoryView = 'ingredients';
+let inventoryBulkEditorOpen = false;
+let kitSpecIngredients = [];
+let kitSpecRecipes = [];
+let kitSpecDraftRows = [];
+let kitSpecCoverageFilter = 'all-products';
+let inventoryEditContext = null;
+let inventoryDeleteContext = null;
+let inventoryHistoryContext = null;
+let latestSalesOpsDashboard = null;
+let latestAdminOverview = null;
 const BOOTSTRAP_CATALOG_FALLBACK = {
   categories: [
     { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
@@ -572,6 +804,59 @@ function formatDate(isoString) {
   });
 }
 
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthlyClosingSelectedMonth() {
+  return String(monthlyClosingMonthInputEl?.value || getCurrentMonthValue()).trim();
+}
+
+function formatMonthLabel(monthValue) {
+  const [year, month] = String(monthValue || '').split('-').map((part) => Number(part));
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return monthValue || 'Selected Month';
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long'
+  });
+}
+
+function toClientProduct(product) {
+  const availabilityStatus = String(product?.availabilityStatus || 'available').trim().toLowerCase() || 'available';
+  const isAvailable = product?.isAvailable !== undefined ? Boolean(product.isAvailable) : availabilityStatus === 'available';
+  return {
+    id: product?.id,
+    name: product?.name,
+    price: Number(product?.price || 0),
+    category: String(product?.category || '').trim().toLowerCase(),
+    image: product?.image || '/Business Logo/Ruels Logo for business.png',
+    hasKitSpec: product?.hasKitSpec !== undefined ? Boolean(product.hasKitSpec) : true,
+    isAvailable,
+    availabilityStatus,
+    availabilityLabel: String(product?.availabilityLabel || (isAvailable ? 'Available' : 'Unavailable')).trim(),
+    availabilityReason: String(product?.availabilityReason || '').trim(),
+    availableUnits: Number(product?.availableUnits || 0)
+  };
+}
+
+function getProductAvailabilityClass(product) {
+  const status = String(product?.availabilityStatus || 'available').trim().toLowerCase();
+  if (status === 'no-kit-spec') return 'needs-kit-spec';
+  if (status === 'kit-spec-issue') return 'kit-spec-issue';
+  if (status === 'out-of-stock') return 'out-of-stock';
+  return 'available';
+}
+
+function getProductDisabledButtonLabel(product) {
+  const status = String(product?.availabilityStatus || '').trim().toLowerCase();
+  if (status === 'no-kit-spec') return 'Kit Spec Required';
+  if (status === 'kit-spec-issue') return 'Review Kit Spec';
+  if (status === 'out-of-stock') return 'Out of Stock';
+  return 'Unavailable';
+}
+
 function getCartItems() {
   return Object.entries(state.cart)
     .filter(([, qty]) => qty > 0)
@@ -588,9 +873,13 @@ function getCartTotal() {
 
 function getDiscountAmount() {
   const subtotal = getCartTotal();
-  const discount = Number(state.discountAmount || 0);
-  if (!Number.isFinite(discount) || discount <= 0) return 0;
-  return Math.min(discount, subtotal);
+  const profile = getSelectedDiscountProfile();
+  const amount = Number(profile?.amount || 0);
+  if (!Number.isFinite(amount) || amount <= 0 || subtotal <= 0) return 0;
+  if (String(profile?.type || '').trim().toLowerCase() === 'fixed') {
+    return Math.min(subtotal, amount);
+  }
+  return Math.min(subtotal, subtotal * (amount / 100));
 }
 
 function getTotalDue() {
@@ -658,6 +947,7 @@ function toOfflineInvoiceViewModel({ sale, invoiceId, reference, createdAt, paid
     paymentMethod: 'cash',
     subtotal,
     discount,
+    discountProfile: normalizeInvoiceDiscountProfile(sale?.discountProfile),
     total,
     lineItems,
     payment: {
@@ -763,6 +1053,8 @@ async function queueOfflineCashSale({ items, amountTendered, discountAmount, ord
   const invoiceId = (window.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.floor(Math.random() * 1000000)}`);
   const reference = createClientInvoiceReference(invoiceId);
   const saleBreakdown = computeOfflineSaleBreakdown({ items, discountAmount });
+  const cashierContext = getCashierInvoiceContext();
+  const discountProfile = normalizeInvoiceDiscountProfile(getSelectedDiscountProfile());
   const payload = {
     operationId: `cash-sale-${invoiceId}`,
     invoiceId,
@@ -776,7 +1068,12 @@ async function queueOfflineCashSale({ items, amountTendered, discountAmount, ord
     totalAmount: Number(saleBreakdown.total || 0),
     amountTendered: Number(amountTendered || 0),
     discountAmount: Number(discountAmount || 0),
-    orderType: String(orderType || 'dine-in')
+    discountProfile,
+    orderType: String(orderType || 'dine-in'),
+    cashierUserId: cashierContext.cashierUserId || null,
+    cashierEmail: cashierContext.cashierEmail || null,
+    cashierName: cashierContext.cashierName || null,
+    cashierRole: cashierContext.cashierRole || null
   };
   await offlineOutbox.enqueueCashSale(payload);
   const paidAt = new Date().toISOString();
@@ -806,9 +1103,14 @@ async function syncClientOfflineOutbox() {
           items: Array.isArray(sale.items) ? sale.items : [],
           paymentMethod: 'cash',
           discountAmount: Number(sale.discountAmount || 0),
+          discountProfile: sale.discountProfile || null,
           orderType: String(sale.orderType || 'dine-in'),
           clientInvoiceId: sale.invoiceId,
-          clientReference: sale.reference
+          clientReference: sale.reference,
+          cashierUserId: sale.cashierUserId || activeAuthSession?.userId || null,
+          cashierEmail: sale.cashierEmail || normalizeEmail(activeAuthSession?.email),
+          cashierName: sale.cashierName || activeAuthSession?.name || null,
+          cashierRole: sale.cashierRole || normalizeRoleChoice(activeAuthSession?.role)
         })
       });
 
@@ -842,6 +1144,794 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function isValidEmail(value) {
+  const email = normalizeEmail(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normalizeRoleChoice(value) {
+  const role = String(value || '').trim().toLowerCase();
+  if (role === 'administrations' || role === 'supervisor' || role === 'encharge') {
+    return role;
+  }
+  return 'encharge';
+}
+
+function isCashierRole(role) {
+  return normalizeRoleChoice(role) === 'encharge';
+}
+
+function isDrawerOperatorRole(role) {
+  const normalizedRole = normalizeRoleChoice(role);
+  return normalizedRole === 'administrations'
+    || normalizedRole === 'supervisor'
+    || normalizedRole === 'encharge';
+}
+
+function canViewShiftMonitorOnPos(role) {
+  return isCashierRole(role);
+}
+
+function parseNonNegativeAmount(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return Math.round(amount * 100) / 100;
+}
+
+function getShiftReferenceBalance(shiftLike) {
+  if (!shiftLike || typeof shiftLike !== 'object') return null;
+  const endingCash = parseNonNegativeAmount(shiftLike.endingCash);
+  if (endingCash !== null) return endingCash;
+  const expectedCash = parseNonNegativeAmount(shiftLike.expectedCash);
+  if (expectedCash !== null) return expectedCash;
+  return parseNonNegativeAmount(shiftLike.startingCash);
+}
+
+function readPersistedCashierShiftState() {
+  const rawShift = readUserUiState()?.cashierShiftState;
+  if (!rawShift || typeof rawShift !== 'object') return null;
+  const startingCash = parseNonNegativeAmount(rawShift.startingCash);
+  if (startingCash === null) return null;
+  const previousDrawerBalance = parseNonNegativeAmount(rawShift.previousDrawerBalance);
+  const openingAdjustment = Number(rawShift.openingAdjustment || 0);
+  return {
+    shiftId: String(rawShift.shiftId || '').trim() || null,
+    drawerId: String(rawShift.drawerId || '').trim() || null,
+    drawerName: String(rawShift.drawerName || '').trim() || null,
+    startedAt: String(rawShift.startedAt || new Date().toISOString()),
+    startingCash,
+    previousDrawerBalance,
+    openingAdjustment: Number.isFinite(openingAdjustment) ? Math.round(openingAdjustment * 100) / 100 : 0
+  };
+}
+
+function persistCashierShiftState(nextState, { resetSummary = true } = {}) {
+  cashierShiftState = nextState || null;
+  if (resetSummary) {
+    latestShiftSummary = null;
+  }
+  if (activeAuthSession?.email) {
+    saveUserUiState({ cashierShiftState: cashierShiftState });
+  }
+  updateCashOnHandBadge();
+}
+
+function clearCashierShiftState() {
+  if (activeAuthSession?.email) {
+    saveUserUiState({ cashierShiftState: null });
+  }
+  cashierShiftState = null;
+  latestShiftSummary = null;
+  updateCashOnHandBadge();
+}
+
+function hydrateCashierShiftState() {
+  if (!activeAuthSession?.email || !isDrawerOperatorRole(activeAuthSession?.role)) {
+    cashierShiftState = null;
+    latestShiftSummary = null;
+    updateCashOnHandBadge();
+    return;
+  }
+  cashierShiftState = readPersistedCashierShiftState();
+  latestShiftSummary = null;
+  updateCashOnHandBadge();
+}
+
+function hasActiveCashierShift() {
+  return Boolean(isDrawerOperatorRole(activeAuthSession?.role) && cashierShiftState?.startedAt);
+}
+
+function needsCashierShiftStart() {
+  return Boolean(isDrawerOperatorRole(activeAuthSession?.role) && activeAuthSession?.email && !hasActiveCashierShift());
+}
+
+function updateShiftMonitorVisibility() {
+  if (shiftMonitorToggleBtn) {
+    shiftMonitorToggleBtn.style.display = (activeAuthSession?.email && canViewShiftMonitorOnPos(activeAuthSession?.role)) ? 'inline-flex' : 'none';
+  }
+  updateCashOnHandBadge();
+}
+
+function updateCashOnHandBadge() {
+  if (!cashOnHandBadgeEl) return;
+  if (!activeAuthSession?.email || !isDrawerOperatorRole(activeAuthSession?.role) || !cashierShiftState) {
+    cashOnHandBadgeEl.style.display = 'none';
+    return;
+  }
+
+  const expectedCash = parseNonNegativeAmount(latestShiftSummary?.expectedCashBalance);
+  const displayedAmount = expectedCash === null
+    ? Number(cashierShiftState.startingCash || 0)
+    : expectedCash;
+  const drawerLabel = String(cashierShiftState?.drawerName || '').trim();
+  const label = expectedCash === null ? 'Cash On Hand (Start)' : 'Cash On Hand';
+  cashOnHandBadgeEl.textContent = `${drawerLabel ? `${drawerLabel} | ` : ''}${label}: ${money(displayedAmount)}`;
+  cashOnHandBadgeEl.style.display = 'inline-flex';
+}
+
+function toShiftSummaryView(summary, shift = null) {
+  if (!summary) return null;
+  const startingCash = Number(summary.startingCash ?? shift?.startingCash ?? 0);
+  const cashPayments = Number(summary.cashPayments ?? summary.cashSales ?? 0);
+  const cashTendered = Number(summary.cashTendered ?? shift?.cashTendered ?? cashPayments);
+  const changeGiven = Number(summary.changeGiven ?? shift?.changeGiven ?? Math.max(0, cashTendered - cashPayments));
+  const netCashRetained = Number(summary.netCashRetained ?? shift?.netCashRetained ?? (cashTendered - changeGiven));
+  const cashWithdrawals = Number(summary.cashWithdrawals ?? shift?.cashWithdrawals ?? 0);
+  const otherPayments = Number(summary.otherPayments ?? summary.digitalSales ?? 0);
+  const totalSales = Number(summary.totalSales ?? 0);
+  const holdForVoidCashAmount = Number(summary.holdForVoidCashAmount || 0);
+  const voidedCashAmount = Number(summary.voidedCashAmount || 0);
+  const expectedCashBalance = Number(summary.expectedCashBalance ?? (startingCash + cashPayments + holdForVoidCashAmount - cashWithdrawals));
+  return {
+    shiftId: String(summary.shiftId || shift?.id || '').trim() || null,
+    drawerId: String(summary.drawerId || shift?.drawerId || '').trim() || null,
+    drawerName: String(summary.drawerName || shift?.drawerName || '').trim() || null,
+    startedAt: String(summary.startedAt || shift?.shiftStartAt || new Date().toISOString()),
+    endedAt: String(summary.endedAt || shift?.shiftEndAt || '').trim() || null,
+    startingCash,
+    totalSales,
+    totalTransactions: Number(summary.totalTransactions || 0),
+    cashPayments,
+    cashTendered,
+    changeGiven,
+    netCashRetained,
+    cashWithdrawals,
+    otherPayments,
+    holdForVoidCount: Number(summary.holdForVoidCount || 0),
+    holdForVoidAmount: Number(summary.holdForVoidAmount || 0),
+    holdForVoidCashAmount,
+    voidedCount: Number(summary.voidedCount || 0),
+    voidedAmount: Number(summary.voidedAmount || 0),
+    voidedCashAmount,
+    paymentMethods: summary.paymentMethods || {},
+    expectedCashBalance,
+    endingCash: summary.endingCash === undefined || summary.endingCash === null ? null : Number(summary.endingCash),
+    discrepancy: summary.discrepancy === undefined || summary.discrepancy === null ? null : Number(summary.discrepancy)
+  };
+}
+
+async function ensureCashierShiftStarted({
+  drawerId = null,
+  startingCash,
+  previousShiftId = null,
+  previousDrawerBalance = null,
+  openingAdjustment = null
+} = {}) {
+  if (!activeAuthSession?.email || !isDrawerOperatorRole(activeAuthSession?.role)) return null;
+
+  const parsedStartingCash = parseNonNegativeAmount(startingCash);
+  if (parsedStartingCash === null) {
+    throw new Error('Cash on Hand is required before starting sales.');
+  }
+  const parsedPreviousDrawerBalance = parseNonNegativeAmount(previousDrawerBalance);
+  const parsedOpeningAdjustment = openingAdjustment === null || openingAdjustment === undefined || openingAdjustment === ''
+    ? null
+    : Math.round(Number(openingAdjustment) * 100) / 100;
+  if (parsedOpeningAdjustment !== null && !Number.isFinite(parsedOpeningAdjustment)) {
+    throw new Error('Opening adjustment must be a valid amount.');
+  }
+  const safeDrawerId = String(drawerId || '').trim();
+  if (!safeDrawerId) {
+    throw new Error('Drawer name is required before starting sales.');
+  }
+
+  const { shift } = await api('/api/shifts/start', {
+    method: 'POST',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({
+      drawerId: safeDrawerId,
+      cashierUserId: activeAuthSession.userId || null,
+      cashierEmail: activeAuthSession.email,
+      cashierName: activeAuthSession.name || 'Cashier',
+      cashierRole: normalizeRoleChoice(activeAuthSession.role),
+      startingCash: parsedStartingCash,
+      previousShiftId: String(previousShiftId || '').trim() || null,
+      previousDrawerBalance: parsedPreviousDrawerBalance,
+      openingAdjustment: parsedOpeningAdjustment
+    })
+  });
+
+  const nextShiftState = {
+    shiftId: String(shift?.id || '').trim() || null,
+    drawerId: String(shift?.drawerId || safeDrawerId).trim() || null,
+    drawerName: String(shift?.drawerName || startShiftContext?.drawerName || '').trim() || null,
+    startedAt: String(shift?.shiftStartAt || new Date().toISOString()),
+    startingCash: Number(shift?.startingCash ?? parsedStartingCash),
+    previousDrawerBalance: parseNonNegativeAmount(shift?.previousDrawerBalance ?? parsedPreviousDrawerBalance),
+    openingAdjustment: Number(shift?.openingAdjustment ?? (parsedOpeningAdjustment ?? 0))
+  };
+  persistCashierShiftState(nextShiftState);
+  return shift;
+}
+
+function normalizePaymentMethod(method) {
+  return String(method || '').trim().toLowerCase() || 'other';
+}
+
+function buildShiftSummary(transactions = [], {
+  drawerId = null,
+  drawerName = null,
+  startingCash = 0,
+  startedAt = null
+} = {}) {
+  const paidTransactions = (Array.isArray(transactions) ? transactions : [])
+    .filter((t) => String(t?.status || '').toUpperCase() === 'PAID');
+
+  let totalSales = 0;
+  let cashPayments = 0;
+  let cashTendered = 0;
+  let changeGiven = 0;
+  let otherPayments = 0;
+  const paymentMethods = {};
+
+  paidTransactions.forEach((txn) => {
+    const amount = Number(txn?.total ?? 0);
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    const method = normalizePaymentMethod(txn?.paymentMethod || txn?.payment?.method);
+
+    totalSales += safeAmount;
+    paymentMethods[method] = (paymentMethods[method] || 0) + safeAmount;
+    if (method === 'cash') {
+      cashPayments += safeAmount;
+      const tendered = Number(txn?.payment?.amountPaid ?? safeAmount);
+      const change = Number(txn?.payment?.change ?? 0);
+      cashTendered += Number.isFinite(tendered) ? tendered : safeAmount;
+      changeGiven += Number.isFinite(change) ? Math.max(0, change) : 0;
+    }
+    else otherPayments += safeAmount;
+  });
+
+  return {
+    drawerId: String(drawerId || '').trim() || null,
+    drawerName: String(drawerName || '').trim() || null,
+    startedAt,
+    startingCash: Number(startingCash || 0),
+    totalSales,
+    totalTransactions: paidTransactions.length,
+    cashPayments,
+    cashTendered,
+    changeGiven,
+    netCashRetained: cashTendered - changeGiven,
+    otherPayments,
+    paymentMethods,
+    expectedCashBalance: Number(startingCash || 0) + cashPayments
+  };
+}
+
+async function refreshLatestShiftSummary() {
+  if (cashierShiftState?.shiftId) {
+    try {
+      const { shift, summary } = await api(`/api/shifts/${encodeURIComponent(cashierShiftState.shiftId)}/summary`, {
+        headers: buildActorHeaders()
+      });
+      latestShiftSummary = toShiftSummaryView(summary, shift);
+      persistCashierShiftState({
+        shiftId: latestShiftSummary?.shiftId || cashierShiftState.shiftId,
+        drawerId: latestShiftSummary?.drawerId || cashierShiftState.drawerId || null,
+        drawerName: latestShiftSummary?.drawerName || cashierShiftState.drawerName || null,
+        startedAt: latestShiftSummary?.startedAt || cashierShiftState.startedAt,
+        startingCash: Number(latestShiftSummary?.startingCash ?? cashierShiftState.startingCash ?? 0),
+        previousDrawerBalance: parseNonNegativeAmount(cashierShiftState?.previousDrawerBalance),
+        openingAdjustment: Number(cashierShiftState?.openingAdjustment || 0)
+      }, { resetSummary: false });
+      return latestShiftSummary;
+    } catch (error) {
+      if (!isNetworkLikeError(error)) throw error;
+    }
+  }
+
+  const defaultShiftStart = new Date();
+  defaultShiftStart.setHours(0, 0, 0, 0);
+  const shiftStartedAt = cashierShiftState?.startedAt || defaultShiftStart.toISOString();
+  const startedAtTs = Date.parse(shiftStartedAt);
+  const { transactions } = await api('/api/admin/transactions?status=PAID', {
+    headers: buildActorHeaders()
+  });
+  const activeUserId = String(activeAuthSession?.userId || '').trim();
+  const activeEmail = normalizeEmail(activeAuthSession?.email);
+  const paidTransactions = (Array.isArray(transactions) ? transactions : [])
+    .filter((txn) => {
+      if (!Number.isFinite(startedAtTs)) return true;
+      const txnTs = Date.parse(txn?.payment?.paidAt || txn?.createdAt || '');
+      return Number.isFinite(txnTs) && txnTs >= startedAtTs;
+    })
+    .filter((txn) => {
+      if (activeUserId && txn?.cashierUserId) {
+        return String(txn.cashierUserId) === activeUserId;
+      }
+      const txnEmail = normalizeEmail(txn?.cashierEmail);
+      return txnEmail && txnEmail === activeEmail;
+    });
+
+  latestShiftSummary = buildShiftSummary(paidTransactions, {
+    drawerId: cashierShiftState?.drawerId || null,
+    drawerName: cashierShiftState?.drawerName || null,
+    startedAt: shiftStartedAt,
+    startingCash: parseNonNegativeAmount(cashierShiftState?.startingCash) || 0
+  });
+  updateCashOnHandBadge();
+  return latestShiftSummary;
+}
+
+function formatDiscrepancyAmount(discrepancy) {
+  if (!Number.isFinite(discrepancy)) return '—';
+  if (discrepancy === 0) return 'Balanced';
+  return discrepancy > 0
+    ? `${money(discrepancy)} Overage`
+    : `${money(Math.abs(discrepancy))} Shortage`;
+}
+
+function renderShiftSummary(containerEl, summary, { endingCash = null } = {}) {
+  if (!containerEl || !summary) return;
+  const expectedCash = Number(summary.expectedCashBalance || 0);
+  const discrepancy = Number.isFinite(endingCash) ? (endingCash - expectedCash) : null;
+  const startedAtText = summary.startedAt ? formatDate(summary.startedAt) : '—';
+  const endedAtText = summary.endedAt ? formatDate(summary.endedAt) : 'Still active';
+
+  const methodRows = Object.entries(summary.paymentMethods || {})
+    .map(([method, amount]) => `
+      <div class="shift-summary-line">
+        <span class="shift-method-label">
+          <img class="payment-method-icon" src="${escapeHtml(getPaymentMethodIcon(method))}" alt="${escapeHtml(getPaymentMethodLabel(method))}" />
+          ${escapeHtml(getPaymentMethodLabel(method))}
+        </span>
+        <strong>${money(amount)}</strong>
+      </div>
+    `)
+    .join('');
+
+  containerEl.innerHTML = `
+    <div class="shift-summary-line"><span>Drawer</span><strong>${escapeHtml(summary.drawerName || 'Drawer')}</strong></div>
+    <div class="shift-summary-line"><span>Shift Start</span><strong>${escapeHtml(startedAtText)}</strong></div>
+    <div class="shift-summary-line"><span>Shift End / Sign Out</span><strong>${escapeHtml(endedAtText)}</strong></div>
+    <div class="shift-summary-line"><span>Total Sales</span><strong>${money(summary.totalSales || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Total Transactions</span><strong>${Number(summary.totalTransactions || 0)}</strong></div>
+    <div class="shift-summary-line"><span>On Hold for Void</span><strong>${money(summary.holdForVoidAmount || 0)} (${Number(summary.holdForVoidCount || 0)})</strong></div>
+    <div class="shift-summary-line"><span>Voided After Payment</span><strong>${money(summary.voidedAmount || 0)} (${Number(summary.voidedCount || 0)})</strong></div>
+    <div class="shift-summary-line"><span>Cash Sales</span><strong>${money(summary.cashPayments || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Cash Tendered</span><strong>${money(summary.cashTendered || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Change Given</span><strong>${money(summary.changeGiven || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Net Cash Retained</span><strong>${money(summary.netCashRetained || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Admin Drawer Deductions</span><strong>${money(summary.cashWithdrawals || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Other Payment Methods</span><strong>${money(summary.otherPayments || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Starting Cash</span><strong>${money(summary.startingCash || 0)}</strong></div>
+    <div class="shift-summary-line"><span>Expected Cash Balance</span><strong>${money(expectedCash)}</strong></div>
+    <div class="shift-summary-line"><span>Entered Ending Balance</span><strong>${Number.isFinite(endingCash) ? money(endingCash) : '—'}</strong></div>
+    <div class="shift-summary-line"><span>Discrepancy</span><strong>${escapeHtml(formatDiscrepancyAmount(discrepancy))}</strong></div>
+    <div class="shift-summary-methods">${methodRows || '<p>No payment records yet.</p>'}</div>
+  `;
+}
+
+function openShiftMonitorModal() {
+  if (!shiftMonitorModalEl) return;
+  shiftMonitorModalEl.classList.add('open');
+  shiftMonitorModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeShiftMonitorModal() {
+  if (!shiftMonitorModalEl) return;
+  shiftMonitorModalEl.classList.remove('open');
+  shiftMonitorModalEl.setAttribute('aria-hidden', 'true');
+}
+
+async function showShiftMonitorSummary() {
+  if (!shiftMonitorSummaryEl) return;
+  shiftMonitorSummaryEl.innerHTML = '<p>Loading shift summary...</p>';
+
+  try {
+    if (!activeAuthSession?.email) {
+      shiftMonitorSummaryEl.innerHTML = '<p>Login is required to view shift monitor.</p>';
+      return;
+    }
+    const summary = await refreshLatestShiftSummary();
+    renderShiftSummary(shiftMonitorSummaryEl, summary);
+  } catch (error) {
+    shiftMonitorSummaryEl.innerHTML = `<p class="error">Shift summary error: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function openStartShiftModal() {
+  if (!startShiftModalEl) return;
+  startShiftModalEl.classList.add('open');
+  startShiftModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeStartShiftModal() {
+  if (!startShiftModalEl) return;
+  startShiftModalEl.classList.remove('open');
+  startShiftModalEl.setAttribute('aria-hidden', 'true');
+  startShiftContext = null;
+}
+
+function renderStartShiftReference(reference = null) {
+  const drawerName = String(reference?.drawerName || '').trim();
+  const previousDrawerBalance = parseNonNegativeAmount(reference?.previousDrawerBalance);
+  const previousShiftEndedAt = reference?.previousShiftEndedAt || null;
+  if (startShiftDrawerNameEl) {
+    startShiftDrawerNameEl.textContent = drawerName || 'No drawer selected';
+  }
+  if (startShiftPreviousBalanceEl) {
+    startShiftPreviousBalanceEl.textContent = previousDrawerBalance === null
+      ? 'No previous balance'
+      : money(previousDrawerBalance);
+  }
+  if (startShiftPreviousEndedAtEl) {
+    startShiftPreviousEndedAtEl.textContent = previousShiftEndedAt
+      ? formatDate(previousShiftEndedAt)
+      : 'No previous shift recorded';
+  }
+  if (startShiftReferenceStatusEl) {
+    startShiftReferenceStatusEl.textContent = !drawerName
+      ? 'Select a drawer name first.'
+      : previousDrawerBalance === null
+      ? 'No previous shift balance is on record yet. Enter the starting drawer amount, or use an adjustment only if your process requires one.'
+      : 'Verify the displayed amount against the physical cash in the drawer. Use the previous balance if it matches, or enter a separate adjustment and apply it before starting the shift.';
+  }
+}
+
+function updateStartShiftAdjustmentStatus() {
+  if (!startShiftAdjustmentStatusEl) return;
+  if (!startShiftContext?.drawerId) {
+    startShiftAdjustmentStatusEl.textContent = 'Select a drawer name first.';
+    return;
+  }
+  const enteredAmount = parseNonNegativeAmount(startShiftCashInputEl?.value);
+  const previousDrawerBalance = parseNonNegativeAmount(startShiftContext?.previousDrawerBalance);
+  const adjustmentValue = startShiftAdjustmentInputEl?.value;
+  const hasAdjustmentValue = String(adjustmentValue ?? '').trim() !== '';
+  const parsedAdjustment = hasAdjustmentValue ? Math.round(Number(adjustmentValue) * 100) / 100 : null;
+
+  if (enteredAmount !== null) {
+    startShiftAdjustmentStatusEl.textContent = `Prepared starting cash for this shift: ${money(enteredAmount)}.`;
+    return;
+  }
+  if (hasAdjustmentValue && !Number.isFinite(parsedAdjustment)) {
+    startShiftAdjustmentStatusEl.textContent = 'Cash adjustment must be a valid positive or negative amount.';
+    return;
+  }
+  if (previousDrawerBalance !== null) {
+    startShiftAdjustmentStatusEl.textContent = hasAdjustmentValue
+      ? `Apply the adjustment to update the starting cash from ${money(previousDrawerBalance)}.`
+      : `Use the previous balance or enter a cash adjustment before starting the shift.`;
+    return;
+  }
+  startShiftAdjustmentStatusEl.textContent = 'Enter the starting drawer cash to begin this shift.';
+}
+
+async function fetchStartShiftContext() {
+  const drawerId = String(startShiftDrawerSelectEl?.value || '').trim();
+  if (!drawerId) {
+    return {
+      drawerId: null,
+      drawerName: '',
+      activeShift: null,
+      previousShiftId: null,
+      previousDrawerBalance: null,
+      previousShiftEndedAt: null
+    };
+  }
+  const result = await api(`/api/shifts/opening-context?drawerId=${encodeURIComponent(drawerId)}`, {
+    headers: buildActorHeaders()
+  });
+  const previousShift = result?.previousShift || null;
+  return {
+    drawerId,
+    drawerName: String(result?.drawer?.name || '').trim() || '',
+    activeShift: result?.activeShift || null,
+    previousShiftId: String(previousShift?.id || '').trim() || null,
+    previousDrawerBalance: parseNonNegativeAmount(result?.previousDrawerBalance),
+    previousShiftEndedAt: previousShift?.shiftEndAt || null
+  };
+}
+
+async function populateStartShiftDrawerOptions(selectedDrawerId = '') {
+  if (!startShiftDrawerSelectEl) return;
+  const result = await api('/api/cash-drawers', {
+    headers: buildActorHeaders()
+  });
+  const drawers = Array.isArray(result?.drawers) ? result.drawers : [];
+  startShiftDrawerSelectEl.innerHTML = ['<option value="">Select drawer</option>']
+    .concat(drawers.map((drawer) => `
+      <option value="${escapeHtml(drawer.id || '')}">${escapeHtml(drawer.name || 'Drawer')}</option>
+    `))
+    .join('');
+  if (selectedDrawerId && drawers.some((drawer) => String(drawer.id || '') === selectedDrawerId)) {
+    startShiftDrawerSelectEl.value = selectedDrawerId;
+  }
+  return drawers;
+}
+
+async function loadSelectedStartShiftDrawerContext() {
+  startShiftContext = await fetchStartShiftContext();
+  renderStartShiftReference(startShiftContext);
+
+  if (!startShiftContext?.drawerId) {
+    if (startShiftCashInputEl) startShiftCashInputEl.value = '';
+    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
+    updateStartShiftAdjustmentStatus();
+    return;
+  }
+
+  const activeShift = startShiftContext?.activeShift || null;
+  if (activeShift?.id && String(activeShift?.status || '').toLowerCase() === 'active') {
+    persistCashierShiftState({
+      shiftId: String(activeShift.id || '').trim() || null,
+      drawerId: String(activeShift.drawerId || startShiftContext.drawerId || '').trim() || null,
+      drawerName: String(activeShift.drawerName || startShiftContext.drawerName || '').trim() || null,
+      startedAt: String(activeShift.shiftStartAt || new Date().toISOString()),
+      startingCash: Number(activeShift.startingCash || 0),
+      previousDrawerBalance: parseNonNegativeAmount(activeShift.previousDrawerBalance),
+      openingAdjustment: Number(activeShift.openingAdjustment || 0)
+    });
+    closeStartShiftModal();
+    setStatus(`Resumed ${activeShift.drawerName || 'drawer'} shift started at ${formatDate(activeShift.shiftStartAt)}.`);
+    return;
+  }
+
+  if (startShiftCashInputEl) {
+    startShiftCashInputEl.value = '';
+    startShiftCashInputEl.focus();
+  }
+  if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
+  updateStartShiftAdjustmentStatus();
+}
+
+async function presentStartShiftModal() {
+  if (!needsCashierShiftStart()) return;
+
+  openStartShiftModal();
+  startShiftContext = null;
+  renderStartShiftReference(null);
+  if (startShiftCashInputEl) startShiftCashInputEl.value = '';
+  if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
+  if (startShiftReferenceStatusEl) {
+    startShiftReferenceStatusEl.textContent = 'Loading drawers...';
+  }
+  updateStartShiftAdjustmentStatus();
+
+  try {
+    const selectedDrawerId = String(cashierShiftState?.drawerId || '').trim();
+    const drawers = await populateStartShiftDrawerOptions(selectedDrawerId);
+    if (!Array.isArray(drawers) || !drawers.length) {
+      startShiftContext = {
+        drawerId: null,
+        drawerName: '',
+        activeShift: null,
+        previousShiftId: null,
+        previousDrawerBalance: null,
+        previousShiftEndedAt: null
+      };
+      renderStartShiftReference(startShiftContext);
+      if (startShiftReferenceStatusEl) {
+        startShiftReferenceStatusEl.textContent = 'No cash drawer has been created yet. An Administrator must create a drawer name and set its first amount before a user can start sales.';
+      }
+      if (startShiftAdjustmentStatusEl) {
+        startShiftAdjustmentStatusEl.textContent = 'Waiting for an Administrator to set up a drawer.';
+      }
+      return;
+    }
+    await loadSelectedStartShiftDrawerContext();
+  } catch (error) {
+    startShiftContext = {
+      drawerId: null,
+      drawerName: '',
+      activeShift: null,
+      previousShiftId: null,
+      previousDrawerBalance: null,
+      previousShiftEndedAt: null
+    };
+    renderStartShiftReference(startShiftContext);
+    if (startShiftReferenceStatusEl) {
+      startShiftReferenceStatusEl.textContent = `Unable to load the previous drawer balance: ${error.message}. Enter the counted drawer cash to continue.`;
+    }
+    if (startShiftCashInputEl) startShiftCashInputEl.focus();
+    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
+    updateStartShiftAdjustmentStatus();
+  }
+}
+
+async function requireCashierShiftForTransactions(message = 'Start the shift first before processing transactions.') {
+  if (!needsCashierShiftStart()) return true;
+  setStatus(message);
+  await presentStartShiftModal();
+  return false;
+}
+
+function usePreviousStartShiftBalance() {
+  if (!startShiftContext?.drawerId) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Select a drawer name first.';
+    }
+    if (startShiftDrawerSelectEl) startShiftDrawerSelectEl.focus();
+    return;
+  }
+  const previousDrawerBalance = parseNonNegativeAmount(startShiftContext?.previousDrawerBalance);
+  if (previousDrawerBalance === null) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'No previous balance is available. Enter the starting drawer cash manually.';
+    }
+    if (startShiftCashInputEl) startShiftCashInputEl.focus();
+    return;
+  }
+  if (startShiftCashInputEl) startShiftCashInputEl.value = String(previousDrawerBalance);
+  if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '0';
+  updateStartShiftAdjustmentStatus();
+}
+
+function applyStartShiftAdjustment() {
+  if (!startShiftContext?.drawerId) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Select a drawer name first.';
+    }
+    if (startShiftDrawerSelectEl) startShiftDrawerSelectEl.focus();
+    return;
+  }
+  const previousDrawerBalance = parseNonNegativeAmount(startShiftContext?.previousDrawerBalance);
+  if (previousDrawerBalance === null) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'No previous balance is available to adjust. Enter the starting drawer cash directly.';
+    }
+    if (startShiftCashInputEl) startShiftCashInputEl.focus();
+    return;
+  }
+
+  const rawAdjustment = String(startShiftAdjustmentInputEl?.value || '').trim();
+  if (!rawAdjustment) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Enter a positive or negative adjustment amount first.';
+    }
+    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.focus();
+    return;
+  }
+
+  const adjustment = Math.round(Number(rawAdjustment) * 100) / 100;
+  if (!Number.isFinite(adjustment)) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Cash adjustment must be a valid number.';
+    }
+    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.focus();
+    return;
+  }
+
+  const adjustedAmount = Math.round((previousDrawerBalance + adjustment) * 100) / 100;
+  if (adjustedAmount < 0) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'The adjusted drawer balance cannot be negative.';
+    }
+    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.focus();
+    return;
+  }
+
+  if (startShiftCashInputEl) startShiftCashInputEl.value = String(adjustedAmount);
+  updateStartShiftAdjustmentStatus();
+}
+
+function openCashoutSummaryModal() {
+  if (!cashoutSummaryModalEl) return;
+  cashoutSummaryModalEl.classList.add('open');
+  cashoutSummaryModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeCashoutSummaryModal() {
+  if (!cashoutSummaryModalEl) return;
+  cashoutSummaryModalEl.classList.remove('open');
+  cashoutSummaryModalEl.setAttribute('aria-hidden', 'true');
+}
+
+function buildCashoutReport(summary, endingCash) {
+  const expectedCash = Number(summary.expectedCashBalance || 0);
+  const discrepancy = Number(endingCash || 0) - expectedCash;
+  return {
+    generatedAt: new Date().toISOString(),
+    user: {
+      id: activeAuthSession?.userId || null,
+      email: activeAuthSession?.email || null,
+      name: activeAuthSession?.name || 'User',
+      role: activeAuthSession?.role || 'encharge'
+    },
+    summary: {
+      shiftStartedAt: summary.startedAt || null,
+      shiftEndedAt: summary.endedAt || null,
+      totalSales: summary.totalSales || 0,
+      totalTransactions: summary.totalTransactions || 0,
+      cashPayments: summary.cashPayments || 0,
+      cashTendered: summary.cashTendered || 0,
+      changeGiven: summary.changeGiven || 0,
+      netCashRetained: summary.netCashRetained || 0,
+      otherPayments: summary.otherPayments || 0,
+      paymentMethods: summary.paymentMethods || {},
+      startingCash: summary.startingCash || 0,
+      expectedCashBalance: expectedCash,
+      enteredEndingBalance: endingCash,
+      discrepancy
+    }
+  };
+}
+
+function downloadCashoutReport(report) {
+  if (!report) return;
+  const lines = [
+    `Cashier Shift Summary - ${report.generatedAt}`,
+    `User: ${report.user.name} (${report.user.email})`,
+    `Role: ${report.user.role}`,
+    `Shift Start: ${report.summary.shiftStartedAt || 'N/A'}`,
+    `Shift End / Sign Out: ${report.summary.shiftEndedAt || 'N/A'}`,
+    `Total Sales: ${money(report.summary.totalSales)}`,
+    `Total Transactions: ${report.summary.totalTransactions}`,
+    `Cash Sales: ${money(report.summary.cashPayments)}`,
+    `Cash Tendered: ${money(report.summary.cashTendered || 0)}`,
+    `Change Given: ${money(report.summary.changeGiven || 0)}`,
+    `Net Cash Retained: ${money(report.summary.netCashRetained || 0)}`,
+    `Other Payment Methods: ${money(report.summary.otherPayments)}`,
+    `Starting Cash: ${money(report.summary.startingCash)}`,
+    `Expected Cash Balance: ${money(report.summary.expectedCashBalance)}`,
+    `Entered Ending Balance: ${money(report.summary.enteredEndingBalance)}`,
+    `Discrepancy: ${formatDiscrepancyAmount(report.summary.discrepancy)}`
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `cashier-shift-summary-${Date.now()}.txt`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function printCashoutReport(report) {
+  if (!report) return;
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=760,height=840');
+  if (!printWindow) return;
+  const summary = report.summary || {};
+  printWindow.document.write(`
+    <html>
+      <head><title>Cashier Shift Summary</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Cashier Shift Summary</h2>
+        <p><strong>Generated:</strong> ${escapeHtml(formatDate(report.generatedAt))}</p>
+        <p><strong>User:</strong> ${escapeHtml(report.user?.name || 'User')} (${escapeHtml(report.user?.email || '-')})</p>
+        <p><strong>Shift Start:</strong> ${escapeHtml(summary.shiftStartedAt ? formatDate(summary.shiftStartedAt) : 'N/A')}</p>
+        <p><strong>Shift End / Sign Out:</strong> ${escapeHtml(summary.shiftEndedAt ? formatDate(summary.shiftEndedAt) : 'N/A')}</p>
+        <hr />
+        <p><strong>Total Sales:</strong> ${escapeHtml(money(summary.totalSales || 0))}</p>
+        <p><strong>Total Transactions:</strong> ${Number(summary.totalTransactions || 0)}</p>
+        <p><strong>Cash Sales:</strong> ${escapeHtml(money(summary.cashPayments || 0))}</p>
+        <p><strong>Cash Tendered:</strong> ${escapeHtml(money(summary.cashTendered || 0))}</p>
+        <p><strong>Change Given:</strong> ${escapeHtml(money(summary.changeGiven || 0))}</p>
+        <p><strong>Net Cash Retained:</strong> ${escapeHtml(money(summary.netCashRetained || 0))}</p>
+        <p><strong>Other Payment Methods:</strong> ${escapeHtml(money(summary.otherPayments || 0))}</p>
+        <p><strong>Expected Cash Balance:</strong> ${escapeHtml(money(summary.expectedCashBalance || 0))}</p>
+        <p><strong>Entered Ending Balance:</strong> ${escapeHtml(money(summary.enteredEndingBalance || 0))}</p>
+        <p><strong>Discrepancy:</strong> ${escapeHtml(formatDiscrepancyAmount(summary.discrepancy))}</p>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 function readActiveSession() {
   try {
     const raw = localStorage.getItem(AUTH_SESSION_KEY);
@@ -863,12 +1953,18 @@ function writeActiveSession(user) {
   };
   activeAuthSession = sessionUser;
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionUser));
+  updateShiftMonitorVisibility();
 }
 
 function clearActiveSession() {
   activeAuthSession = null;
+  cashierShiftState = null;
+  latestShiftSummary = null;
+  startShiftContext = null;
+  closeStartShiftModal();
   localStorage.removeItem(AUTH_SESSION_KEY);
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  updateShiftMonitorVisibility();
 }
 
 function writeAccessToken(token) {
@@ -1016,11 +2112,7 @@ function hydrateCatalogState(cached, { keepCategory = true } = {}) {
     sortOrder: Number(x.sortOrder || 0)
   }));
   state.products = nextProducts.map((x) => ({
-    id: x.id,
-    name: x.name,
-    price: Number(x.price || 0),
-    category: String(x.category || '').trim().toLowerCase(),
-    image: x.image || '/Business Logo/Ruels Logo for business.png'
+    ...toClientProduct(x)
   }));
 
   if (!state.categories.length) {
@@ -1050,12 +2142,589 @@ function canManageInventory() {
   return role === 'administrations';
 }
 
+const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
+  { id: 'student', name: 'Students', type: 'percent', amount: 10 },
+  { id: 'senior', name: 'Seniors', type: 'percent', amount: 20 },
+  { id: 'pwd', name: 'PWD', type: 'percent', amount: 20 }
+]);
+
+function normalizeDiscountProfileId(value, fallback = 'discount') {
+  return String(value || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64) || fallback;
+}
+
+function normalizeDiscountProfile(profile = {}, index = 0) {
+  const name = String(profile?.name || '').trim().slice(0, 60) || `Discount ${index + 1}`;
+  const type = String(profile?.type || '').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const legacyPercent = Number(profile?.percent);
+  const rawAmount = profile?.amount !== undefined ? Number(profile.amount) : legacyPercent;
+  const amount = Number.isFinite(rawAmount)
+    ? (type === 'percent' ? Math.min(100, Math.max(0, rawAmount)) : Math.max(0, rawAmount))
+    : 0;
+  return {
+    id: normalizeDiscountProfileId(profile?.id || name, `discount-${index + 1}`),
+    name,
+    type,
+    amount
+  };
+}
+
+function normalizeDiscountProfiles(profiles = []) {
+  const source = Array.isArray(profiles)
+    ? profiles
+    : DEFAULT_DISCOUNT_PROFILES;
+  const seenIds = new Set();
+  return source.reduce((rows, profile, index) => {
+    const normalized = normalizeDiscountProfile(profile, index);
+    let nextId = normalized.id;
+    let suffix = 2;
+    while (seenIds.has(nextId)) {
+      nextId = `${normalized.id}-${suffix}`;
+      suffix += 1;
+    }
+    seenIds.add(nextId);
+    rows.push({
+      ...normalized,
+      id: nextId
+    });
+    return rows;
+  }, []);
+}
+
+function normalizeAppConfig(config = {}) {
+  return {
+    enforceKitSpec: config?.enforceKitSpec !== false,
+    discountProfiles: normalizeDiscountProfiles(config?.discountProfiles)
+  };
+}
+
+const DEFAULT_RECEIPT_TEMPLATE = Object.freeze({
+  id: 'classic-roast-beef',
+  name: 'Classic Official',
+  settings: {
+    paperWidthMm: 80,
+    paddingPx: 12,
+    borderRadiusPx: 12,
+    fontFamily: "'Trebuchet MS', 'Arial', sans-serif",
+    baseFontSizePx: 13,
+    titleFontSizePx: 24,
+    metaFontSizePx: 12,
+    totalFontSizePx: 16,
+    sectionGapPx: 10,
+    logoUrl: '/Business Logo/Ruels Logo for business.png',
+    showLogo: true,
+    logoWidthPx: 78,
+    headerAlign: 'center',
+    footerAlign: 'center',
+    backgroundColor: '#ffffff',
+    textColor: '#432716',
+    accentColor: '#5a3521',
+    mutedColor: '#7b5a47',
+    borderColor: '#c8a88f',
+    borderStyle: 'dashed',
+    dividerStyle: 'dashed',
+    storeName: "Ruel's Roast Beef",
+    storeAddress: 'Location : Tres Martires, City of Baybay, 6521 Leyte',
+    taxLine: 'Vat Registered TIN 342-231-312-00000',
+    showDiscountProfileType: true,
+    discountProfileLabel: 'Customer Discount Type',
+    footerMessage: 'Thank you for dining with us!',
+    extraMessage: '',
+    extraMessageAlign: 'center',
+    extraMessageStyle: 'dashed',
+    footerFontSizePx: 12,
+    footerTopSpacingPx: 12,
+    headerTopPaddingPx: 0,
+    headerOffsetX: 0,
+    headerOffsetY: 0,
+    metaOffsetX: 0,
+    metaOffsetY: 0,
+    itemsOffsetX: 0,
+    itemsOffsetY: 0,
+    totalsOffsetX: 0,
+    totalsOffsetY: 0,
+    footerOffsetX: 0,
+    footerOffsetY: 0,
+    extraMessageOffsetX: 0,
+    extraMessageOffsetY: 0
+  }
+});
+const RECEIPT_TEMPLATE_SAMPLE = Object.freeze({
+  reference: 'INV-1773287822393-859',
+  paidAt: '2026-03-12T03:57:00.000Z',
+  orderType: 'dine-in',
+  paymentMethod: 'cash',
+  subtotal: 249,
+  discount: 24.9,
+  discountProfile: {
+    name: 'Students',
+    type: 'percent',
+    amount: 10
+  },
+  total: 224.1,
+  payment: {
+    amountPaid: 230,
+    change: 5.9
+  },
+  lineItems: [
+    { name: 'Succulent Roast Beef', qty: 1, subtotal: 249 }
+  ]
+});
+const RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY = '__draft__';
+let receiptTemplatePreviewDragState = null;
+
+function normalizeTemplateName(name) {
+  return String(name || '').trim().slice(0, 80);
+}
+
+function normalizeTemplateText(value, fallback, maxLength = 180) {
+  const text = String(value || '').trim();
+  return text ? text.slice(0, maxLength) : fallback;
+}
+
+function normalizeTemplateColor(value, fallback) {
+  const color = String(value || '').trim();
+  return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? color : fallback;
+}
+
+function clampTemplateNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function normalizeTemplateAlign(value, fallback = 'center') {
+  const align = String(value || '').trim().toLowerCase();
+  return ['left', 'center', 'right'].includes(align) ? align : fallback;
+}
+
+function normalizeTemplateBorderStyle(value, fallback = 'dashed') {
+  const style = String(value || '').trim().toLowerCase();
+  return ['solid', 'dashed', 'dotted', 'none'].includes(style) ? style : fallback;
+}
+
+function normalizeReceiptTemplateSettings(settings = {}) {
+  const defaults = DEFAULT_RECEIPT_TEMPLATE.settings;
+  return {
+    paperWidthMm: clampTemplateNumber(settings?.paperWidthMm, 58, 100, defaults.paperWidthMm),
+    paddingPx: clampTemplateNumber(settings?.paddingPx, 0, 32, defaults.paddingPx),
+    borderRadiusPx: clampTemplateNumber(settings?.borderRadiusPx, 0, 32, defaults.borderRadiusPx),
+    fontFamily: String(settings?.fontFamily || defaults.fontFamily).trim() || defaults.fontFamily,
+    baseFontSizePx: clampTemplateNumber(settings?.baseFontSizePx, 10, 20, defaults.baseFontSizePx),
+    titleFontSizePx: clampTemplateNumber(settings?.titleFontSizePx, 14, 36, defaults.titleFontSizePx),
+    metaFontSizePx: clampTemplateNumber(settings?.metaFontSizePx, 10, 18, defaults.metaFontSizePx),
+    totalFontSizePx: clampTemplateNumber(settings?.totalFontSizePx, 12, 28, defaults.totalFontSizePx),
+    sectionGapPx: clampTemplateNumber(settings?.sectionGapPx, 4, 24, defaults.sectionGapPx),
+    logoUrl: normalizeTemplateText(settings?.logoUrl, defaults.logoUrl, 240),
+    showLogo: settings?.showLogo !== false,
+    logoWidthPx: clampTemplateNumber(settings?.logoWidthPx, 32, 180, defaults.logoWidthPx),
+    headerAlign: normalizeTemplateAlign(settings?.headerAlign, defaults.headerAlign),
+    footerAlign: normalizeTemplateAlign(settings?.footerAlign, defaults.footerAlign),
+    backgroundColor: normalizeTemplateColor(settings?.backgroundColor, defaults.backgroundColor),
+    textColor: normalizeTemplateColor(settings?.textColor, defaults.textColor),
+    accentColor: normalizeTemplateColor(settings?.accentColor, defaults.accentColor),
+    mutedColor: normalizeTemplateColor(settings?.mutedColor, defaults.mutedColor),
+    borderColor: normalizeTemplateColor(settings?.borderColor, defaults.borderColor),
+    borderStyle: normalizeTemplateBorderStyle(settings?.borderStyle, defaults.borderStyle),
+    dividerStyle: normalizeTemplateBorderStyle(settings?.dividerStyle, defaults.dividerStyle),
+    storeName: normalizeTemplateText(settings?.storeName, defaults.storeName, 80),
+    storeAddress: normalizeTemplateText(settings?.storeAddress, defaults.storeAddress, 180),
+    taxLine: normalizeTemplateText(settings?.taxLine, defaults.taxLine, 180),
+    showDiscountProfileType: settings?.showDiscountProfileType !== false,
+    discountProfileLabel: normalizeTemplateText(settings?.discountProfileLabel, defaults.discountProfileLabel, 80),
+    footerMessage: normalizeTemplateText(settings?.footerMessage, defaults.footerMessage, 220),
+    extraMessage: normalizeTemplateText(settings?.extraMessage, defaults.extraMessage, 360),
+    extraMessageAlign: normalizeTemplateAlign(settings?.extraMessageAlign, defaults.extraMessageAlign),
+    extraMessageStyle: normalizeTemplateBorderStyle(settings?.extraMessageStyle, defaults.extraMessageStyle),
+    footerFontSizePx: clampTemplateNumber(settings?.footerFontSizePx, 10, 24, defaults.footerFontSizePx || 12),
+    footerTopSpacingPx: clampTemplateNumber(settings?.footerTopSpacingPx, 0, 48, defaults.footerTopSpacingPx || 12),
+    headerTopPaddingPx: clampTemplateNumber(settings?.headerTopPaddingPx, 0, 48, defaults.headerTopPaddingPx || 0),
+    headerOffsetX: clampTemplateNumber(settings?.headerOffsetX, -120, 120, defaults.headerOffsetX || 0),
+    headerOffsetY: clampTemplateNumber(settings?.headerOffsetY, -80, 120, defaults.headerOffsetY || 0),
+    metaOffsetX: clampTemplateNumber(settings?.metaOffsetX, -120, 120, defaults.metaOffsetX || 0),
+    metaOffsetY: clampTemplateNumber(settings?.metaOffsetY, -80, 120, defaults.metaOffsetY || 0),
+    itemsOffsetX: clampTemplateNumber(settings?.itemsOffsetX, -120, 120, defaults.itemsOffsetX || 0),
+    itemsOffsetY: clampTemplateNumber(settings?.itemsOffsetY, -80, 120, defaults.itemsOffsetY || 0),
+    totalsOffsetX: clampTemplateNumber(settings?.totalsOffsetX, -120, 120, defaults.totalsOffsetX || 0),
+    totalsOffsetY: clampTemplateNumber(settings?.totalsOffsetY, -80, 120, defaults.totalsOffsetY || 0),
+    footerOffsetX: clampTemplateNumber(settings?.footerOffsetX, -120, 120, defaults.footerOffsetX || 0),
+    footerOffsetY: clampTemplateNumber(settings?.footerOffsetY, -80, 120, defaults.footerOffsetY || 0),
+    extraMessageOffsetX: clampTemplateNumber(settings?.extraMessageOffsetX, -120, 120, defaults.extraMessageOffsetX || 0),
+    extraMessageOffsetY: clampTemplateNumber(settings?.extraMessageOffsetY, -80, 120, defaults.extraMessageOffsetY || 0)
+  };
+}
+
+function normalizeReceiptTemplate(template = {}) {
+  return {
+    id: String(template?.id || DEFAULT_RECEIPT_TEMPLATE.id).trim() || DEFAULT_RECEIPT_TEMPLATE.id,
+    name: normalizeTemplateName(template?.name || DEFAULT_RECEIPT_TEMPLATE.name) || DEFAULT_RECEIPT_TEMPLATE.name,
+    settings: normalizeReceiptTemplateSettings(template?.settings || {}),
+    isActive: Boolean(template?.isActive),
+    createdAt: String(template?.createdAt || ''),
+    updatedAt: String(template?.updatedAt || '')
+  };
+}
+
+function getActiveReceiptTemplate() {
+  return withLocalReceiptTemplateLogo(normalizeReceiptTemplate(
+    state.activeReceiptTemplate
+    || state.receiptTemplates.find((template) => template.isActive)
+    || DEFAULT_RECEIPT_TEMPLATE
+  ));
+}
+
+function getReceiptTemplateLocalLogoKey(templateId = null) {
+  const safeTemplateId = String(templateId || state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY).trim();
+  return safeTemplateId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY;
+}
+
+function readReceiptTemplateLocalLogos() {
+  const stored = readUserUiState()?.receiptTemplateLocalLogos;
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+function saveReceiptTemplateLocalLogos(nextMap) {
+  saveUserUiState({ receiptTemplateLocalLogos: nextMap && typeof nextMap === 'object' ? nextMap : {} });
+}
+
+function getStoredReceiptTemplateLogo(templateId = null) {
+  const logos = readReceiptTemplateLocalLogos();
+  const key = getReceiptTemplateLocalLogoKey(templateId);
+  const value = logos[key];
+  return typeof value === 'string' && value.startsWith('data:image/') ? value : '';
+}
+
+function setStoredReceiptTemplateLogo(templateId, dataUrl) {
+  const key = getReceiptTemplateLocalLogoKey(templateId);
+  const logos = readReceiptTemplateLocalLogos();
+  if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+    logos[key] = dataUrl;
+  } else {
+    delete logos[key];
+  }
+  saveReceiptTemplateLocalLogos(logos);
+}
+
+function moveStoredReceiptTemplateLogo(fromTemplateId, toTemplateId) {
+  const fromKey = getReceiptTemplateLocalLogoKey(fromTemplateId);
+  const toKey = getReceiptTemplateLocalLogoKey(toTemplateId);
+  if (fromKey === toKey) return;
+  const logos = readReceiptTemplateLocalLogos();
+  const existing = logos[fromKey];
+  if (!existing) return;
+  logos[toKey] = existing;
+  delete logos[fromKey];
+  saveReceiptTemplateLocalLogos(logos);
+}
+
+function withLocalReceiptTemplateLogo(template) {
+  const normalized = normalizeReceiptTemplate(template);
+  const localLogo = getStoredReceiptTemplateLogo(normalized.id);
+  if (!localLogo) return normalized;
+  return {
+    ...normalized,
+    settings: {
+      ...normalized.settings,
+      logoUrl: localLogo
+    }
+  };
+}
+
+function getDiscountProfiles() {
+  return normalizeDiscountProfiles(state.appConfig?.discountProfiles);
+}
+
+function getSelectedDiscountProfile() {
+  const selectedId = String(state.selectedDiscountProfileId || '').trim();
+  if (!selectedId) return null;
+  return getDiscountProfiles().find((profile) => profile.id === selectedId) || null;
+}
+
+function ensureValidSelectedDiscountProfile() {
+  const selected = getSelectedDiscountProfile();
+  if (selected) return;
+  state.selectedDiscountProfileId = '';
+}
+
+function formatDiscountProfileValue(profile = null) {
+  const type = String(profile?.type || 'percent').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const amount = Number(profile?.amount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return type === 'fixed' ? money(0) : '0%';
+  }
+  if (type === 'fixed') {
+    return `- ${money(amount)}`;
+  }
+  return Number.isInteger(amount) ? `${amount}%` : `${amount.toFixed(2)}%`;
+}
+
+function getDiscountProfileSummaryText(profile = null) {
+  if (!profile) return 'Regular Customer (No discount)';
+  return `${profile.name} (${formatDiscountProfileValue(profile)})`;
+}
+
+function normalizeInvoiceDiscountProfile(profile = null) {
+  if (!profile || typeof profile !== 'object') return null;
+  const normalized = normalizeDiscountProfile(profile);
+  if (!normalized.name) return null;
+  if (!Number.isFinite(Number(normalized.amount || 0)) || Number(normalized.amount || 0) <= 0) return null;
+  return normalized;
+}
+
+function getReceiptDiscountProfileText(invoice = null) {
+  const profile = normalizeInvoiceDiscountProfile(invoice?.discountProfile);
+  return profile ? getDiscountProfileSummaryText(profile) : '';
+}
+
+function applyReceiptDiscountProfileLine(template, invoice, refs = {}) {
+  const settings = normalizeReceiptTemplate(template).settings;
+  const summaryText = getReceiptDiscountProfileText(invoice);
+  const shouldShow = Boolean(settings.showDiscountProfileType && summaryText);
+  const rowEl = refs.rowEl || null;
+  const labelEl = refs.labelEl || null;
+  const valueEl = refs.valueEl || null;
+  if (rowEl) rowEl.style.display = shouldShow ? '' : 'none';
+  if (labelEl) labelEl.textContent = settings.discountProfileLabel;
+  if (valueEl) valueEl.textContent = summaryText;
+}
+
+function renderDiscountProfileSelect() {
+  if (!discountProfileSelectEl) return;
+  const profiles = getDiscountProfiles();
+  const options = [
+    '<option value="">Regular Customer</option>',
+    ...profiles.map((profile) => `
+      <option value="${escapeHtml(profile.id)}">${escapeHtml(getDiscountProfileSummaryText(profile))}</option>
+    `)
+  ];
+  discountProfileSelectEl.innerHTML = options.join('');
+  discountProfileSelectEl.value = state.selectedDiscountProfileId || '';
+}
+
+function renderDiscountManager() {
+  const canEdit = canManageUsers();
+  if (discountConfigAdminNoteEl) {
+    discountConfigAdminNoteEl.textContent = canEdit
+      ? 'Administrations can add, rename, remove, and set customer discount deductions as percent or minus amount.'
+      : 'View-only mode. Only Administrations can change discount types.';
+  }
+
+  if (discountProfileFormEl) {
+    Array.from(discountProfileFormEl.elements || []).forEach((element) => {
+      if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
+        element.disabled = !canEdit;
+      }
+    });
+  }
+
+  if (!discountProfilesListEl) return;
+  const profiles = getDiscountProfiles();
+  discountProfilesListEl.innerHTML = profiles.length
+    ? `
+      <div class="discount-profile-grid">
+        ${profiles.map((profile) => `
+          <article class="discount-profile-card" data-discount-profile-id="${escapeHtml(profile.id)}">
+            <label>Name</label>
+            <input type="text" data-discount-profile-name value="${escapeHtml(profile.name)}" maxlength="60"${canEdit ? '' : ' disabled'} />
+            <label>Deduction Type</label>
+            <select data-discount-profile-type${canEdit ? '' : ' disabled'}>
+              <option value="percent"${profile.type === 'percent' ? ' selected' : ''}>Percent</option>
+              <option value="fixed"${profile.type === 'fixed' ? ' selected' : ''}>Minus Amount</option>
+            </select>
+            <label>${profile.type === 'fixed' ? 'Amount' : 'Percent'}</label>
+            <input type="number" data-discount-profile-amount min="0" step="0.01" value="${escapeHtml(String(profile.amount))}"${profile.type === 'percent' ? ' max="100"' : ''}${canEdit ? '' : ' disabled'} />
+            <p>${escapeHtml(getDiscountProfileSummaryText(profile))} will be applied to the current cart subtotal for this customer type.</p>
+            <div class="discount-profile-actions">
+              <button type="button" data-discount-profile-save="${escapeHtml(profile.id)}"${canEdit ? '' : ' disabled'}>Save</button>
+              <button class="secondary" type="button" data-discount-profile-delete="${escapeHtml(profile.id)}"${canEdit ? '' : ' disabled'}>Delete</button>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    `
+    : '<p>No discount profiles available yet.</p>';
+}
+
+async function saveDiscountProfiles(profiles, successMessage) {
+  const result = await api('/api/admin/app-config', {
+    method: 'PUT',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({
+      enforceKitSpec: state.appConfig?.enforceKitSpec !== false,
+      discountProfiles: profiles
+    })
+  });
+  applyAppConfig(result?.appConfig || state.appConfig);
+  renderDiscountManager();
+  if (successMessage) {
+    setStatus(successMessage);
+    showConfirmationToast({
+      title: 'Discount settings updated',
+      message: successMessage
+    });
+  }
+}
+
+async function handleDiscountProfileSubmit(event) {
+  event.preventDefault();
+  if (!canManageUsers()) {
+    setStatus('Only Administrations can manage discount types.');
+    return;
+  }
+  const name = String(discountProfileNameInputEl?.value || '').trim();
+  const type = String(discountProfileTypeInputEl?.value || 'percent').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const amount = Number(discountProfilePercentInputEl?.value || 0);
+  if (!name) {
+    setStatus('Enter a discount name.');
+    return;
+  }
+  if (!Number.isFinite(amount) || amount < 0 || (type === 'percent' && amount > 100)) {
+    setStatus(type === 'fixed'
+      ? 'Enter a minus discount amount of 0 or more.'
+      : 'Enter a discount percent from 0 to 100 only.');
+    return;
+  }
+  const profiles = getDiscountProfiles();
+  const nextProfile = normalizeDiscountProfile({
+    id: `${normalizeDiscountProfileId(name)}-${Date.now()}`,
+    name,
+    type,
+    amount
+  }, profiles.length);
+  await saveDiscountProfiles([...profiles, nextProfile], `Discount type "${nextProfile.name}" added.`);
+  if (discountProfileFormEl) discountProfileFormEl.reset();
+  if (discountProfileTypeInputEl) discountProfileTypeInputEl.value = 'percent';
+}
+
+async function handleDiscountProfileListClick(event) {
+  const saveBtn = event.target.closest('[data-discount-profile-save]');
+  const deleteBtn = event.target.closest('[data-discount-profile-delete]');
+  if (!saveBtn && !deleteBtn) return;
+  if (!canManageUsers()) {
+    setStatus('Only Administrations can manage discount types.');
+    return;
+  }
+
+  const profileId = String(
+    saveBtn?.getAttribute('data-discount-profile-save')
+    || deleteBtn?.getAttribute('data-discount-profile-delete')
+    || ''
+  ).trim();
+  if (!profileId) return;
+
+  const profiles = getDiscountProfiles();
+  const currentProfile = profiles.find((profile) => profile.id === profileId);
+  if (!currentProfile) return;
+
+  if (deleteBtn) {
+    const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
+    await saveDiscountProfiles(nextProfiles, `Discount type "${currentProfile.name}" deleted.`);
+    return;
+  }
+
+  const cardEl = saveBtn.closest('[data-discount-profile-id]');
+  const nameInputEl = cardEl?.querySelector('[data-discount-profile-name]');
+  const typeInputEl = cardEl?.querySelector('[data-discount-profile-type]');
+  const amountInputEl = cardEl?.querySelector('[data-discount-profile-amount]');
+  const nextName = String(nameInputEl?.value || '').trim();
+  const nextType = String(typeInputEl?.value || 'percent').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const nextAmount = Number(amountInputEl?.value || 0);
+  if (!nextName) {
+    setStatus('Discount name cannot be empty.');
+    return;
+  }
+  if (!Number.isFinite(nextAmount) || nextAmount < 0 || (nextType === 'percent' && nextAmount > 100)) {
+    setStatus(nextType === 'fixed'
+      ? 'Minus discount amount must be 0 or more.'
+      : 'Discount percent must be between 0 and 100.');
+    return;
+  }
+  const nextProfiles = profiles.map((profile) => (
+    profile.id === profileId
+      ? normalizeDiscountProfile({ ...profile, name: nextName, type: nextType, amount: nextAmount })
+      : profile
+  ));
+  await saveDiscountProfiles(nextProfiles, `Discount type "${nextName}" updated.`);
+}
+
+function handleDiscountProfileListChange(event) {
+  const typeInputEl = event.target.closest('[data-discount-profile-type]');
+  if (!typeInputEl) return;
+  const cardEl = typeInputEl.closest('[data-discount-profile-id]');
+  const amountInputEl = cardEl?.querySelector('[data-discount-profile-amount]');
+  const labelEl = amountInputEl?.previousElementSibling;
+  const isFixed = String(typeInputEl.value || '').trim().toLowerCase() === 'fixed';
+  if (labelEl) labelEl.textContent = isFixed ? 'Amount' : 'Percent';
+  if (amountInputEl) {
+    if (isFixed) {
+      amountInputEl.removeAttribute('max');
+    } else {
+      amountInputEl.setAttribute('max', '100');
+    }
+  }
+}
+
+function applyAppConfig(config = {}) {
+  state.appConfig = normalizeAppConfig(config?.appConfig || config);
+  ensureValidSelectedDiscountProfile();
+  renderDiscountProfileSelect();
+  renderDiscountManager();
+  renderKitSpecModeControl();
+  renderCart();
+}
+
+function canManageUsers() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations';
+}
+
+function canManageReceiptTemplates() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations';
+}
+
+function canManageCashDrawer() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations';
+}
+
+function buildActorHeaders() {
+  return {
+    'x-user-role': String(activeAuthSession?.role || ''),
+    'x-user-id': String(activeAuthSession?.userId || ''),
+    'x-user-email': String(activeAuthSession?.email || '')
+  };
+}
+
+function getAdminRangeQueryValue() {
+  const range = String(adminRangeEl?.value || '').trim().toLowerCase();
+  if (range === 'daily' || range === 'weekly') return range;
+  return '';
+}
+
+function getCashierInvoiceContext() {
+  if (!activeAuthSession?.email) return {};
+  return {
+    cashierUserId: activeAuthSession.userId || null,
+    cashierEmail: normalizeEmail(activeAuthSession.email),
+    cashierName: String(activeAuthSession.name || '').trim() || activeAuthSession.email,
+    cashierRole: normalizeRoleChoice(activeAuthSession.role)
+  };
+}
+
 function updateSettingsRoleItems() {
   if (settingsAdminDashboardBtn) {
     settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
   }
   if (settingsEditMenuBtn) {
     settingsEditMenuBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+  }
+  if (settingsCashDrawerBtn) {
+    settingsCashDrawerBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
   }
 }
 
@@ -1105,10 +2774,12 @@ function updateWelcomeBanner() {
   if (welcomeTextEl) {
     welcomeTextEl.textContent = `Welcome ${firstName}, have a nice day.`;
     updateSettingsRoleItems();
+    updateShiftMonitorVisibility();
     return;
   }
   welcomeBannerEl.textContent = `Welcome ${firstName}, have a nice day.`;
   updateSettingsRoleItems();
+  updateShiftMonitorVisibility();
 }
 
 function updatePhilippineDateTime() {
@@ -1152,7 +2823,199 @@ function toggleSettingsMenu() {
   if (settingsToggleBtn) settingsToggleBtn.setAttribute('aria-expanded', String(willOpen));
 }
 
-async function handleLogout() {
+function openCashDrawerControlModal() {
+  if (!cashDrawerControlModalEl) return;
+  if (!canAccessAdminFeatures()) {
+    setStatus('Cash drawer control is available only for Administrations and Supervisor roles.');
+    return;
+  }
+  cashDrawerControlModalEl.classList.add('open');
+  cashDrawerControlModalEl.setAttribute('aria-hidden', 'false');
+  refreshCashDrawerAdmin().catch((error) => {
+    if (cashDrawerSummaryEl) cashDrawerSummaryEl.textContent = `Cash drawer error: ${error.message}`;
+  });
+}
+
+function closeCashDrawerControlModal() {
+  if (!cashDrawerControlModalEl) return;
+  cashDrawerControlModalEl.classList.remove('open');
+  cashDrawerControlModalEl.setAttribute('aria-hidden', 'true');
+}
+
+function updateCashoutDiscrepancyStatus(summary) {
+  if (!cashoutDiscrepancyStatusEl) return;
+  if (!summary) {
+    cashoutDiscrepancyStatusEl.textContent = 'Loading summary...';
+    return;
+  }
+  const endingCash = parseCashoutEndingCash();
+  if (endingCash === null) {
+    cashoutDiscrepancyStatusEl.textContent = 'Enter ending cash to compute discrepancy.';
+    return;
+  }
+  const expectedCash = Number(summary?.expectedCashBalance || 0);
+  const discrepancy = endingCash - expectedCash;
+  const note = discrepancy === 0
+    ? 'Balanced. Ending cash matches expected.'
+    : discrepancy > 0
+      ? `Overage detected: ${money(discrepancy)}`
+      : `Shortage detected: ${money(Math.abs(discrepancy))}`;
+  cashoutDiscrepancyStatusEl.textContent = note;
+}
+
+function parseCashoutEndingCash({ requireValue = false } = {}) {
+  if (!cashoutEndingCashInputEl) return null;
+  const rawValue = String(cashoutEndingCashInputEl.value || '').trim();
+  if (!rawValue) {
+    cashoutEndingCashInputEl.setCustomValidity(requireValue ? 'Enter the counted ending cash before signing out.' : '');
+    return null;
+  }
+
+  const endingCash = parseNonNegativeAmount(rawValue);
+  if (endingCash === null) {
+    cashoutEndingCashInputEl.setCustomValidity(requireValue ? 'Enter a valid ending cash amount that is 0 or higher.' : '');
+    return null;
+  }
+
+  cashoutEndingCashInputEl.setCustomValidity('');
+  return endingCash;
+}
+
+async function openCashoutFlow() {
+  if (!cashoutSummaryEl) return;
+  openCashoutSummaryModal();
+  cashoutSummaryEl.innerHTML = '<p>Loading summary...</p>';
+  if (cashoutEndingCashInputEl) cashoutEndingCashInputEl.value = '';
+  if (cashoutDiscrepancyStatusEl) {
+    cashoutDiscrepancyStatusEl.textContent = 'Enter ending cash to compute discrepancy.';
+  }
+
+  try {
+    const summary = await refreshLatestShiftSummary();
+    renderShiftSummary(cashoutSummaryEl, summary);
+    if (cashoutEndingCashInputEl) cashoutEndingCashInputEl.setCustomValidity('');
+    updateCashoutDiscrepancyStatus(summary);
+  } catch (error) {
+    cashoutSummaryEl.innerHTML = `<p class="error">Unable to load shift summary: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function submitStartShift() {
+  if (state.startShiftBusy || !needsCashierShiftStart()) return;
+
+  const drawerId = String(startShiftContext?.drawerId || startShiftDrawerSelectEl?.value || '').trim();
+  if (!drawerId) {
+    if (startShiftReferenceStatusEl) {
+      startShiftReferenceStatusEl.textContent = 'Select a drawer name before starting the shift.';
+    }
+    if (startShiftDrawerSelectEl) startShiftDrawerSelectEl.focus();
+    return;
+  }
+  const startingCash = parseNonNegativeAmount(startShiftCashInputEl?.value);
+  if (startingCash === null) {
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Enter the counted cash drawer amount to start the shift.';
+    }
+    if (startShiftCashInputEl) startShiftCashInputEl.focus();
+    return;
+  }
+
+  const previousDrawerBalance = parseNonNegativeAmount(startShiftContext?.previousDrawerBalance);
+  const rawAdjustment = String(startShiftAdjustmentInputEl?.value || '').trim();
+  let openingAdjustment = 0;
+  if (rawAdjustment) {
+    openingAdjustment = Math.round(Number(rawAdjustment) * 100) / 100;
+    if (!Number.isFinite(openingAdjustment)) {
+      if (startShiftAdjustmentStatusEl) {
+        startShiftAdjustmentStatusEl.textContent = 'Cash adjustment must be a valid number before you start the shift.';
+      }
+      if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.focus();
+      return;
+    }
+  }
+  if (previousDrawerBalance !== null) {
+    const expectedStartingCash = Math.round((previousDrawerBalance + openingAdjustment) * 100) / 100;
+    if (expectedStartingCash < 0) {
+      if (startShiftAdjustmentStatusEl) {
+        startShiftAdjustmentStatusEl.textContent = 'The previous balance plus adjustment cannot be negative.';
+      }
+      if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.focus();
+      return;
+    }
+    if (startingCash !== expectedStartingCash) {
+      if (startShiftAdjustmentStatusEl) {
+        startShiftAdjustmentStatusEl.textContent = rawAdjustment
+          ? 'Click "Apply Adjustment" so the cash amount matches the adjustment before starting the shift.'
+          : 'Use "Use Previous Balance" or "Apply Adjustment" before starting the shift.';
+      }
+      return;
+    }
+  }
+
+  try {
+    state.startShiftBusy = true;
+    if (startShiftConfirmBtn) {
+      startShiftConfirmBtn.disabled = true;
+      startShiftConfirmBtn.textContent = 'Starting...';
+    }
+    const shift = await ensureCashierShiftStarted({
+      drawerId,
+      startingCash,
+      previousShiftId: startShiftContext?.previousShiftId || null,
+      previousDrawerBalance,
+      openingAdjustment
+    });
+    const recordedStartingCash = Number(shift?.startingCash ?? startingCash);
+    const recordedAdjustment = Number(shift?.openingAdjustment ?? openingAdjustment ?? 0);
+    closeStartShiftModal();
+    setStatus(`Shift started. Starting cash recorded at ${money(recordedStartingCash)}.`);
+    showConfirmationToast({
+      title: 'Shift started',
+      message: recordedStartingCash !== startingCash
+        ? `An existing active shift was resumed with starting cash ${money(recordedStartingCash)}.`
+        : recordedAdjustment === 0
+          ? `Starting cash verified at ${money(recordedStartingCash)}.`
+          : `Starting cash set to ${money(recordedStartingCash)} with an applied cash adjustment of ${money(Math.abs(recordedAdjustment))}.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    if (isNetworkLikeError(error)) {
+      persistCashierShiftState({
+        shiftId: null,
+        drawerId,
+        drawerName: String(startShiftContext?.drawerName || '').trim() || null,
+        startedAt: new Date().toISOString(),
+        startingCash,
+        previousDrawerBalance,
+        openingAdjustment
+      });
+      closeStartShiftModal();
+      setStatus(`Shift started in offline mode. Starting cash recorded at ${money(startingCash)}.`);
+      showConfirmationToast({
+        title: 'Offline shift started',
+        message: 'The shift was stored locally and will sync when the server is reachable.',
+        tone: 'warning',
+        duration: 3200
+      });
+      return;
+    }
+
+    if (startShiftReferenceStatusEl) {
+      startShiftReferenceStatusEl.textContent = `Unable to start shift: ${error.message}`;
+    }
+    if (startShiftAdjustmentStatusEl) {
+      startShiftAdjustmentStatusEl.textContent = 'Fix the issue above, then try starting the shift again.';
+    }
+  } finally {
+    state.startShiftBusy = false;
+    if (startShiftConfirmBtn) {
+      startShiftConfirmBtn.disabled = false;
+      startShiftConfirmBtn.textContent = 'Start Shift';
+    }
+  }
+}
+
+async function finalizeLogout() {
   if (state.logoutBusy) return;
   state.logoutBusy = true;
 
@@ -1162,34 +3025,56 @@ async function handleLogout() {
     email: activeAuthSession?.email || null
   };
 
-  // Do local logout immediately so the UI feels responsive.
-  if (state.poller) {
-    clearInterval(state.poller);
-    state.poller = null;
+  try {
+    if (state.poller) {
+      clearInterval(state.poller);
+      state.poller = null;
+    }
+
+    closeSettingsMenu();
+    closeAdminLogin();
+    closeAdminDashboard();
+    closeAdminReceiptModal();
+    closeEwalletModal();
+    closeShiftMonitorModal();
+    closeStartShiftModal();
+    closeCashoutSummaryModal();
+    closeInventoryEditModal();
+    closeInventoryDeleteModal();
+    closeInventoryHistoryModal();
+    closeCashDrawerControlModal();
+    setLatestAdminReport(null);
+
+    if (isDrawerOperatorRole(activeAuthSession?.role)) {
+      clearCashierShiftState();
+    }
+
+    clearActiveSession();
+    lockDashboard();
+    setAuthMode('login');
+    showConfirmationToast({
+      title: 'Logged out successfully',
+      message: `See you next time, ${displayName}.`,
+      tone: 'success'
+    });
+    if (loginEmailEl) loginEmailEl.focus();
+
+    api('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify(logoutPayload)
+    }).catch(() => {});
+  } finally {
+    state.logoutBusy = false;
   }
+}
 
-  closeSettingsMenu();
-  closeAdminLogin();
-  closeAdminDashboard();
-  closeAdminReceiptModal();
-  closeEwalletModal();
-  clearActiveSession();
-  lockDashboard();
-  setAuthMode('login');
-  showConfirmationToast({
-    title: 'Logged out successfully',
-    message: `See you next time, ${displayName}.`,
-    tone: 'success'
-  });
-  if (loginEmailEl) loginEmailEl.focus();
-
-  // Notify server in background without blocking UI.
-  api('/api/auth/logout', {
-    method: 'POST',
-    body: JSON.stringify(logoutPayload)
-  }).catch(() => {});
-
-  state.logoutBusy = false;
+async function handleLogout() {
+  if (state.logoutBusy) return;
+  if (isDrawerOperatorRole(activeAuthSession?.role) && cashierShiftState?.startedAt) {
+    await openCashoutFlow();
+    return;
+  }
+  await finalizeLogout();
 }
 
 function setAuthMessage(message, isSuccess = false) {
@@ -1199,17 +3084,8 @@ function setAuthMessage(message, isSuccess = false) {
 }
 
 function setAuthMode(mode) {
-  const showLogin = mode !== 'signup';
+  const showLogin = mode !== 'hidden';
   if (loginFormEl) loginFormEl.classList.toggle('hidden', !showLogin);
-  if (signupFormEl) signupFormEl.classList.toggle('hidden', showLogin);
-  if (showLoginBtn) {
-    showLoginBtn.classList.toggle('active', showLogin);
-    showLoginBtn.setAttribute('aria-selected', String(showLogin));
-  }
-  if (showSignupBtn) {
-    showSignupBtn.classList.toggle('active', !showLogin);
-    showSignupBtn.setAttribute('aria-selected', String(!showLogin));
-  }
   setAuthMessage('');
   updateSettingsRoleItems();
 }
@@ -1258,7 +3134,7 @@ async function handleLoginSubmit(event) {
   const password = String(loginPasswordEl?.value || '');
 
   if (!email || !password) {
-    setAuthMessage('Enter your email and password.');
+    setAuthMessage('Complete email and password to sign in.');
     return;
   }
 
@@ -1270,6 +3146,8 @@ async function handleLoginSubmit(event) {
       body: JSON.stringify({ email, password })
     });
 
+    const accountRole = normalizeRoleChoice(result?.user?.role);
+
     writeActiveSession({
       name: result.user.fullName,
       email: result.user.email,
@@ -1277,6 +3155,9 @@ async function handleLoginSubmit(event) {
       userId: result.user.id
     });
     writeAccessToken(result.session?.accessToken || '');
+
+    clearCashierShiftState();
+
     await cacheOfflineAuthCredential({
       name: result.user.fullName,
       email: result.user.email,
@@ -1292,6 +3173,9 @@ async function handleLoginSubmit(event) {
     });
     unlockDashboard();
     startAppOnce();
+    if (canViewShiftMonitorOnPos(accountRole)) {
+      await presentStartShiftModal();
+    }
   } catch (error) {
     const errorText = String(error?.message || '');
     const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
@@ -1299,8 +3183,11 @@ async function handleLoginSubmit(event) {
       try {
         const offlineUser = await tryOfflineLogin(email, password);
         if (offlineUser) {
+          const offlineRole = normalizeRoleChoice(offlineUser.role);
+
           writeActiveSession(offlineUser);
           writeAccessToken('');
+          clearCashierShiftState();
           setAuthMessage('Offline login successful (cached credentials).', true);
           showConfirmationToast({
             title: 'Offline login',
@@ -1310,6 +3197,9 @@ async function handleLoginSubmit(event) {
           });
           unlockDashboard();
           startAppOnce();
+          if (canViewShiftMonitorOnPos(offlineRole)) {
+            await presentStartShiftModal();
+          }
           return;
         }
       } catch (_offlineError) {
@@ -1325,102 +3215,20 @@ async function handleLoginSubmit(event) {
   }
 }
 
-async function handleSignupSubmit(event) {
-  event.preventDefault();
-  if (state.authBusy) return;
-  const name = String(signupNameEl?.value || '').trim();
-  const email = normalizeEmail(signupEmailEl?.value);
-  const role = String(signupRoleEl?.value || '').trim().toLowerCase();
-  const password = String(signupPasswordEl?.value || '');
-
-  if (!name || !email || !password || !role) {
-    setAuthMessage('Complete all fields to create an account.');
-    return;
-  }
-  if (password.length < 6) {
-    setAuthMessage('Password must be at least 6 characters.');
-    return;
-  }
-  if (!['administrations', 'supervisor', 'encharge'].includes(role)) {
-    setAuthMessage('Select a valid role.');
-    return;
-  }
-
-  try {
-    state.authBusy = true;
-    setFormSubmitBusy(signupFormEl, true, 'Creating account...');
-    await api('/api/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({
-        fullName: name,
-        email,
-        role,
-        password
-      })
-    });
-
-    const loginResult = await api('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-
-    writeActiveSession({
-      name: loginResult.user.fullName,
-      email: loginResult.user.email,
-      role: loginResult.user.role,
-      userId: loginResult.user.id
-    });
-    writeAccessToken(loginResult.session?.accessToken || '');
-    await cacheOfflineAuthCredential({
-      name: loginResult.user.fullName,
-      email: loginResult.user.email,
-      role: loginResult.user.role,
-      userId: loginResult.user.id,
-      password
-    });
-    setAuthMessage('Sign up successful. Redirecting to dashboard...', true);
-    showConfirmationToast({
-      title: 'Signup successful',
-      message: `Welcome ${loginResult.user.fullName}. Your account is ready.`,
-      tone: 'success'
-    });
-    unlockDashboard();
-    startAppOnce();
-  } catch (error) {
-    const errorText = String(error.message || '');
-    const isExisting = /already|exists|registered/i.test(errorText);
-    if (isExisting) {
-      setAuthMessage('This email is already registered. Please login instead.');
-      showConfirmationToast({
-        title: 'Signup blocked',
-        message: 'Email already exists. Use Login.',
-        tone: 'warning',
-        duration: 2200
-      });
-      setAuthMode('login');
-      if (loginEmailEl) loginEmailEl.value = email;
-      if (loginEmailEl) loginEmailEl.focus();
-      return;
-    }
-    setAuthMessage(`Sign up failed: ${error.message}`);
-  } finally {
-    state.authBusy = false;
-    setFormSubmitBusy(signupFormEl, false);
-  }
-}
-
 function setupAuth() {
-  if (showLoginBtn) {
-    showLoginBtn.addEventListener('click', () => setAuthMode('login'));
-  }
-  if (showSignupBtn) {
-    showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
-  }
   if (loginFormEl) {
     loginFormEl.addEventListener('submit', handleLoginSubmit);
   }
-  if (signupFormEl) {
-    signupFormEl.addEventListener('submit', handleSignupSubmit);
+  if (cashoutEndingCashInputEl) {
+    cashoutEndingCashInputEl.addEventListener('input', () => {
+      parseCashoutEndingCash();
+      updateCashoutDiscrepancyStatus(latestShiftSummary);
+      if (cashoutSummaryEl && latestShiftSummary) {
+        renderShiftSummary(cashoutSummaryEl, latestShiftSummary, {
+          endingCash: parseCashoutEndingCash()
+        });
+      }
+    });
   }
   if (settingsToggleBtn) {
     settingsToggleBtn.addEventListener('click', (e) => {
@@ -1430,6 +3238,39 @@ function setupAuth() {
   }
   if (logoutBtn) {
     logoutBtn.addEventListener('click', handleLogout);
+  }
+  if (startShiftCashInputEl) {
+    startShiftCashInputEl.addEventListener('input', updateStartShiftAdjustmentStatus);
+  }
+  if (startShiftDrawerSelectEl) {
+    startShiftDrawerSelectEl.addEventListener('change', () => {
+      loadSelectedStartShiftDrawerContext().catch((error) => {
+        if (startShiftReferenceStatusEl) {
+          startShiftReferenceStatusEl.textContent = `Unable to load drawer context: ${error.message}`;
+        }
+      });
+    });
+  }
+  if (startShiftAdjustmentInputEl) {
+    startShiftAdjustmentInputEl.addEventListener('input', updateStartShiftAdjustmentStatus);
+  }
+  if (startShiftUsePreviousBtn) {
+    startShiftUsePreviousBtn.addEventListener('click', usePreviousStartShiftBalance);
+  }
+  if (startShiftApplyAdjustmentBtn) {
+    startShiftApplyAdjustmentBtn.addEventListener('click', applyStartShiftAdjustment);
+  }
+  if (startShiftConfirmBtn) {
+    startShiftConfirmBtn.addEventListener('click', () => {
+      submitStartShift().catch((error) => {
+        setStatus(`Shift start error: ${error.message}`);
+      });
+    });
+  }
+  if (startShiftSignOutBtn) {
+    startShiftSignOutBtn.addEventListener('click', () => {
+      finalizeLogout().catch(() => {});
+    });
   }
   if (settingsAdminDashboardBtn) {
     settingsAdminDashboardBtn.addEventListener('click', async () => {
@@ -1449,6 +3290,15 @@ function setupAuth() {
         });
       }
     });
+  }
+  if (settingsCashDrawerBtn) {
+    settingsCashDrawerBtn.addEventListener('click', () => {
+      closeSettingsMenu();
+      openCashDrawerControlModal();
+    });
+  }
+  if (cashDrawerControlCloseBtnEl) {
+    cashDrawerControlCloseBtnEl.addEventListener('click', closeCashDrawerControlModal);
   }
   document.addEventListener('click', (e) => {
     if (!settingsMenuEl?.classList.contains('open')) return;
@@ -1565,6 +3415,7 @@ async function bootstrap() {
       role: activeUser.role || 'encharge',
       userId: activeUser.userId || null
     };
+    hydrateCashierShiftState();
     unlockDashboard();
     startAppOnce();
     document.body.classList.remove('auth-checking');
@@ -1581,7 +3432,11 @@ async function bootstrap() {
         userId: sessionResult.user.id
       };
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(activeAuthSession));
+      hydrateCashierShiftState();
       unlockDashboard();
+      if (canViewShiftMonitorOnPos(activeAuthSession?.role) && needsCashierShiftStart()) {
+        await presentStartShiftModal();
+      }
     } catch (error) {
       const errorText = String(error?.message || '');
       const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
@@ -1589,6 +3444,8 @@ async function bootstrap() {
         clearActiveSession();
         lockDashboard();
         if (loginEmailEl) loginEmailEl.focus();
+      } else if (canViewShiftMonitorOnPos(activeAuthSession?.role) && needsCashierShiftStart()) {
+        await presentStartShiftModal();
       }
     }
     return;
@@ -1612,25 +3469,80 @@ function switchTab(tabName) {
   });
 
   if (tabName === 'admin') {
-    refreshAdminTransactions();
+    refreshSalesReport(activeSalesRange);
   }
 }
 
-function switchAdminPanel(panelName) {
-  const isOverview = panelName === 'overview';
-  const isInventory = panelName === 'inventory';
-  const isKit = panelName === 'kit-spec';
+function normalizeAdminPanelName(panelName) {
+  const normalized = String(panelName || '').trim().toLowerCase();
+  const allowedPanels = new Set([
+    'overview',
+    'inventory',
+    'kit-spec',
+    'users',
+    'operations',
+    'receipt-templates',
+    'reports',
+    'others'
+  ]);
+  return allowedPanels.has(normalized) ? normalized : 'overview';
+}
+
+function switchAdminPanel(panelName, { persist = true } = {}) {
+  const activePanel = normalizeAdminPanelName(panelName);
+  const isOverview = activePanel === 'overview';
+  const isInventory = activePanel === 'inventory';
+  const isKit = activePanel === 'kit-spec';
+  const isUsers = activePanel === 'users';
+  const isOperations = activePanel === 'operations';
+  const isReceiptTemplates = activePanel === 'receipt-templates';
+  const isReports = activePanel === 'reports';
+  const isOthers = activePanel === 'others';
 
   if (adminPanelOverviewEl) adminPanelOverviewEl.classList.toggle('active', isOverview);
   if (adminPanelInventoryEl) adminPanelInventoryEl.classList.toggle('active', isInventory);
   if (adminPanelKitSpecEl) adminPanelKitSpecEl.classList.toggle('active', isKit);
+  if (adminPanelUsersEl) adminPanelUsersEl.classList.toggle('active', isUsers);
+  if (adminPanelOperationsEl) adminPanelOperationsEl.classList.toggle('active', isOperations);
+  if (adminPanelReceiptTemplatesEl) adminPanelReceiptTemplatesEl.classList.toggle('active', isReceiptTemplates);
+  if (adminPanelReportsEl) adminPanelReportsEl.classList.toggle('active', isReports);
+  if (adminPanelOthersEl) adminPanelOthersEl.classList.toggle('active', isOthers);
 
   if (adminNavOverviewBtn) adminNavOverviewBtn.classList.toggle('active', isOverview);
   if (adminNavInventoryBtn) adminNavInventoryBtn.classList.toggle('active', isInventory);
   if (adminNavKitSpecBtn) adminNavKitSpecBtn.classList.toggle('active', isKit);
+  if (adminNavUsersBtn) adminNavUsersBtn.classList.toggle('active', isUsers);
+  if (adminNavOperationsBtn) adminNavOperationsBtn.classList.toggle('active', isOperations);
+  if (adminNavReceiptTemplatesBtn) adminNavReceiptTemplatesBtn.classList.toggle('active', isReceiptTemplates);
+  if (adminNavReportsBtn) adminNavReportsBtn.classList.toggle('active', isReports);
+  if (adminNavOthersBtn) adminNavOthersBtn.classList.toggle('active', isOthers);
 
   if (isInventory) {
     refreshInventoryModule();
+  }
+  if (isKit) {
+    refreshKitSpecModule();
+  }
+  if (isUsers) {
+    refreshAdminUsers();
+  }
+  if (isOperations) {
+    refreshCashierMonitoring();
+    refreshShiftManagement();
+    refreshDiscrepancyAlerts();
+  }
+  if (isReceiptTemplates) {
+    refreshReceiptTemplatesModule();
+  }
+  if (isOverview) {
+    refreshSalesReport(activeSalesRange);
+  }
+  if (isOthers) {
+    renderDiscountManager();
+    refreshMonthlyClosingModule();
+  }
+  if (persist) {
+    saveUserUiState({ adminPanel: activePanel });
   }
 }
 
@@ -1657,12 +3569,12 @@ function closeAdminLogin() {
   document.body.classList.remove('admin-login-open');
 }
 
-async function openAdminDashboard() {
+async function openAdminDashboard({ panelName, persist = true } = {}) {
+  const restoredPanel = panelName || readUserUiState()?.adminPanel;
+  const activePanel = normalizeAdminPanelName(restoredPanel);
   document.body.classList.add('admin-open');
   saveUserUiState({ adminOpen: true });
-  switchAdminPanel('overview');
-  await refreshAdminTransactions();
-  await refreshSalesReport(activeSalesRange);
+  switchAdminPanel(activePanel, { persist });
 }
 
 function closeAdminDashboard() {
@@ -1778,16 +3690,28 @@ function renderProducts() {
 
   const fragment = document.createDocumentFragment();
   state.products.forEach((p) => {
+    const availabilityClass = getProductAvailabilityClass(p);
+    const isUnavailable = !Boolean(p.isAvailable);
+    const buttonLabel = isUnavailable ? getProductDisabledButtonLabel(p) : 'Add to Order';
+    const indicatorMarkup = isUnavailable
+      ? `
+        <div class="product-availability ${availabilityClass}">
+          <div class="product-availability-label">${escapeHtml(p.availabilityLabel || 'Unavailable')}</div>
+          <div class="product-availability-reason">${escapeHtml(p.availabilityReason || 'This product is not ready for selling.')}</div>
+        </div>
+      `
+      : '';
     const row = document.createElement('div');
-    row.className = 'product-row';
+    row.className = `product-row${isUnavailable ? ' unavailable' : ''}`;
     row.setAttribute('data-category', String(p.category || '').toLowerCase());
     row.innerHTML = `
       <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
       <div class="product-info">
         <div class="product-name">${p.name}</div>
         <div class="product-price">${money(p.price)}</div>
+        ${indicatorMarkup}
       </div>
-      <button data-add="${p.id}">Add to Order</button>
+      <button data-add="${p.id}" ${isUnavailable ? 'disabled' : ''}>${buttonLabel}</button>
     `;
     fragment.appendChild(row);
   });
@@ -1827,6 +3751,7 @@ function switchCategory(category) {
 
 async function refreshCatalog({ keepCategory = true } = {}) {
   const result = await api('/api/products');
+  applyAppConfig(result?.appConfig || state.appConfig);
   const nextCategories = Array.isArray(result.categories) ? result.categories : [];
   const nextProducts = Array.isArray(result.products) ? result.products : [];
 
@@ -1837,11 +3762,7 @@ async function refreshCatalog({ keepCategory = true } = {}) {
     sortOrder: Number(x.sortOrder || 0)
   }));
   state.products = nextProducts.map((x) => ({
-    id: x.id,
-    name: x.name,
-    price: Number(x.price || 0),
-    category: String(x.category || '').trim().toLowerCase(),
-    image: x.image || '/Business Logo/Ruels Logo for business.png'
+    ...toClientProduct(x)
   }));
 
   if (!state.categories.length) {
@@ -2370,6 +4291,7 @@ async function handleMenuProductEditorClick(event) {
 }
 
 function renderCart() {
+  if (!cartEl) return;
   cartEl.innerHTML = '';
 
   const items = getCartItems();
@@ -2394,13 +4316,19 @@ function renderCart() {
   }
 
   const subtotal = getCartTotal();
+  const selectedProfile = getSelectedDiscountProfile();
   const discount = getDiscountAmount();
   const totalDue = getTotalDue();
+  state.discountAmount = discount;
   if (subtotalValueEl) subtotalValueEl.textContent = money(subtotal);
   if (totalDueValueEl) totalDueValueEl.textContent = money(totalDue);
-  if (discountInputEl) {
-    discountInputEl.value = discount ? discount.toFixed(2) : '0';
+  renderDiscountProfileSelect();
+  if (discountPreviousTotalValueEl) discountPreviousTotalValueEl.textContent = money(subtotal);
+  if (discountAppliedLabelEl) {
+    discountAppliedLabelEl.textContent = getDiscountProfileSummaryText(selectedProfile);
   }
+  if (discountDeductionValueEl) discountDeductionValueEl.textContent = money(discount);
+  if (discountCurrentTotalValueEl) discountCurrentTotalValueEl.textContent = money(totalDue);
 }
 
 function onProductClick(e) {
@@ -2408,6 +4336,18 @@ function onProductClick(e) {
   const removeId = e.target.getAttribute('data-remove');
 
   if (addId) {
+    const product = (state.products || []).find((x) => String(x.id) === String(addId));
+    if (product && !product.isAvailable) {
+      const reason = String(product.availabilityLabel || product.availabilityReason || 'This product is unavailable.').trim();
+      setStatus(`${product.name} cannot be added right now. ${reason}`);
+      return;
+    }
+    const currentQty = Number(state.cart[addId] || 0);
+    const availableUnits = Number(product?.availableUnits || 0);
+    if (product && Number.isFinite(availableUnits) && availableUnits > 0 && currentQty >= availableUnits) {
+      setStatus(`${product.name} only has ${availableUnits} serving(s) available based on the current kit specification stock.`);
+      return;
+    }
     state.cart[addId] = (state.cart[addId] || 0) + 1;
     renderCart();
     playAddToCartConfetti();
@@ -2422,32 +4362,506 @@ function onProductClick(e) {
 function resetAfterSale() {
   state.cart = {};
   state.activeInvoice = null;
+  state.scanQrContext = null;
+  state.selectedDiscountProfileId = '';
   state.discountAmount = 0;
   gcashInfoEl.innerHTML = '';
   if (state.poller) {
     clearInterval(state.poller);
     state.poller = null;
   }
+  closeScanQrModal();
   // Clear customer info fields
   if (customerNameEl) customerNameEl.value = '';
   if (customerEmailEl) customerEmailEl.value = '';
   if (customerPhoneEl) customerPhoneEl.value = '';
-  if (discountInputEl) discountInputEl.value = '0';
   renderCart();
 }
 
 function updateReceiptActionVisibility() {
   const hasReceipt = Boolean(state.lastPaidInvoice);
+  const canHoldForVoid = Boolean(
+    hasReceipt
+    && isCashierRole(activeAuthSession?.role)
+    && String(state.lastPaidInvoice?.status || '').trim().toUpperCase() === 'PAID'
+  );
   if (statusReceiptActionsEl) {
     statusReceiptActionsEl.style.display = hasReceipt ? 'flex' : 'none';
   }
   if (statusPrintReceiptBtn) {
     statusPrintReceiptBtn.disabled = !hasReceipt;
   }
+  if (statusHoldForVoidBtn) {
+    statusHoldForVoidBtn.disabled = !canHoldForVoid;
+    statusHoldForVoidBtn.textContent = canHoldForVoid ? 'Hold for Void' : 'Hold for Void Requested';
+  }
+  if (receiptHoldForVoidBtn) {
+    receiptHoldForVoidBtn.disabled = !canHoldForVoid;
+    receiptHoldForVoidBtn.textContent = canHoldForVoid ? 'Hold for Void' : 'Hold for Void Requested';
+  }
+}
+
+function setReceiptTemplateContent(el, value) {
+  if (!el) return;
+  const text = String(value || '').trim();
+  el.textContent = text;
+  el.style.display = text ? '' : 'none';
+}
+
+function applyReceiptTemplateToArea(areaEl, template, refs = {}) {
+  if (!areaEl) return;
+  const settings = normalizeReceiptTemplate(template).settings;
+  areaEl.style.setProperty('--receipt-paper-width', `${settings.paperWidthMm}mm`);
+  areaEl.style.setProperty('--receipt-padding', `${settings.paddingPx}px`);
+  areaEl.style.setProperty('--receipt-radius', `${settings.borderRadiusPx}px`);
+  areaEl.style.setProperty('--receipt-font-family', settings.fontFamily);
+  areaEl.style.setProperty('--receipt-base-font-size', `${settings.baseFontSizePx}px`);
+  areaEl.style.setProperty('--receipt-title-size', `${settings.titleFontSizePx}px`);
+  areaEl.style.setProperty('--receipt-meta-size', `${settings.metaFontSizePx}px`);
+  areaEl.style.setProperty('--receipt-total-size', `${settings.totalFontSizePx}px`);
+  areaEl.style.setProperty('--receipt-section-gap', `${settings.sectionGapPx}px`);
+  areaEl.style.setProperty('--receipt-logo-width', `${settings.logoWidthPx}px`);
+  areaEl.style.setProperty('--receipt-header-align', settings.headerAlign);
+  areaEl.style.setProperty('--receipt-footer-align', settings.footerAlign);
+  areaEl.style.setProperty('--receipt-background', settings.backgroundColor);
+  areaEl.style.setProperty('--receipt-text-color', settings.textColor);
+  areaEl.style.setProperty('--receipt-accent-color', settings.accentColor);
+  areaEl.style.setProperty('--receipt-muted-color', settings.mutedColor);
+  areaEl.style.setProperty('--receipt-border-color', settings.borderColor);
+  areaEl.style.setProperty('--receipt-border-style', settings.borderStyle);
+  areaEl.style.setProperty('--receipt-divider-style', settings.dividerStyle);
+  areaEl.style.setProperty('--receipt-extra-note-align', settings.extraMessageAlign);
+  areaEl.style.setProperty('--receipt-extra-note-style', settings.extraMessageStyle);
+  areaEl.style.setProperty('--receipt-footer-size', `${settings.footerFontSizePx}px`);
+  areaEl.style.setProperty('--receipt-footer-top-spacing', `${settings.footerTopSpacingPx}px`);
+  areaEl.style.setProperty('--receipt-header-top-padding', `${settings.headerTopPaddingPx}px`);
+  areaEl.style.setProperty('--receipt-header-offset-x', `${settings.headerOffsetX}px`);
+  areaEl.style.setProperty('--receipt-header-offset-y', `${settings.headerOffsetY}px`);
+  areaEl.style.setProperty('--receipt-meta-offset-x', `${settings.metaOffsetX}px`);
+  areaEl.style.setProperty('--receipt-meta-offset-y', `${settings.metaOffsetY}px`);
+  areaEl.style.setProperty('--receipt-items-offset-x', `${settings.itemsOffsetX}px`);
+  areaEl.style.setProperty('--receipt-items-offset-y', `${settings.itemsOffsetY}px`);
+  areaEl.style.setProperty('--receipt-totals-offset-x', `${settings.totalsOffsetX}px`);
+  areaEl.style.setProperty('--receipt-totals-offset-y', `${settings.totalsOffsetY}px`);
+  areaEl.style.setProperty('--receipt-footer-offset-x', `${settings.footerOffsetX}px`);
+  areaEl.style.setProperty('--receipt-footer-offset-y', `${settings.footerOffsetY}px`);
+  areaEl.style.setProperty('--receipt-extra-note-offset-x', `${settings.extraMessageOffsetX}px`);
+  areaEl.style.setProperty('--receipt-extra-note-offset-y', `${settings.extraMessageOffsetY}px`);
+  areaEl.classList.toggle('logo-hidden', settings.showLogo === false);
+
+  const logoEl = refs.logoEl || areaEl.querySelector('.receipt-logo');
+  if (logoEl) {
+    logoEl.src = settings.logoUrl;
+    logoEl.alt = `${settings.storeName} Logo`;
+    logoEl.style.display = settings.showLogo === false ? 'none' : '';
+  }
+
+  setReceiptTemplateContent(refs.storeNameEl || areaEl.querySelector('.receipt-store-name'), settings.storeName);
+  setReceiptTemplateContent(refs.storeAddressEl || areaEl.querySelector('.receipt-store-address'), settings.storeAddress);
+  setReceiptTemplateContent(refs.storeTaxEl || areaEl.querySelector('.receipt-store-tax'), settings.taxLine);
+  setReceiptTemplateContent(refs.footerEl || areaEl.querySelector('.receipt-footer'), settings.footerMessage);
+  setReceiptTemplateContent(refs.extraNoteEl || areaEl.querySelector('.receipt-extra-note'), settings.extraMessage);
+}
+
+function applyActiveReceiptTemplate() {
+  const template = getActiveReceiptTemplate();
+  state.activeReceiptTemplate = template;
+  applyReceiptTemplateToArea(receiptPrintAreaEl, template, {
+    logoEl: receiptLogoEl,
+    storeNameEl: receiptStoreNameEl,
+    storeAddressEl: receiptStoreAddressEl,
+    storeTaxEl: receiptStoreTaxEl,
+    footerEl: receiptFooterEl,
+    extraNoteEl: receiptExtraNoteEl
+  });
+  applyReceiptTemplateToArea(adminReceiptPrintAreaEl, template, {
+    logoEl: adminReceiptLogoEl,
+    storeNameEl: adminReceiptStoreNameEl,
+    storeAddressEl: adminReceiptStoreAddressEl,
+    storeTaxEl: adminReceiptStoreTaxEl,
+    footerEl: adminReceiptFooterEl,
+    extraNoteEl: adminReceiptExtraNoteEl
+  });
+}
+
+function buildReceiptItemRows(items = []) {
+  return (items || [])
+    .map((item) => `
+      <div class="receipt-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+}
+
+function buildReceiptTemplatePreviewMarkup(template) {
+  const settings = normalizeReceiptTemplate(template).settings;
+  const invoice = RECEIPT_TEMPLATE_SAMPLE;
+  return `
+    <div class="receipt-print-area receipt-template-preview-surface">
+      <div class="receipt-header receipt-preview-draggable" data-preview-drag="header" title="Drag to move header in preview">
+        <img class="receipt-logo" src="${escapeHtml(settings.logoUrl)}" alt="${escapeHtml(settings.storeName)} Logo" />
+        <h3 class="receipt-store-name">${escapeHtml(settings.storeName)}</h3>
+        <p class="receipt-store-address">${escapeHtml(settings.storeAddress)}</p>
+        <p class="receipt-store-tax">${escapeHtml(settings.taxLine)}</p>
+      </div>
+      <div class="receipt-meta receipt-preview-draggable" data-preview-drag="meta" title="Drag to move meta details in preview">
+        <div><span>Receipt No:</span> <strong>${escapeHtml(invoice.reference)}</strong></div>
+        <div><span>Date:</span> <strong>${escapeHtml(formatDate(invoice.paidAt))}</strong></div>
+        <div><span>Order Type:</span> <strong>${escapeHtml(getOrderTypeLabel(invoice.orderType))}</strong></div>
+        <div><span>Payment:</span> <strong>${escapeHtml(getPaymentMethodLabel(invoice.paymentMethod))}</strong></div>
+      </div>
+      <div class="receipt-items receipt-preview-draggable" data-preview-drag="items" title="Drag to move item list in preview">${buildReceiptItemRows(invoice.lineItems)}</div>
+      <div class="receipt-totals receipt-preview-draggable" data-preview-drag="totals" title="Drag to move totals in preview">
+        <div><span>Subtotal</span><strong>${money(invoice.subtotal)}</strong></div>
+        <div><span>Discount</span><strong>${money(invoice.discount)}</strong></div>
+        ${settings.showDiscountProfileType && invoice.discountProfile ? `<div><span>${escapeHtml(settings.discountProfileLabel)}</span><strong>${escapeHtml(getReceiptDiscountProfileText(invoice))}</strong></div>` : ''}
+        <div class="total-due"><span>Total Due</span><strong>${money(invoice.total)}</strong></div>
+        <div><span>Amount Paid</span><strong>${money(invoice.payment.amountPaid)}</strong></div>
+        <div><span>Change</span><strong>${money(invoice.payment.change)}</strong></div>
+      </div>
+      <p class="receipt-footer receipt-preview-draggable" data-preview-drag="footer" title="Drag to move footer in preview">${escapeHtml(settings.footerMessage)}</p>
+      ${settings.extraMessage ? `<div class="receipt-extra-note receipt-preview-draggable" data-preview-drag="extra" title="Drag to move extra note in preview">${escapeHtml(settings.extraMessage)}</div>` : ''}
+    </div>
+  `;
+}
+
+function collectReceiptTemplateDraft() {
+  const localLogo = getStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY);
+  return normalizeReceiptTemplate({
+    id: state.receiptTemplateEditorId || DEFAULT_RECEIPT_TEMPLATE.id,
+    name: receiptTemplateNameInputEl?.value,
+    settings: {
+      storeName: receiptTemplateStoreNameInputEl?.value,
+      storeAddress: receiptTemplateStoreAddressInputEl?.value,
+      taxLine: receiptTemplateTaxLineInputEl?.value,
+      showDiscountProfileType: Boolean(receiptTemplateShowDiscountProfileInputEl?.checked),
+      discountProfileLabel: receiptTemplateDiscountProfileLabelInputEl?.value,
+      footerMessage: receiptTemplateFooterMessageInputEl?.value,
+      extraMessage: receiptTemplateExtraMessageInputEl?.value,
+      extraMessageAlign: receiptTemplateExtraMessageAlignSelectEl?.value,
+      extraMessageStyle: receiptTemplateExtraMessageStyleSelectEl?.value,
+      footerFontSizePx: receiptTemplateFooterFontSizeInputEl?.value,
+      footerTopSpacingPx: receiptTemplateFooterTopSpacingInputEl?.value,
+      headerTopPaddingPx: receiptTemplateHeaderTopPaddingInputEl?.value,
+      headerOffsetX: receiptTemplateHeaderOffsetXInputEl?.value,
+      headerOffsetY: receiptTemplateHeaderOffsetYInputEl?.value,
+      metaOffsetX: receiptTemplateMetaOffsetXInputEl?.value,
+      metaOffsetY: receiptTemplateMetaOffsetYInputEl?.value,
+      itemsOffsetX: receiptTemplateItemsOffsetXInputEl?.value,
+      itemsOffsetY: receiptTemplateItemsOffsetYInputEl?.value,
+      totalsOffsetX: receiptTemplateTotalsOffsetXInputEl?.value,
+      totalsOffsetY: receiptTemplateTotalsOffsetYInputEl?.value,
+      footerOffsetX: receiptTemplateFooterOffsetXInputEl?.value,
+      footerOffsetY: receiptTemplateFooterOffsetYInputEl?.value,
+      extraMessageOffsetX: receiptTemplateExtraMessageOffsetXInputEl?.value,
+      extraMessageOffsetY: receiptTemplateExtraMessageOffsetYInputEl?.value,
+      logoUrl: localLogo || receiptTemplateLogoUrlInputEl?.value,
+      showLogo: Boolean(receiptTemplateShowLogoInputEl?.checked),
+      fontFamily: receiptTemplateFontFamilySelectEl?.value,
+      headerAlign: receiptTemplateHeaderAlignSelectEl?.value,
+      footerAlign: receiptTemplateFooterAlignSelectEl?.value,
+      paperWidthMm: receiptTemplatePaperWidthInputEl?.value,
+      paddingPx: receiptTemplatePaddingInputEl?.value,
+      borderRadiusPx: receiptTemplateBorderRadiusInputEl?.value,
+      sectionGapPx: receiptTemplateSectionGapInputEl?.value,
+      baseFontSizePx: receiptTemplateBaseFontSizeInputEl?.value,
+      titleFontSizePx: receiptTemplateTitleFontSizeInputEl?.value,
+      metaFontSizePx: receiptTemplateMetaFontSizeInputEl?.value,
+      totalFontSizePx: receiptTemplateTotalFontSizeInputEl?.value,
+      logoWidthPx: receiptTemplateLogoWidthInputEl?.value,
+      borderStyle: receiptTemplateBorderStyleSelectEl?.value,
+      dividerStyle: receiptTemplateDividerStyleSelectEl?.value,
+      textColor: receiptTemplateTextColorInputEl?.value,
+      accentColor: receiptTemplateAccentColorInputEl?.value,
+      mutedColor: receiptTemplateMutedColorInputEl?.value,
+      backgroundColor: receiptTemplateBackgroundColorInputEl?.value,
+      borderColor: receiptTemplateBorderColorInputEl?.value
+    }
+  });
+}
+
+function updateReceiptTemplateLogoStorageNote() {
+  if (!receiptTemplateLogoStorageNoteEl) return;
+  const hasLocalLogo = Boolean(getStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY));
+  receiptTemplateLogoStorageNoteEl.textContent = hasLocalLogo
+    ? 'A logo image is stored in this browser for this template and will be used for preview and printing.'
+    : 'No local uploaded logo stored for this template yet.';
+}
+
+function setReceiptTemplatesStatus(message, tone = 'info') {
+  if (!receiptTemplatesStatusEl) return;
+  receiptTemplatesStatusEl.textContent = message;
+  receiptTemplatesStatusEl.classList.remove('status-success', 'status-error');
+  if (tone === 'success') {
+    receiptTemplatesStatusEl.classList.add('status-success');
+  } else if (tone === 'error') {
+    receiptTemplatesStatusEl.classList.add('status-error');
+  }
+}
+
+function populateReceiptTemplateEditor(template) {
+  const normalized = withLocalReceiptTemplateLogo(normalizeReceiptTemplate(template || getActiveReceiptTemplate()));
+  state.receiptTemplateEditorId = normalized.id || null;
+  if (receiptTemplateNameInputEl) receiptTemplateNameInputEl.value = normalized.name;
+  if (receiptTemplateStoreNameInputEl) receiptTemplateStoreNameInputEl.value = normalized.settings.storeName;
+  if (receiptTemplateStoreAddressInputEl) receiptTemplateStoreAddressInputEl.value = normalized.settings.storeAddress;
+  if (receiptTemplateTaxLineInputEl) receiptTemplateTaxLineInputEl.value = normalized.settings.taxLine;
+  if (receiptTemplateShowDiscountProfileInputEl) receiptTemplateShowDiscountProfileInputEl.checked = normalized.settings.showDiscountProfileType !== false;
+  if (receiptTemplateDiscountProfileLabelInputEl) receiptTemplateDiscountProfileLabelInputEl.value = normalized.settings.discountProfileLabel;
+  if (receiptTemplateFooterMessageInputEl) receiptTemplateFooterMessageInputEl.value = normalized.settings.footerMessage;
+  if (receiptTemplateExtraMessageInputEl) receiptTemplateExtraMessageInputEl.value = normalized.settings.extraMessage;
+  if (receiptTemplateExtraMessageAlignSelectEl) receiptTemplateExtraMessageAlignSelectEl.value = normalized.settings.extraMessageAlign;
+  if (receiptTemplateExtraMessageStyleSelectEl) receiptTemplateExtraMessageStyleSelectEl.value = normalized.settings.extraMessageStyle;
+  if (receiptTemplateFooterFontSizeInputEl) receiptTemplateFooterFontSizeInputEl.value = normalized.settings.footerFontSizePx;
+  if (receiptTemplateFooterTopSpacingInputEl) receiptTemplateFooterTopSpacingInputEl.value = normalized.settings.footerTopSpacingPx;
+  if (receiptTemplateHeaderTopPaddingInputEl) receiptTemplateHeaderTopPaddingInputEl.value = normalized.settings.headerTopPaddingPx;
+  if (receiptTemplateHeaderOffsetXInputEl) receiptTemplateHeaderOffsetXInputEl.value = normalized.settings.headerOffsetX;
+  if (receiptTemplateHeaderOffsetYInputEl) receiptTemplateHeaderOffsetYInputEl.value = normalized.settings.headerOffsetY;
+  if (receiptTemplateMetaOffsetXInputEl) receiptTemplateMetaOffsetXInputEl.value = normalized.settings.metaOffsetX;
+  if (receiptTemplateMetaOffsetYInputEl) receiptTemplateMetaOffsetYInputEl.value = normalized.settings.metaOffsetY;
+  if (receiptTemplateItemsOffsetXInputEl) receiptTemplateItemsOffsetXInputEl.value = normalized.settings.itemsOffsetX;
+  if (receiptTemplateItemsOffsetYInputEl) receiptTemplateItemsOffsetYInputEl.value = normalized.settings.itemsOffsetY;
+  if (receiptTemplateTotalsOffsetXInputEl) receiptTemplateTotalsOffsetXInputEl.value = normalized.settings.totalsOffsetX;
+  if (receiptTemplateTotalsOffsetYInputEl) receiptTemplateTotalsOffsetYInputEl.value = normalized.settings.totalsOffsetY;
+  if (receiptTemplateFooterOffsetXInputEl) receiptTemplateFooterOffsetXInputEl.value = normalized.settings.footerOffsetX;
+  if (receiptTemplateFooterOffsetYInputEl) receiptTemplateFooterOffsetYInputEl.value = normalized.settings.footerOffsetY;
+  if (receiptTemplateExtraMessageOffsetXInputEl) receiptTemplateExtraMessageOffsetXInputEl.value = normalized.settings.extraMessageOffsetX;
+  if (receiptTemplateExtraMessageOffsetYInputEl) receiptTemplateExtraMessageOffsetYInputEl.value = normalized.settings.extraMessageOffsetY;
+  if (receiptTemplateLogoUrlInputEl) receiptTemplateLogoUrlInputEl.value = normalized.settings.logoUrl;
+  if (receiptTemplateShowLogoInputEl) receiptTemplateShowLogoInputEl.checked = normalized.settings.showLogo !== false;
+  if (receiptTemplateFontFamilySelectEl) receiptTemplateFontFamilySelectEl.value = normalized.settings.fontFamily;
+  if (receiptTemplateHeaderAlignSelectEl) receiptTemplateHeaderAlignSelectEl.value = normalized.settings.headerAlign;
+  if (receiptTemplateFooterAlignSelectEl) receiptTemplateFooterAlignSelectEl.value = normalized.settings.footerAlign;
+  if (receiptTemplatePaperWidthInputEl) receiptTemplatePaperWidthInputEl.value = normalized.settings.paperWidthMm;
+  if (receiptTemplatePaddingInputEl) receiptTemplatePaddingInputEl.value = normalized.settings.paddingPx;
+  if (receiptTemplateBorderRadiusInputEl) receiptTemplateBorderRadiusInputEl.value = normalized.settings.borderRadiusPx;
+  if (receiptTemplateSectionGapInputEl) receiptTemplateSectionGapInputEl.value = normalized.settings.sectionGapPx;
+  if (receiptTemplateBaseFontSizeInputEl) receiptTemplateBaseFontSizeInputEl.value = normalized.settings.baseFontSizePx;
+  if (receiptTemplateTitleFontSizeInputEl) receiptTemplateTitleFontSizeInputEl.value = normalized.settings.titleFontSizePx;
+  if (receiptTemplateMetaFontSizeInputEl) receiptTemplateMetaFontSizeInputEl.value = normalized.settings.metaFontSizePx;
+  if (receiptTemplateTotalFontSizeInputEl) receiptTemplateTotalFontSizeInputEl.value = normalized.settings.totalFontSizePx;
+  if (receiptTemplateLogoWidthInputEl) receiptTemplateLogoWidthInputEl.value = normalized.settings.logoWidthPx;
+  if (receiptTemplateBorderStyleSelectEl) receiptTemplateBorderStyleSelectEl.value = normalized.settings.borderStyle;
+  if (receiptTemplateDividerStyleSelectEl) receiptTemplateDividerStyleSelectEl.value = normalized.settings.dividerStyle;
+  if (receiptTemplateTextColorInputEl) receiptTemplateTextColorInputEl.value = normalized.settings.textColor;
+  if (receiptTemplateAccentColorInputEl) receiptTemplateAccentColorInputEl.value = normalized.settings.accentColor;
+  if (receiptTemplateMutedColorInputEl) receiptTemplateMutedColorInputEl.value = normalized.settings.mutedColor;
+  if (receiptTemplateBackgroundColorInputEl) receiptTemplateBackgroundColorInputEl.value = normalized.settings.backgroundColor;
+  if (receiptTemplateBorderColorInputEl) receiptTemplateBorderColorInputEl.value = normalized.settings.borderColor;
+  if (receiptTemplateLogoFileInputEl) receiptTemplateLogoFileInputEl.value = '';
+  updateReceiptTemplateLogoStorageNote();
+  renderReceiptTemplatePreview();
+  updateReceiptTemplateEditorState();
+}
+
+function updateReceiptTemplateEditorState() {
+  const canEdit = canManageReceiptTemplates();
+  const selectedTemplate = state.receiptTemplates.find((template) => template.id === state.receiptTemplateEditorId) || null;
+  const isSelectedActive = Boolean(selectedTemplate?.isActive);
+  if (receiptTemplateAdminNoteEl) {
+    receiptTemplateAdminNoteEl.textContent = canEdit
+      ? 'Save new templates or activate one for all printed transaction receipts.'
+      : 'You can preview receipt templates here, but only Administrations can save or activate them.';
+  }
+  if (receiptTemplateUpdateBtnEl) receiptTemplateUpdateBtnEl.disabled = !canEdit || !selectedTemplate;
+  if (receiptTemplateActivateBtnEl) {
+    receiptTemplateActivateBtnEl.disabled = !canEdit || !selectedTemplate || isSelectedActive;
+    receiptTemplateActivateBtnEl.textContent = isSelectedActive
+      ? 'Active for Transaction Receipts'
+      : 'Use for Transaction Receipts';
+  }
+  if (receiptTemplateSaveNewBtnEl) receiptTemplateSaveNewBtnEl.disabled = !canEdit;
+  if (receiptTemplateLogoClearBtnEl) receiptTemplateLogoClearBtnEl.disabled = !canEdit || !getStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY);
+  updateReceiptTemplateLogoStorageNote();
+}
+
+function renderReceiptTemplatePreview() {
+  if (!receiptTemplatePreviewAreaEl) return;
+  const draft = collectReceiptTemplateDraft();
+  receiptTemplatePreviewAreaEl.innerHTML = buildReceiptTemplatePreviewMarkup(draft);
+  const previewAreaEl = receiptTemplatePreviewAreaEl.querySelector('.receipt-print-area');
+  if (previewAreaEl) {
+    applyReceiptTemplateToArea(previewAreaEl, draft);
+  }
+}
+
+function getReceiptTemplateOffsetInputPair(section) {
+  if (section === 'header') {
+    return {
+      x: receiptTemplateHeaderOffsetXInputEl,
+      y: receiptTemplateHeaderOffsetYInputEl
+    };
+  }
+  if (section === 'footer') {
+    return {
+      x: receiptTemplateFooterOffsetXInputEl,
+      y: receiptTemplateFooterOffsetYInputEl
+    };
+  }
+  if (section === 'meta') {
+    return {
+      x: receiptTemplateMetaOffsetXInputEl,
+      y: receiptTemplateMetaOffsetYInputEl
+    };
+  }
+  if (section === 'items') {
+    return {
+      x: receiptTemplateItemsOffsetXInputEl,
+      y: receiptTemplateItemsOffsetYInputEl
+    };
+  }
+  if (section === 'totals') {
+    return {
+      x: receiptTemplateTotalsOffsetXInputEl,
+      y: receiptTemplateTotalsOffsetYInputEl
+    };
+  }
+  return {
+    x: receiptTemplateExtraMessageOffsetXInputEl,
+    y: receiptTemplateExtraMessageOffsetYInputEl
+  };
+}
+
+function updateReceiptTemplateSectionOffset(section, nextX, nextY) {
+  const fields = getReceiptTemplateOffsetInputPair(section);
+  if (fields.x) fields.x.value = String(clampTemplateNumber(nextX, -120, 120, 0));
+  if (fields.y) fields.y.value = String(clampTemplateNumber(nextY, -80, 120, 0));
+  renderReceiptTemplatePreview();
+  updateReceiptTemplateEditorState();
+}
+
+function startReceiptTemplatePreviewDrag(event) {
+  const dragTarget = event.target.closest('[data-preview-drag]');
+  if (!dragTarget || !receiptTemplatePreviewAreaEl) return;
+  const section = String(dragTarget.getAttribute('data-preview-drag') || '').trim();
+  if (!section) return;
+  event.preventDefault();
+  const fields = getReceiptTemplateOffsetInputPair(section);
+  receiptTemplatePreviewDragState = {
+    section,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startOffsetX: Number(fields.x?.value || 0),
+    startOffsetY: Number(fields.y?.value || 0)
+  };
+  document.body.classList.add('receipt-template-dragging');
+}
+
+function continueReceiptTemplatePreviewDrag(event) {
+  if (!receiptTemplatePreviewDragState) return;
+  event.preventDefault();
+  const dx = event.clientX - receiptTemplatePreviewDragState.startClientX;
+  const dy = event.clientY - receiptTemplatePreviewDragState.startClientY;
+  updateReceiptTemplateSectionOffset(
+    receiptTemplatePreviewDragState.section,
+    receiptTemplatePreviewDragState.startOffsetX + dx,
+    receiptTemplatePreviewDragState.startOffsetY + dy
+  );
+}
+
+function stopReceiptTemplatePreviewDrag() {
+  if (!receiptTemplatePreviewDragState) return;
+  receiptTemplatePreviewDragState = null;
+  document.body.classList.remove('receipt-template-dragging');
+}
+
+function renderReceiptTemplateList() {
+  if (!receiptTemplateListEl) return;
+  if (!state.receiptTemplates.length) {
+    receiptTemplateListEl.innerHTML = '<p>No saved receipt templates yet.</p>';
+    return;
+  }
+
+  const rows = state.receiptTemplates.map((template) => {
+    const normalized = withLocalReceiptTemplateLogo(normalizeReceiptTemplate(template));
+    const isSelected = normalized.id === state.receiptTemplateEditorId;
+    const fontLabel = normalized.settings.fontFamily.split(',')[0].replace(/['"]/g, '');
+    const hasLocalLogo = Boolean(getStoredReceiptTemplateLogo(normalized.id));
+    const canActivate = canManageReceiptTemplates() && !normalized.isActive;
+    return `
+      <article class="receipt-template-list-card${isSelected ? ' selected' : ''}">
+        <div class="receipt-template-list-head">
+          <div>
+            <strong>${escapeHtml(normalized.name)}</strong>
+            <small>${normalized.isActive ? 'Currently used for transaction printing' : 'Saved template'}${hasLocalLogo ? ' • local logo uploaded' : ''}</small>
+          </div>
+          ${normalized.isActive ? '<span class="receipt-template-active-badge">Active</span>' : ''}
+        </div>
+        <div class="receipt-template-list-meta">
+          <span>${escapeHtml(String(normalized.settings.paperWidthMm))}mm</span>
+          <span>${escapeHtml(normalized.settings.headerAlign)} header</span>
+          <span>${escapeHtml(fontLabel)}</span>
+        </div>
+        <div class="receipt-template-list-actions">
+          <button class="secondary small" type="button" data-receipt-template-load="${escapeHtml(normalized.id)}">Load</button>
+          <button class="secondary small" type="button" data-receipt-template-activate="${escapeHtml(normalized.id)}"${canActivate ? '' : ' disabled'}>${normalized.isActive ? 'Active Template' : 'Use for Receipts'}</button>
+          <button class="secondary small" type="button" data-receipt-template-delete="${escapeHtml(normalized.id)}"${canManageReceiptTemplates() && !normalized.isActive ? '' : ' disabled'}>Delete</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  receiptTemplateListEl.innerHTML = rows;
+}
+
+function applyReceiptTemplatesState(payload = {}) {
+  if (Array.isArray(payload?.templates)) {
+    state.receiptTemplates = payload.templates.map(normalizeReceiptTemplate);
+  }
+  if (payload?.activeReceiptTemplate) {
+    const activeTemplate = normalizeReceiptTemplate(payload.activeReceiptTemplate);
+    state.activeReceiptTemplate = activeTemplate;
+    if (state.receiptTemplates.length) {
+      state.receiptTemplates = state.receiptTemplates.map((template) => ({
+        ...normalizeReceiptTemplate(template),
+        isActive: template.id === activeTemplate.id
+      }));
+    } else {
+      state.receiptTemplates = [{ ...activeTemplate, isActive: true }];
+    }
+  } else if (state.receiptTemplates.length) {
+    state.activeReceiptTemplate = normalizeReceiptTemplate(
+      state.receiptTemplates.find((template) => template.isActive) || state.receiptTemplates[0]
+    );
+  } else {
+    state.activeReceiptTemplate = normalizeReceiptTemplate(DEFAULT_RECEIPT_TEMPLATE);
+  }
+
+  applyActiveReceiptTemplate();
+  renderReceiptTemplateList();
+  const selectedTemplate = state.receiptTemplates.find((template) => template.id === state.receiptTemplateEditorId);
+  populateReceiptTemplateEditor(selectedTemplate || state.activeReceiptTemplate);
+  const statusMessage = typeof payload?.statusMessage === 'string' && payload.statusMessage.trim()
+    ? payload.statusMessage.trim()
+    : `Active template: ${state.activeReceiptTemplate.name}. ${state.receiptTemplates.length || 1} saved template(s).`;
+  setReceiptTemplatesStatus(statusMessage, payload?.statusTone);
+}
+
+async function refreshReceiptTemplatesModule() {
+  if (!receiptTemplatesStatusEl) return;
+  setReceiptTemplatesStatus('Loading receipt templates...');
+  if (receiptTemplateListEl) receiptTemplateListEl.innerHTML = '<p>Loading templates...</p>';
+  try {
+    const result = await api('/api/admin/receipt-templates', {
+      headers: buildActorHeaders()
+    });
+    applyReceiptTemplatesState({
+      templates: result?.templates,
+      activeReceiptTemplate: result?.activeReceiptTemplate
+    });
+  } catch (error) {
+    setReceiptTemplatesStatus(`Receipt template error: ${error.message}`, 'error');
+    if (receiptTemplateListEl) receiptTemplateListEl.innerHTML = '';
+  }
 }
 
 function renderReceipt(invoice) {
-  const successText = invoice?.payment?.successMessage || (invoice.status === 'PAID' ? 'Payment Successful' : 'Payment Pending');
+  const normalizedStatus = String(invoice?.status || '').trim().toUpperCase();
+  const successText = normalizedStatus === 'HOLD_FOR_VOID'
+    ? 'Payment completed and placed on hold for admin void review'
+    : invoice?.payment?.successMessage || (normalizedStatus === 'PAID' ? 'Payment Successful' : 'Payment Pending');
   const itemRows = (invoice.lineItems || [])
     .map((item) => `
       <div class="status-item-row">
@@ -2458,12 +4872,20 @@ function renderReceipt(invoice) {
     .join('');
   const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : getOrderTypeLabel(state.orderType);
   const paidAtText = formatDate(invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString());
+  const statusBadgeClass = normalizedStatus === 'PAID'
+    ? 'paid'
+    : normalizedStatus === 'HOLD_FOR_VOID'
+      ? 'hold-void'
+      : '';
+  const lifecycleNote = (normalizedStatus === 'HOLD_FOR_VOID' || normalizedStatus === 'VOIDED' || normalizedStatus === 'CANCELLED')
+    ? `<div class="status-paid-at">${escapeHtml(getOverviewMixLabel(normalizedStatus))}${invoice?.statusReason ? `: ${escapeHtml(invoice.statusReason)}` : ''}</div>`
+    : '';
 
   statusEl.classList.add('invoice-status');
   statusEl.innerHTML = `
     <div class="status-head">
       <div class="status-ref">Invoice: ${escapeHtml(invoice.reference || '-')}</div>
-      <div class="status-badge ${String(invoice.status || '').toLowerCase() === 'paid' ? 'paid' : ''}">${escapeHtml(invoice.status || '-')}</div>
+      <div class="status-badge ${statusBadgeClass}">${escapeHtml(getOverviewMixLabel(normalizedStatus) || invoice.status || '-')}</div>
     </div>
     <div class="status-grid">
       <div class="status-grid-row"><span>Order</span><strong>${escapeHtml(orderLabel)}</strong></div>
@@ -2479,7 +4901,9 @@ function renderReceipt(invoice) {
       <div class="status-total-row"><span>Change</span><strong>${money(invoice?.payment?.change || 0)}</strong></div>
     </div>
     <div class="status-paid-at">Paid At: ${escapeHtml(paidAtText)}</div>
+    ${lifecycleNote}
   `;
+  updateReceiptActionVisibility();
 }
 
 function renderPaymentReceiptModal(invoice) {
@@ -2488,14 +4912,7 @@ function renderPaymentReceiptModal(invoice) {
     : getOrderTypeLabel(state.orderType);
   const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
   const paidAt = invoice?.payment?.paidAt || new Date().toISOString();
-  const itemRows = (invoice.lineItems || [])
-    .map((item) => `
-      <div class="receipt-item-row">
-        <span>${escapeHtml(item.name)} x ${item.qty}</span>
-        <strong>${money(item.subtotal)}</strong>
-      </div>
-    `)
-    .join('');
+  const itemRows = buildReceiptItemRows(invoice.lineItems || []);
 
   if (receiptRefEl) receiptRefEl.textContent = invoice.reference;
   if (receiptDateEl) receiptDateEl.textContent = formatDate(paidAt);
@@ -2507,20 +4924,19 @@ function renderPaymentReceiptModal(invoice) {
   if (receiptTotalDueEl) receiptTotalDueEl.textContent = money(invoice.total || 0);
   if (receiptAmountPaidEl) receiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
   if (receiptChangeEl) receiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+  applyActiveReceiptTemplate();
+  applyReceiptDiscountProfileLine(getActiveReceiptTemplate(), invoice, {
+    rowEl: receiptDiscountProfileRowEl,
+    labelEl: receiptDiscountProfileLabelEl,
+    valueEl: receiptDiscountProfileValueEl
+  });
 }
 
 function renderAdminReceiptModal(invoice) {
   const paidAt = invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString();
   const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : 'N/A';
   const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
-  const itemRows = (invoice.lineItems || [])
-    .map((item) => `
-      <div class="receipt-item-row">
-        <span>${escapeHtml(item.name)} x ${item.qty}</span>
-        <strong>${money(item.subtotal)}</strong>
-      </div>
-    `)
-    .join('');
+  const itemRows = buildReceiptItemRows(invoice.lineItems || []);
 
   if (adminReceiptRefEl) adminReceiptRefEl.textContent = invoice.reference || '-';
   if (adminReceiptDateEl) adminReceiptDateEl.textContent = formatDate(paidAt);
@@ -2532,6 +4948,12 @@ function renderAdminReceiptModal(invoice) {
   if (adminReceiptTotalDueEl) adminReceiptTotalDueEl.textContent = money(invoice.total || 0);
   if (adminReceiptAmountPaidEl) adminReceiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
   if (adminReceiptChangeEl) adminReceiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+  applyActiveReceiptTemplate();
+  applyReceiptDiscountProfileLine(getActiveReceiptTemplate(), invoice, {
+    rowEl: adminReceiptDiscountProfileRowEl,
+    labelEl: adminReceiptDiscountProfileLabelEl,
+    valueEl: adminReceiptDiscountProfileValueEl
+  });
 }
 
 function finalizeSuccessfulPayment(invoice, modeLabel) {
@@ -2560,24 +4982,77 @@ function printReceiptContent(printAreaEl) {
     return;
   }
 
-  const receiptHtml = printAreaEl.innerHTML;
+  const receiptHtml = printAreaEl.outerHTML;
   const printStyles = `
     <style>
-      body { font-family: Arial, sans-serif; margin: 0; padding: 8px; color: #2d1b12; }
-      .receipt-print-area { width: 80mm; margin: 0 auto; }
-      .receipt-header { text-align: center; border-bottom: 1px dashed #c8a88f; padding-bottom: 10px; margin-bottom: 10px; }
-      .receipt-logo { width: 110px; height: auto; object-fit: contain; margin-bottom: 6px; }
-      .receipt-header h3 { margin: 0; font-size: 24px; font-weight: 800; }
-      .receipt-header p { margin: 2px 0; font-size: 12px; }
-      .receipt-meta { display: grid; gap: 4px; margin-bottom: 10px; font-size: 12px; }
-      .receipt-meta div { display: flex; justify-content: space-between; border-bottom: 1px dotted #e6d3c3; padding-bottom: 2px; }
-      .receipt-items { border-top: 1px dashed #c8a88f; border-bottom: 1px dashed #c8a88f; padding: 8px 0; margin: 10px 0; }
-      .receipt-item-row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; gap: 8px; }
+      body { margin: 0; padding: 8px; background: #ffffff; }
+      .receipt-print-area {
+        width: var(--receipt-paper-width, 80mm);
+        margin: 0 auto;
+        border: 1px var(--receipt-border-style, dashed) var(--receipt-border-color, #c8a88f);
+        border-radius: var(--receipt-radius, 12px);
+        padding: var(--receipt-padding, 12px);
+        background: var(--receipt-background, #ffffff);
+        color: var(--receipt-text-color, #432716);
+        font-family: var(--receipt-font-family, Arial, sans-serif);
+        font-size: var(--receipt-base-font-size, 13px);
+        box-sizing: border-box;
+      }
+      .receipt-header {
+        text-align: var(--receipt-header-align, center);
+        border-bottom: 1px var(--receipt-divider-style, dashed) var(--receipt-border-color, #c8a88f);
+        padding-top: var(--receipt-header-top-padding, 0px);
+        padding-bottom: var(--receipt-section-gap, 10px);
+        margin-bottom: var(--receipt-section-gap, 10px);
+        transform: translate(var(--receipt-header-offset-x, 0px), var(--receipt-header-offset-y, 0px));
+      }
+      .receipt-logo { width: var(--receipt-logo-width, 78px); height: auto; object-fit: contain; margin-bottom: 6px; }
+      .receipt-print-area.logo-hidden .receipt-logo { display: none !important; }
+      .receipt-header h3 { margin: 0; font-size: var(--receipt-title-size, 24px); font-weight: 800; color: var(--receipt-accent-color, #5a3521); }
+      .receipt-header p { margin: 2px 0; font-size: var(--receipt-meta-size, 12px); color: var(--receipt-muted-color, #7b5a47); white-space: pre-line; }
+      .receipt-meta { display: grid; gap: 4px; margin-bottom: var(--receipt-section-gap, 10px); font-size: var(--receipt-meta-size, 12px); transform: translate(var(--receipt-meta-offset-x, 0px), var(--receipt-meta-offset-y, 0px)); }
+      .receipt-meta div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted var(--receipt-border-color, #c8a88f); padding-bottom: 2px; }
+      .receipt-items {
+        border-top: 1px var(--receipt-divider-style, dashed) var(--receipt-border-color, #c8a88f);
+        border-bottom: 1px var(--receipt-divider-style, dashed) var(--receipt-border-color, #c8a88f);
+        padding: 8px 0;
+        margin: var(--receipt-section-gap, 10px) 0;
+        transform: translate(var(--receipt-items-offset-x, 0px), var(--receipt-items-offset-y, 0px));
+      }
+      .receipt-item-row { display: flex; justify-content: space-between; align-items: baseline; font-size: inherit; margin: 4px 0; gap: 8px; }
       .receipt-item-row strong { white-space: nowrap; }
-      .receipt-totals { display: grid; gap: 4px; }
-      .receipt-totals div { display: flex; justify-content: space-between; font-size: 13px; }
-      .receipt-totals .total-due { margin-top: 4px; padding-top: 6px; border-top: 1px solid #cfb29b; font-size: 16px; font-weight: 800; }
-      .receipt-footer { margin-top: 12px; text-align: center; font-size: 12px; font-weight: 700; }
+      .receipt-totals { display: grid; gap: 4px; transform: translate(var(--receipt-totals-offset-x, 0px), var(--receipt-totals-offset-y, 0px)); }
+      .receipt-totals div { display: flex; justify-content: space-between; font-size: inherit; }
+      .receipt-totals .total-due {
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid var(--receipt-border-color, #c8a88f);
+        font-size: var(--receipt-total-size, 16px);
+        font-weight: 800;
+        color: var(--receipt-accent-color, #5a3521);
+      }
+      .receipt-footer {
+        margin-top: var(--receipt-footer-top-spacing, 12px);
+        text-align: var(--receipt-footer-align, center);
+        font-size: var(--receipt-footer-size, 12px);
+        font-weight: 700;
+        color: var(--receipt-accent-color, #7a4a2d);
+        white-space: pre-line;
+        transform: translate(var(--receipt-footer-offset-x, 0px), var(--receipt-footer-offset-y, 0px));
+      }
+      .receipt-extra-note {
+        margin-top: calc(var(--receipt-section-gap, 10px) - 2px);
+        padding: 8px 10px;
+        border: 1px var(--receipt-extra-note-style, dashed) var(--receipt-border-color, #c8a88f);
+        border-radius: calc(var(--receipt-radius, 12px) * 0.7);
+        text-align: var(--receipt-extra-note-align, center);
+        font-size: var(--receipt-meta-size, 12px);
+        font-weight: 600;
+        line-height: 1.45;
+        color: var(--receipt-text-color, #432716);
+        white-space: pre-line;
+        transform: translate(var(--receipt-extra-note-offset-x, 0px), var(--receipt-extra-note-offset-y, 0px));
+      }
     </style>
   `;
 
@@ -2586,7 +5061,7 @@ function printReceiptContent(printAreaEl) {
     <!doctype html>
     <html>
       <head><meta charset="utf-8" /><title>Receipt</title>${printStyles}</head>
-      <body><div class="receipt-print-area">${receiptHtml}</div></body>
+      <body>${receiptHtml}</body>
     </html>
   `);
   printWindow.document.close();
@@ -2732,7 +5207,9 @@ async function startScanQrPaymentFlow() {
         items,
         paymentMethod: 'gcash',
         discountAmount: getDiscountAmount(),
-        orderType: state.orderType
+        discountProfile: normalizeInvoiceDiscountProfile(getSelectedDiscountProfile()),
+        orderType: state.orderType,
+        ...getCashierInvoiceContext()
       })
     });
 
@@ -2791,78 +5268,388 @@ async function finishScanQrPayment() {
   state.scanQrContext = null;
 }
 
+function formatOverviewDelta(comparison, formatter = money) {
+  const delta = Number(comparison?.delta || 0);
+  const percent = Number(comparison?.percentChange || 0);
+  const direction = String(comparison?.direction || 'flat');
+  const sign = delta > 0 ? '+' : '';
+  const percentSign = percent > 0 ? '+' : '';
+  if (direction === 'flat') return 'No change vs previous range';
+  return `${sign}${formatter(delta)} | ${percentSign}${percent.toFixed(2)}% vs previous range`;
+}
+
+function formatOverviewCountDelta(comparison) {
+  const delta = Number(comparison?.delta || 0);
+  const percent = Number(comparison?.percentChange || 0);
+  const direction = String(comparison?.direction || 'flat');
+  const sign = delta > 0 ? '+' : '';
+  const percentSign = percent > 0 ? '+' : '';
+  if (direction === 'flat') return 'No change vs previous range';
+  return `${sign}${delta} | ${percentSign}${percent.toFixed(2)}% vs previous range`;
+}
+
+function getOverviewMixLabel(value, fallback = 'Unknown') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === 'gcash' || normalized === 'paymaya' || normalized === 'cash') {
+    return getPaymentMethodLabel(normalized);
+  }
+  if (normalized === 'dine-in' || normalized === 'take-out') {
+    return getOrderTypeLabel(normalized);
+  }
+  if (normalized === 'pending') return 'Pending';
+  if (normalized === 'paid') return 'Paid';
+  if (normalized === 'hold_for_void') return 'Hold for Void';
+  if (normalized === 'cancelled') return 'Cancelled';
+  if (normalized === 'voided') return 'Voided';
+  return normalized.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function renderOverviewMetricCards(report) {
+  const metrics = report?.metrics || {};
+  const comparisons = report?.comparisons || {};
+  return `
+    <div class="overview-kpi-grid">
+      <article class="overview-kpi-card highlight">
+        <span>Gross Sales</span>
+        <strong>${money(metrics.totalSales || 0)}</strong>
+        <small>${formatOverviewDelta(comparisons.sales, money)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Paid Transactions</span>
+        <strong>${Number(metrics.paidTransactions || 0)}</strong>
+        <small>${formatOverviewCountDelta(comparisons.transactions)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Average Ticket</span>
+        <strong>${money(metrics.averageTicket || 0)}</strong>
+        <small>${formatOverviewDelta(comparisons.averageTicket, money)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Items Sold</span>
+        <strong>${Number(metrics.itemsSold || 0)}</strong>
+        <small>${formatOverviewCountDelta(comparisons.itemsSold)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Net Cash</span>
+        <strong>${money(metrics.netCash || 0)}</strong>
+        <small>Tendered ${money(metrics.cashTendered || 0)} | Change ${money(metrics.changeGiven || 0)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Active Cashiers</span>
+        <strong>${Number(metrics.activeCashiers || 0)}</strong>
+        <small>${Number(metrics.pendingTransactions || 0)} pending payment(s) in range</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Monthly Net After Expenses</span>
+        <strong>${money(metrics.monthlyNetAfterExpenses || 0)}</strong>
+        <small>Monthly expenses ${money(metrics.monthlyExpenses || 0)}</small>
+      </article>
+      <article class="overview-kpi-card">
+        <span>Risk Signals</span>
+        <strong>${Number((metrics.lowStockIngredients || 0) + (metrics.discrepancyAlerts || 0) + (metrics.unsyncedOperations || 0))}</strong>
+        <small>Low stock ${Number(metrics.lowStockIngredients || 0)} | Discrepancies ${Number(metrics.discrepancyAlerts || 0)}</small>
+      </article>
+    </div>
+  `;
+}
+
+function renderOverviewMixSection(report) {
+  const paymentMix = Array.isArray(report?.paymentMix) ? report.paymentMix : [];
+  const orderTypeMix = Array.isArray(report?.orderTypeMix) ? report.orderTypeMix : [];
+  const attention = report?.attention || {};
+  const statusBreakdown = Array.isArray(report?.statusBreakdown) ? report.statusBreakdown : [];
+
+  const renderMixRows = (rows, type) => rows.length
+    ? rows.map((row) => `
+        <div class="overview-mix-row">
+          <div>
+            <strong>${escapeHtml(getOverviewMixLabel(type === 'payment' ? row.method : type === 'order' ? row.orderType : row.status))}</strong>
+            <small>${Number(row.count || 0)} transaction(s)</small>
+          </div>
+          <div class="overview-mix-meta">
+            <span>${type === 'status' ? money(row.amount || 0) : `${Number(row.share || 0).toFixed(1)}%`}</span>
+            ${type === 'status' ? '' : `<small>${money(row.amount || 0)}</small>`}
+          </div>
+        </div>
+      `).join('')
+    : '<p>No data for this range.</p>';
+
+  return `
+    <div class="overview-analysis-grid">
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Payment Mix</h3>
+          <span>Cash and e-wallet share</span>
+        </div>
+        <div class="overview-mix-list">${renderMixRows(paymentMix, 'payment')}</div>
+      </section>
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Order Type Mix</h3>
+          <span>Dine in vs take out</span>
+        </div>
+        <div class="overview-mix-list">${renderMixRows(orderTypeMix, 'order')}</div>
+      </section>
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Status Breakdown</h3>
+          <span>Lifecycle visibility</span>
+        </div>
+        <div class="overview-mix-list">${renderMixRows(statusBreakdown, 'status')}</div>
+      </section>
+      <section class="overview-panel-card attention">
+        <div class="overview-panel-head">
+          <h3>Attention Needed</h3>
+          <span>Issues to review now</span>
+        </div>
+        <div class="overview-alert-list">
+          <article class="overview-alert-item">
+            <strong>${Number(attention.pendingPayments || 0)}</strong>
+            <span>Pending Payments</span>
+          </article>
+          <article class="overview-alert-item">
+            <strong>${Number(attention.discrepancyAlerts || 0)}</strong>
+            <span>Shift Discrepancies</span>
+          </article>
+          <article class="overview-alert-item">
+            <strong>${Number(attention.lowStockIngredients || 0)}</strong>
+            <span>Low Stock Ingredients</span>
+          </article>
+          <article class="overview-alert-item">
+            <strong>${Number(attention.unsyncedOperations || 0)}</strong>
+            <span>Unsynced Operations</span>
+          </article>
+          <article class="overview-alert-item">
+            <strong>${Number(attention.voidedTransactions || 0)}</strong>
+            <span>Voided Sales</span>
+          </article>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderOverviewDetailSection(report) {
+  const peakHour = report?.highlights?.peakHour || null;
+  const monthly = report?.monthlyClosing?.summary || {};
+  const inventory = report?.inventory || {};
+  const hourlySales = Array.isArray(report?.hourlySales) ? report.hourlySales : [];
+  const weekdaySales = Array.isArray(report?.weekdaySales) ? report.weekdaySales : [];
+  const bestSalesDay = weekdaySales.reduce((best, row) => {
+    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
+  }, null);
+  const busiestDay = weekdaySales.reduce((best, row) => {
+    return Number(row?.transactions || 0) > Number(best?.transactions || 0) ? row : best;
+  }, null);
+  const hourlyMax = Math.max(...hourlySales.map((row) => Number(row?.totalSales || 0)), 0);
+  const weekdayMax = Math.max(...weekdaySales.map((row) => Number(row?.totalSales || 0)), 0);
+  const populatedHourlySales = hourlySales.filter((row) => Number(row?.totalSales || 0) > 0 || Number(row?.transactions || 0) > 0);
+  const populatedWeekdaySales = weekdaySales.filter((row) => Number(row?.totalSales || 0) > 0 || Number(row?.transactions || 0) > 0);
+  const hourlyTrendMarkup = populatedHourlySales.length
+    ? populatedHourlySales
+      .slice(0, 8)
+      .map((row) => {
+        const percent = hourlyMax > 0 ? Math.max(8, Math.round((Number(row?.totalSales || 0) / hourlyMax) * 100)) : 0;
+        return `
+          <div class="overview-trend-row">
+            <div class="overview-trend-copy">
+              <strong>${escapeHtml(row?.label || '—')}</strong>
+              <small>${Number(row?.transactions || 0)} paid transaction(s)</small>
+            </div>
+            <div class="overview-trend-meta">
+              <span>${money(row?.totalSales || 0)}</span>
+              <div class="overview-trend-meter"><span style="width:${percent}%;"></span></div>
+            </div>
+          </div>
+        `;
+      }).join('')
+    : '<p>No hourly sales data for this range.</p>';
+  const weekdayTrendMarkup = populatedWeekdaySales.length
+    ? populatedWeekdaySales
+      .map((row) => {
+        const percent = weekdayMax > 0 ? Math.max(8, Math.round((Number(row?.totalSales || 0) / weekdayMax) * 100)) : 0;
+        return `
+          <div class="overview-trend-row">
+            <div class="overview-trend-copy">
+              <strong>${escapeHtml(row?.fullLabel || row?.label || '—')}</strong>
+              <small>${Number(row?.transactions || 0)} paid transaction(s)</small>
+            </div>
+            <div class="overview-trend-meta">
+              <span>${money(row?.totalSales || 0)}</span>
+              <div class="overview-trend-meter"><span style="width:${percent}%;"></span></div>
+            </div>
+          </div>
+        `;
+      }).join('')
+    : '<p>No weekday sales data for this range.</p>';
+  return `
+    <div class="overview-detail-stack">
+      <div class="overview-detail-grid">
+        <article class="overview-detail-card">
+          <span>Peak Hour</span>
+          <strong>${escapeHtml(peakHour?.label || '—')}</strong>
+          <small>${money(peakHour?.totalSales || 0)} across ${Number(peakHour?.transactions || 0)} transaction(s)</small>
+        </article>
+        <article class="overview-detail-card">
+          <span>Best Sales Day</span>
+          <strong>${escapeHtml(bestSalesDay?.fullLabel || '—')}</strong>
+          <small>${money(bestSalesDay?.totalSales || 0)} in paid sales for the selected range</small>
+        </article>
+        <article class="overview-detail-card">
+          <span>Busiest Day</span>
+          <strong>${escapeHtml(busiestDay?.fullLabel || '—')}</strong>
+          <small>${Number(busiestDay?.transactions || 0)} paid transaction(s)</small>
+        </article>
+        <article class="overview-detail-card">
+          <span>Inventory Snapshot</span>
+          <strong>${money(inventory?.totals?.totalInventoryValue || 0)}</strong>
+          <small>${Number(inventory?.totals?.lowStockCount || 0)} low-stock ingredient(s)</small>
+        </article>
+      </div>
+      <div class="overview-analysis-grid">
+        <section class="overview-panel-card">
+          <div class="overview-panel-head">
+            <h3>Hourly Trend</h3>
+            <span>Paid sales by hour</span>
+          </div>
+          <div class="overview-trend-list">${hourlyTrendMarkup}</div>
+        </section>
+        <section class="overview-panel-card">
+          <div class="overview-panel-head">
+            <h3>Weekday Trend</h3>
+            <span>Sales performance by day</span>
+          </div>
+          <div class="overview-trend-list">${weekdayTrendMarkup}</div>
+        </section>
+        <article class="overview-detail-card">
+          <span>Monthly Expenses</span>
+          <strong>${money(monthly.totalExpenses || 0)}</strong>
+          <small>${Number(monthly.expenseCount || 0)} expense entry(s) logged this month</small>
+        </article>
+        <article class="overview-detail-card">
+          <span>Drawer Withdrawals</span>
+          <strong>${money(monthly.drawerWithdrawals || 0)}</strong>
+          <small>Shift discrepancies ${money(monthly.totalDiscrepancy || 0)}</small>
+        </article>
+      </div>
+    </div>
+  `;
+}
+
+function renderOverviewTopLists(report) {
+  const topProducts = Array.isArray(report?.topProducts) ? report.topProducts : [];
+  const activeCashiers = Array.isArray(report?.activeCashiers) ? report.activeCashiers : [];
+  const inventoryAlerts = Array.isArray(report?.inventory?.alerts) ? report.inventory.alerts.slice(0, 5) : [];
+  const discountTypeSummary = Array.isArray(report?.discountTypeSummary) ? report.discountTypeSummary : [];
+
+  const topProductsMarkup = topProducts.length
+    ? topProducts.map((item) => `
+        <div class="overview-list-row">
+          <div>
+            <strong>${escapeHtml(item.productName || 'Product')}</strong>
+            <small>${Number(item.qtySold || 0)} sold</small>
+          </div>
+          <span>${money(item.totalSales || 0)}</span>
+        </div>
+      `).join('')
+    : '<p>No product sales yet for this range.</p>';
+
+  const activeCashiersMarkup = activeCashiers.length
+    ? activeCashiers.map((cashier) => `
+        <div class="overview-list-row">
+          <div>
+            <strong>${escapeHtml(cashier.cashierName || cashier.cashierEmail || 'Cashier')}</strong>
+            <small>${escapeHtml(cashier.drawerName || 'Drawer')} | Hold for void ${money(cashier.holdForVoidAmount || 0)}</small>
+          </div>
+          <span>${money(cashier.currentSales || 0)}</span>
+        </div>
+      `).join('')
+    : '<p>No active cashiers right now.</p>';
+
+  const inventoryAlertsMarkup = inventoryAlerts.length
+    ? inventoryAlerts.map((alert) => `
+        <div class="overview-list-row">
+          <div>
+            <strong>${escapeHtml(alert.ingredientName || alert.title || 'Inventory Alert')}</strong>
+            <small>${escapeHtml(alert.reason || alert.message || 'Needs review')}</small>
+          </div>
+          <span>${escapeHtml(alert.severity || 'warning')}</span>
+        </div>
+      `).join('')
+    : '<p>No inventory alerts right now.</p>';
+
+  const discountTypeMarkup = discountTypeSummary.length
+    ? discountTypeSummary.map((item) => `
+        <div class="overview-list-row">
+          <div>
+            <strong>${escapeHtml(item.label || item.profileName || 'Discount')}</strong>
+            <small>${Number(item.count || 0)} transaction(s) used this customer type</small>
+          </div>
+          <span>${money(item.discountAmount || 0)}</span>
+        </div>
+      `).join('')
+    : '<p>No customer discount transactions yet in this range.</p>';
+
+  return `
+    <div class="overview-analysis-grid">
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Top Products</h3>
+          <span>Best sellers in selected range</span>
+        </div>
+        <div class="overview-list">${topProductsMarkup}</div>
+      </section>
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Active Cashiers</h3>
+          <span>Live cashier activity</span>
+        </div>
+        <div class="overview-list">${activeCashiersMarkup}</div>
+      </section>
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Discount Monitor</h3>
+          <span>Customer discount usage</span>
+        </div>
+        <div class="overview-list">${discountTypeMarkup}</div>
+      </section>
+      <section class="overview-panel-card">
+        <div class="overview-panel-head">
+          <h3>Inventory Alerts</h3>
+          <span>Operational stock warnings</span>
+        </div>
+        <div class="overview-list">${inventoryAlertsMarkup}</div>
+      </section>
+    </div>
+  `;
+}
+
 function renderSalesReport(report) {
-  salesSummaryEl.textContent = [
-    `Range: ${report.range.label.toUpperCase()}`,
-    `Total Sales: ${money(report.totalSales)}`,
-    `Transactions: ${report.totalTransactions}`,
-    `Average Ticket: ${money(report.averageTicket)}`,
-    `Cash: ${money(report.byMethod?.cash || 0)}`,
-    `E-Wallet: ${money((report.byMethod?.gcash || 0) + (report.byMethod?.paymaya || 0))}`
-  ].join('\n');
-
-  const rows = (report.transactions || []).slice(0, 10);
-  if (!rows.length) {
-    salesListEl.innerHTML = '<p>No sales found for this range.</p>';
-    return;
+  latestAdminOverview = report || null;
+  if (salesSummaryEl) {
+    salesSummaryEl.innerHTML = renderOverviewMetricCards(report);
   }
-
-  salesListEl.innerHTML = rows
-    .map(
-      (x) => `
-      <div class="sales-row sales-row-clickable" data-receipt="${x.invoiceId || ''}">
-        <span class="sales-ref">${x.reference}</span>
-        <span class="method-chip">
-          <img class="payment-method-icon" src="${getPaymentMethodIcon(x.method)}" alt="${getPaymentMethodLabel(x.method)}" />
-          ${getPaymentMethodLabel(x.method)}
-        </span>
-        <span class="sales-amount">${money(x.amountPaid)}</span>
-      </div>
-    `
-    )
-    .join('');
-}
-
-function renderDetailedSalesReport(report) {
-  if (detailDailySalesEl) detailDailySalesEl.textContent = money(report?.dailySales?.totalSales || 0);
-  if (detailDailyMetaEl) {
-    detailDailyMetaEl.textContent = `${Number(report?.dailySales?.totalTransactions || 0)} transactions | Avg ${money(report?.dailySales?.averageTicket || 0)}`;
+  if (salesListEl) {
+    salesListEl.innerHTML = renderOverviewMixSection(report);
   }
-  if (detailMonthlySalesEl) detailMonthlySalesEl.textContent = money(report?.monthlySales?.totalSales || 0);
-  if (detailMonthlyMetaEl) {
-    detailMonthlyMetaEl.textContent = `${Number(report?.monthlySales?.totalTransactions || 0)} transactions | Avg ${money(report?.monthlySales?.averageTicket || 0)}`;
+  if (detailDailySalesEl) detailDailySalesEl.textContent = '';
+  if (detailDailyMetaEl) detailDailyMetaEl.textContent = '';
+  if (detailMonthlySalesEl) detailMonthlySalesEl.textContent = '';
+  if (detailMonthlyMetaEl) detailMonthlyMetaEl.textContent = '';
+  if (salesDetailedGridEl) {
+    salesDetailedGridEl.innerHTML = renderOverviewDetailSection(report);
   }
-
-  if (!topProductsListEl) return;
-  const rows = Array.isArray(report?.topSalesPerProduct) ? report.topSalesPerProduct : [];
-  if (!rows.length) {
-    topProductsListEl.innerHTML = '<p>No product sales yet.</p>';
-    return;
+  if (topProductsListEl) {
+    topProductsListEl.innerHTML = renderOverviewTopLists(report);
   }
-
-  topProductsListEl.innerHTML = rows
-    .map((item) => `
-      <div class="top-product-row">
-        <span class="top-product-name">${escapeHtml(item.productName || 'Unknown Product')}</span>
-        <span class="top-product-qty">${Number(item.qtySold || 0)} sold</span>
-        <span class="top-product-sales">${money(item.totalSales || 0)}</span>
-      </div>
-    `)
-    .join('');
-}
-
-async function refreshDetailedSalesReport() {
-  try {
-    const report = await api('/api/reports/sales/detailed');
-    renderDetailedSalesReport(report);
-  } catch (error) {
-    if (topProductsListEl) {
-      topProductsListEl.innerHTML = `<p class="error">Detailed sales error: ${escapeHtml(error.message)}</p>`;
-    }
-  }
+  renderAdminStats(report);
 }
 
 function renderInventoryReport(report) {
+  latestInventoryReportData = report || null;
+  const defaultUnits = ['pcs', 'kg', 'g', 'liter', 'ml', 'pack', 'bottle'];
+
   function formatQty(value) {
     return Number(value || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
@@ -2877,55 +5664,829 @@ function renderInventoryReport(report) {
     })}`;
   }
 
-  const totals = report?.totals || {};
-  const ingredients = Array.isArray(report?.ingredients) ? report.ingredients : [];
-
-  if (inventorySummaryEl) {
-    inventorySummaryEl.textContent = [
-      `Total Ingredients: ${Number(totals.totalIngredients || 0)}`,
-      `Total Inventory Value: ${formatInventoryMoney(totals.totalInventoryValue || 0)}`,
-      `Low Stock Items: ${Number(totals.lowStockCount || 0)}`
-    ].join('\n');
+  function getInventoryStatusBadge(ingredient) {
+    const qtyOnHand = Number(ingredient?.qtyOnHand || 0);
+    if (qtyOnHand <= 0) {
+      return '<span class="inventory-status-badge no-stock">No Stock</span>';
+    }
+    if (ingredient?.lowStock) {
+      return '<span class="inventory-status-badge low-stock">Low Stock</span>';
+    }
+    return '<span class="inventory-status-badge in-stock">In Stock</span>';
   }
 
-  if (!inventoryTableWrapEl) return;
-  if (!ingredients.length) {
-    inventoryTableWrapEl.innerHTML = '<p>No ingredients yet. Add your first ingredient above.</p>';
+  function renderInventoryInsightPanel(title, contentMarkup) {
+    if (!inventoryAlertsWrapEl) return;
+    inventoryAlertsWrapEl.style.display = '';
+    inventoryAlertsWrapEl.innerHTML = `
+      <div class="inventory-monitor-section inventory-insight-panel">
+        <div class="inventory-insight-header">
+          <div>
+            <span class="inventory-insight-eyebrow">Inventory View</span>
+            <h3>${escapeHtml(title)}</h3>
+          </div>
+          <button type="button" class="secondary small" data-inventory-view="ingredients">Back to Ingredients</button>
+        </div>
+        ${contentMarkup}
+      </div>
+    `;
+  }
+
+  function buildInventoryTableRows(list, highlightedColumn = '') {
+    highlightedColumn = String(highlightedColumn || '').trim();
+    const columnClass = (key) => highlightedColumn === key ? 'inventory-column-highlight' : '';
+
+    return list.map((x) => {
+      const usageRows = (x.usageByProduct || [])
+        .slice(0, 3)
+        .map((u) => `<li>${escapeHtml(u.productName)}: used ${formatQty(u.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</li>`)
+        .join('');
+      const assignedCount = Array.isArray(x.usageByProduct) ? x.usageByProduct.length : 0;
+      const actionsHtml = canManageInventory()
+        ? `
+          <div class="inventory-actions">
+            <button class="secondary small" type="button" data-inventory-history="${escapeHtml(x.id || '')}" data-ingredient-name="${escapeHtml(x.name || '')}" data-ingredient-unit="${escapeHtml(x.unit || '')}">History</button>
+            <button class="secondary small" type="button" data-inventory-edit="${escapeHtml(x.id || '')}" data-ingredient-name="${escapeHtml(x.name || '')}" data-ingredient-qty="${escapeHtml(String(x.qtyOnHand ?? ''))}" data-ingredient-unit-price="${escapeHtml(String(x.unitPrice ?? ''))}" data-ingredient-unit="${escapeHtml(x.unit || '')}" data-assigned-count="${assignedCount}">Edit</button>
+            <button class="secondary small" type="button" data-inventory-delete="${escapeHtml(x.id || '')}" data-ingredient-name="${escapeHtml(x.name || '')}" data-assigned-count="${assignedCount}" ${assignedCount ? 'disabled' : ''}>Delete</button>
+          </div>
+          ${assignedCount ? `<small class="inventory-assigned-note">Assigned to ${assignedCount} product(s). Remove from kit spec before delete.</small>` : ''}
+        `
+        : 'View only';
+
+      return `
+        <tr>
+          <td class="${columnClass('ingredient')}"><strong>${escapeHtml(x.name)}</strong></td>
+          <td class="${columnClass('uom')}">${escapeHtml(x.unit || 'pcs')}</td>
+          <td class="${columnClass('qty-on-hand')}">${formatQty(x.qtyOnHand || 0)}</td>
+          <td class="${columnClass('unit-price')}">${formatInventoryMoney(x.unitPrice || 0)}</td>
+          <td class="${columnClass('inventory-value')}">${formatInventoryMoney(x.inventoryValue || 0)}</td>
+          <td class="${columnClass('estimated-used')}">${formatQty(x.estimatedUsedQty || 0)}</td>
+          <td class="${columnClass('current-remaining')}">${formatQty(x.estimatedRemainingQty || 0)}</td>
+          <td class="${columnClass('status')}">${getInventoryStatusBadge(x)}</td>
+          <td class="${columnClass('used-in-products')}">${usageRows ? `<ul class="usage-list">${usageRows}</ul>` : 'No recipe mapping yet'}</td>
+          <td class="${columnClass('actions')}">${actionsHtml}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderInventoryTableView(list, options = {}) {
+    if (!inventoryTableWrapEl) return;
+    const title = String(options.title || '').trim();
+    const subtitle = String(options.subtitle || '').trim();
+    const emptyMessage = String(options.emptyMessage || 'No ingredients available.').trim();
+    const highlightedColumn = String(options.highlightedColumn || '').trim();
+    const headingClass = (key) => highlightedColumn === key ? 'inventory-column-highlight' : '';
+
+    inventoryTableWrapEl.style.display = '';
+    if (!list.length) {
+      inventoryTableWrapEl.innerHTML = `
+        ${title ? `
+          <div class="inventory-detail-heading">
+            <h3>${escapeHtml(title)}</h3>
+            ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
+          </div>
+        ` : ''}
+        <p>${escapeHtml(emptyMessage)}</p>
+      `;
+      return;
+    }
+
+    const rows = buildInventoryTableRows(list, highlightedColumn);
+    inventoryTableWrapEl.innerHTML = `
+      ${title ? `
+        <div class="inventory-detail-heading">
+          <h3>${escapeHtml(title)}</h3>
+          ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
+        </div>
+      ` : ''}
+      <table class="inventory-table">
+        <thead>
+          <tr>
+            <th class="${headingClass('ingredient')}">Ingredient</th>
+            <th class="${headingClass('uom')}">UOM</th>
+            <th class="${headingClass('qty-on-hand')}">Qty On Hand</th>
+            <th class="${headingClass('unit-price')}">Unit Price</th>
+            <th class="${headingClass('inventory-value')}">Inventory Value</th>
+            <th class="${headingClass('estimated-used')}">Estimated Used</th>
+            <th class="${headingClass('current-remaining')}">Current Remaining</th>
+            <th class="${headingClass('status')}">Status</th>
+            <th class="${headingClass('used-in-products')}">Used in Products</th>
+            <th class="${headingClass('actions')}">Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function renderInventoryBulkEditor(list) {
+    if (!inventoryBulkEditorEl) return;
+    if (!canManageInventory() || activeInventoryView !== 'ingredients') {
+      inventoryBulkEditorOpen = false;
+      syncInventoryBulkToggleButton();
+      inventoryBulkEditorEl.style.display = 'none';
+      inventoryBulkEditorEl.innerHTML = '';
+      return;
+    }
+
+    if (!inventoryBulkEditorOpen) {
+      syncInventoryBulkToggleButton();
+      inventoryBulkEditorEl.style.display = 'none';
+      inventoryBulkEditorEl.innerHTML = '';
+      return;
+    }
+
+    syncInventoryBulkToggleButton();
+    inventoryBulkEditorEl.style.display = '';
+    if (!list.length) {
+      inventoryBulkEditorEl.innerHTML = `
+        <section class="inventory-bulk-editor-card">
+          <div class="inventory-bulk-editor-head">
+            <div>
+              <span class="inventory-bulk-eyebrow">Bulk Edit</span>
+              <h3>Bulk Stock and Price Update</h3>
+            </div>
+          </div>
+          <p class="inventory-bulk-empty">Add ingredients first before using bulk edit.</p>
+        </section>
+      `;
+      return;
+    }
+
+    inventoryBulkEditorEl.innerHTML = `
+      <section class="inventory-bulk-editor-card">
+        <div class="inventory-bulk-editor-head">
+          <div>
+            <span class="inventory-bulk-eyebrow">Bulk Edit</span>
+            <h3>Bulk Stock and Price Update</h3>
+            <p>Enter only the qty or unit price you want to change. Leave a field blank to keep the current value.</p>
+          </div>
+        </div>
+        <form id="inventoryBulkEditForm" class="inventory-bulk-form">
+          <div class="inventory-bulk-toolbar">
+            <label for="inventoryBulkQtyMode">Qty Mode</label>
+            <select id="inventoryBulkQtyMode">
+              <option value="replace">Set qty on hand</option>
+              <option value="add">Add to current qty</option>
+            </select>
+            <button id="inventoryBulkApplyBtn" type="submit">Apply Bulk Update</button>
+            <button id="inventoryBulkResetBtn" class="secondary" type="button">Clear Inputs</button>
+          </div>
+          <p id="inventoryBulkStatus" class="status">Blank fields remain unchanged.</p>
+          <div class="inventory-bulk-table-wrap">
+            <table class="inventory-table inventory-bulk-table">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>UOM</th>
+                  <th>Current Qty</th>
+                  <th>New Qty</th>
+                  <th class="inventory-bulk-price-col">Current Unit Price</th>
+                  <th class="inventory-bulk-price-col">New Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map((item) => `
+                  <tr
+                    data-bulk-ingredient-id="${escapeHtml(item.id || '')}"
+                    data-bulk-name="${escapeHtml(item.name || '')}"
+                    data-bulk-unit="${escapeHtml(item.unit || 'pcs')}"
+                    data-bulk-qty="${escapeHtml(String(Number(item.qtyOnHand || 0)))}"
+                    data-bulk-price="${escapeHtml(String(Number(item.unitPrice || 0)))}"
+                  >
+                    <td><strong>${escapeHtml(item.name || 'Ingredient')}</strong></td>
+                    <td>${escapeHtml(item.unit || 'pcs')}</td>
+                    <td>${formatQty(item.qtyOnHand || 0)}</td>
+                    <td><input class="inventory-bulk-qty-input" type="number" min="0" step="0.001" placeholder="Unchanged" /></td>
+                    <td class="inventory-bulk-price-col inventory-bulk-price-value">${formatInventoryMoney(item.unitPrice || 0)}</td>
+                    <td class="inventory-bulk-price-col"><input class="inventory-bulk-price-input" type="number" min="0" step="0.01" placeholder="Unchanged" /></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </form>
+      </section>
+    `;
+  }
+
+  function renderInventoryCardView(monitor, ingredients) {
+    const topConsumedToday = Array.isArray(monitor?.topConsumedToday) ? monitor.topConsumedToday : [];
+    const alerts = Array.isArray(monitor?.alerts) ? monitor.alerts : [];
+    const normalizedView = [
+      'ingredients',
+      'inventory-value',
+      'unit-price',
+      'low-stock',
+      'consumed',
+      'alerts'
+    ].includes(activeInventoryView)
+      ? activeInventoryView
+      : 'ingredients';
+
+    activeInventoryView = normalizedView;
+
+    const showIngredientManagement = normalizedView === 'ingredients';
+    if (inventoryIngredientFormEl) {
+      inventoryIngredientFormEl.style.display = showIngredientManagement && canManageInventory() ? 'flex' : 'none';
+    }
+    if (inventoryAdminNoteEl) {
+      inventoryAdminNoteEl.style.display = showIngredientManagement && !canManageInventory() ? 'block' : 'none';
+    }
+    if (!showIngredientManagement || !canManageInventory()) {
+      inventoryBulkEditorOpen = false;
+    }
+    syncInventoryBulkToggleButton();
+    renderInventoryBulkEditor(showIngredientManagement ? ingredients : []);
+    if (inventoryAlertsWrapEl) {
+      inventoryAlertsWrapEl.style.display = 'none';
+      inventoryAlertsWrapEl.innerHTML = '';
+    }
+    if (inventoryTableWrapEl) {
+      inventoryTableWrapEl.style.display = '';
+      inventoryTableWrapEl.innerHTML = '';
+    }
+
+    if (showIngredientManagement && canManageInventory() && inventoryBulkEditorOpen) {
+      if (inventoryTableWrapEl) {
+        inventoryTableWrapEl.style.display = 'none';
+        inventoryTableWrapEl.innerHTML = '';
+      }
+      return;
+    }
+
+    if (normalizedView === 'consumed') {
+      if (inventoryTableWrapEl) inventoryTableWrapEl.style.display = 'none';
+      renderInventoryInsightPanel(
+        'Top Ingredients Consumed Today',
+        topConsumedToday.length
+          ? `
+            <table class="inventory-table inventory-monitor-table">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Qty Deducted</th>
+                  <th>Current Stock</th>
+                  <th>Sales Trigger</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topConsumedToday.map((row) => `
+                  <tr>
+                    <td><strong>${escapeHtml(row.ingredientName || 'Ingredient')}</strong></td>
+                    <td>${formatQty(row.qtyDeducted || 0)} ${escapeHtml(row.ingredientUnit || 'pcs')}</td>
+                    <td>${formatQty(row.currentQtyOnHand || 0)} ${escapeHtml(row.ingredientUnit || 'pcs')}</td>
+                    <td>${escapeHtml(row.productSummary || 'Sales deduction')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `
+          : '<p>No sale-based ingredient deductions yet today.</p>'
+      );
+      return;
+    }
+
+    if (normalizedView === 'alerts') {
+      if (inventoryTableWrapEl) inventoryTableWrapEl.style.display = 'none';
+      renderInventoryInsightPanel(
+        'Fast Alerts',
+        alerts.length
+          ? `
+            <div class="inventory-alert-list">
+              ${alerts.map((row) => `
+                <article class="inventory-alert-item ${escapeHtml(row.severity || 'warning')}">
+                  <div>
+                    <strong>${escapeHtml(row.ingredientName || 'Ingredient')}</strong>
+                    <span>${formatQty(row.qtyOnHand || 0)} ${escapeHtml(row.ingredientUnit || 'pcs')} remaining</span>
+                  </div>
+                  <small>${escapeHtml(row.affectedProducts ? `Used by: ${row.affectedProducts}` : 'No product mapping yet')}</small>
+                </article>
+              `).join('')}
+            </div>
+          `
+          : '<p>All monitored ingredients currently have healthy stock levels.</p>'
+      );
+      return;
+    }
+
+    if (normalizedView === 'inventory-value') {
+      renderInventoryTableView(
+        ingredients.slice().sort((a, b) => Number(b.inventoryValue || 0) - Number(a.inventoryValue || 0)),
+        {
+          title: 'Inventory Value',
+          subtitle: 'Ingredients sorted by highest current inventory value.',
+          emptyMessage: 'No ingredients available for inventory value view.',
+          highlightedColumn: 'inventory-value'
+        }
+      );
+      return;
+    }
+
+    if (normalizedView === 'unit-price') {
+      renderInventoryTableView(
+        ingredients.slice().sort((a, b) => Number(b.unitPrice || 0) - Number(a.unitPrice || 0)),
+        {
+          title: 'Unit Price Sum',
+          subtitle: 'Ingredients sorted by highest unit price.',
+          emptyMessage: 'No ingredients available for unit price view.',
+          highlightedColumn: 'unit-price'
+        }
+      );
+      return;
+    }
+
+    if (normalizedView === 'low-stock') {
+      renderInventoryTableView(
+        ingredients.filter((item) => Number(item?.qtyOnHand || 0) <= 0 || item?.lowStock),
+        {
+          title: 'Low Stock Items',
+          subtitle: 'Ingredients that need restocking first.',
+          emptyMessage: 'No low stock ingredients found.',
+          highlightedColumn: 'status'
+        }
+      );
+      return;
+    }
+
+    renderInventoryTableView(ingredients, {
+      emptyMessage: 'No ingredients yet. Add your first ingredient above.',
+      highlightedColumn: 'ingredient'
+    });
+  }
+
+  const totals = report?.totals || {};
+  const ingredients = Array.isArray(report?.ingredients) ? report.ingredients : [];
+  const monitor = report?.monitor || {};
+  const topConsumedCount = Array.isArray(monitor?.topConsumedToday) ? monitor.topConsumedToday.length : 0;
+  const alertCount = Array.isArray(monitor?.alerts) ? monitor.alerts.length : 0;
+  if (ingredientUnitSuggestionsEl) {
+    const unitOptions = Array.from(new Set(
+      defaultUnits
+        .concat(ingredients.map((item) => String(item?.unit || '').trim()))
+        .filter(Boolean)
+        .map((unit) => unit.toLowerCase())
+    )).sort((a, b) => a.localeCompare(b));
+    ingredientUnitSuggestionsEl.innerHTML = unitOptions
+      .map((unit) => `<option value="${escapeHtml(unit)}"></option>`)
+      .join('');
+  }
+
+  if (inventorySummaryEl) {
+    const summaryGroups = [
+      {
+        title: 'Inventory Summary',
+        cards: [
+          {
+            label: 'Ingredients',
+            value: Number(totals.totalIngredients || 0).toLocaleString('en-US'),
+            accent: 'ingredients',
+            view: 'ingredients',
+            icon: '📦',
+            meta: 'Total items tracked',
+            hoverInfo: 'Opens the full inventory list with the ingredient form, stock table, and actions.'
+          },
+          {
+            label: 'Inventory Value',
+            value: formatInventoryMoney(totals.totalInventoryValue || 0),
+            accent: 'inventory-value',
+            view: 'inventory-value',
+            icon: '💰',
+            meta: 'Current stock worth',
+            hoverInfo: 'Shows ingredients sorted by highest inventory value so you can see where most stock value sits.'
+          },
+          {
+            label: 'Unit Price Sum',
+            value: formatInventoryMoney(totals.totalUnitPriceValue || 0),
+            accent: 'unit-price',
+            view: 'unit-price',
+            icon: '🏷',
+            meta: 'Combined unit pricing',
+            hoverInfo: 'Shows ingredients sorted by unit price to highlight the most expensive items first.'
+          }
+        ]
+      },
+      {
+        title: 'Status & Warnings',
+        cards: [
+          {
+            label: 'Low Stock',
+            value: Number(totals.lowStockCount || 0).toLocaleString('en-US'),
+            accent: 'low-stock',
+            view: 'low-stock',
+            icon: '⚠',
+            meta: 'Items need restock',
+            hoverInfo: 'Filters the inventory table to low-stock and no-stock ingredients that need replenishment.'
+          },
+          {
+            label: 'Consumed',
+            value: Number(topConsumedCount || 0).toLocaleString('en-US'),
+            accent: 'top-consumed',
+            view: 'consumed',
+            icon: '🍳',
+            meta: topConsumedCount ? 'Used in recent sales' : 'No recent usage',
+            hoverInfo: 'Opens the consumption panel with ingredients recently deducted by product sales.'
+          },
+          {
+            label: 'Alerts',
+            value: Number(alertCount || 0).toLocaleString('en-US'),
+            accent: 'fast-alerts',
+            view: 'alerts',
+            icon: '🚨',
+            meta: alertCount ? 'Issues need review' : 'No active issues',
+            hoverInfo: 'Opens the alert panel so you can review inventory issues and affected products quickly.'
+          }
+        ]
+      }
+    ];
+
+    inventorySummaryEl.innerHTML = `
+      <div class="inventory-summary-shell">
+        <div class="inventory-summary-header">
+          <span class="inventory-summary-eyebrow">Inventory Snapshot</span>
+          <h3>Ingredient Stock Overview</h3>
+        </div>
+        <div class="inventory-summary-groups">
+          ${summaryGroups.map((group) => `
+            <section class="inventory-summary-group">
+              <div class="inventory-summary-group-title">${escapeHtml(group.title)}</div>
+              <div class="inventory-summary-grid">
+                ${group.cards.map((card) => `
+                  <article
+                    class="inventory-summary-card ${escapeHtml(card.accent)}${card.view === activeInventoryView ? ' active' : ''} clickable"
+                    data-inventory-view="${escapeHtml(card.view)}"
+                    role="button"
+                    tabindex="0"
+                    title="${escapeHtml(card.hoverInfo || '')}"
+                  >
+                    <div class="inventory-summary-card-head">
+                      <span class="inventory-summary-icon" aria-hidden="true">${card.icon}</span>
+                      <span class="inventory-summary-label">${escapeHtml(card.label)}</span>
+                    </div>
+                    <strong>${escapeHtml(card.value)}</strong>
+                    <small>${escapeHtml(card.meta)}</small>
+                    <span class="inventory-summary-hover-note">${escapeHtml(card.hoverInfo || '')}</span>
+                    <span class="inventory-summary-link">${card.view === activeInventoryView ? 'Showing below' : 'View details ->'}</span>
+                  </article>
+                `).join('')}
+              </div>
+            </section>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  renderInventoryCardView(monitor, ingredients);
+}
+
+async function refreshInventoryModule() {
+  const isAdmin = canManageInventory();
+  const showIngredientManagement = activeInventoryView === 'ingredients';
+  if (inventoryIngredientFormEl) {
+    inventoryIngredientFormEl.style.display = isAdmin && showIngredientManagement ? 'flex' : 'none';
+  }
+  if (inventoryAdminNoteEl) {
+    inventoryAdminNoteEl.style.display = !isAdmin && showIngredientManagement ? 'block' : 'none';
+  }
+  if (!isAdmin || !showIngredientManagement) {
+    inventoryBulkEditorOpen = false;
+  }
+  syncInventoryBulkToggleButton();
+  if (inventoryBulkEditorEl) {
+    inventoryBulkEditorEl.style.display = showIngredientManagement && isAdmin && inventoryBulkEditorOpen ? '' : 'none';
+    inventoryBulkEditorEl.innerHTML = showIngredientManagement && isAdmin && inventoryBulkEditorOpen
+      ? '<p>Loading bulk editor...</p>'
+      : '';
+  }
+
+  if (inventorySummaryEl) inventorySummaryEl.innerHTML = '<div class="inventory-summary-loading">Loading inventory summary...</div>';
+  if (inventoryAlertsWrapEl) {
+    inventoryAlertsWrapEl.style.display = 'none';
+    inventoryAlertsWrapEl.innerHTML = '';
+  }
+  if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '<p>Loading ingredients...</p>';
+
+  try {
+    const report = await api('/api/admin/inventory/report');
+    renderInventoryReport(report);
+  } catch (error) {
+    if (inventorySummaryEl) inventorySummaryEl.innerHTML = `<p class="error">Inventory error: ${escapeHtml(error.message)}</p>`;
+    if (inventoryBulkEditorEl) {
+      inventoryBulkEditorEl.style.display = 'none';
+      inventoryBulkEditorEl.innerHTML = '';
+    }
+    if (inventoryAlertsWrapEl) {
+      inventoryAlertsWrapEl.style.display = 'none';
+      inventoryAlertsWrapEl.innerHTML = '';
+    }
+    if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '';
+  }
+}
+
+function getKitSpecProductsForCategory(categoryKey = '') {
+  const safeCategoryKey = String(categoryKey || '').trim().toLowerCase();
+  let products = Array.isArray(state.products) ? state.products.slice() : [];
+  if (safeCategoryKey) {
+    products = products.filter((product) => String(product.category || '').trim().toLowerCase() === safeCategoryKey);
+  }
+  return products.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+function populateKitSpecCategoryOptions(selectedCategory = '') {
+  if (!kitSpecCategorySelectEl) return;
+  const categories = Array.isArray(state.categories) ? state.categories : [];
+  kitSpecCategorySelectEl.innerHTML = categories
+    .map((category) => `<option value="${escapeHtml(category.key || '')}">${escapeHtml(category.name || category.key || 'Category')}</option>`)
+    .join('');
+  if (selectedCategory && categories.some((category) => String(category.key || '') === selectedCategory)) {
+    kitSpecCategorySelectEl.value = selectedCategory;
+  } else if (categories[0]?.key) {
+    kitSpecCategorySelectEl.value = categories[0].key;
+  }
+}
+
+function loadKitSpecDraftRowsForSelectedProduct() {
+  const productId = String(kitSpecProductSelectEl?.value || '').trim();
+  kitSpecDraftRows = kitSpecRecipes
+    .filter((recipe) => String(recipe.productId || '') === productId)
+    .map((recipe) => ({
+      ingredientId: String(recipe.ingredientId || '').trim(),
+      qtyPerProduct: Number(recipe.qtyPerProduct || 0)
+    }));
+  if (!kitSpecDraftRows.length) {
+    kitSpecDraftRows = [{ ingredientId: '', qtyPerProduct: '' }];
+  }
+}
+
+function renderKitSpecProductOptions(selectedProductId = '') {
+  if (!kitSpecProductSelectEl) return;
+  const categoryKey = String(kitSpecCategorySelectEl?.value || '').trim().toLowerCase();
+  const products = getKitSpecProductsForCategory(categoryKey);
+  kitSpecProductSelectEl.innerHTML = products.length
+    ? products.map((product) => `<option value="${escapeHtml(product.id || '')}">${escapeHtml(product.name || 'Product')}</option>`).join('')
+    : '<option value="">No products in this category</option>';
+
+  if (selectedProductId && products.some((product) => String(product.id || '') === selectedProductId)) {
+    kitSpecProductSelectEl.value = selectedProductId;
+  } else if (products[0]?.id) {
+    kitSpecProductSelectEl.value = products[0].id;
+  }
+  loadKitSpecDraftRowsForSelectedProduct();
+}
+
+function formatKitSpecQtyValue(value) {
+  return Number(Number(value || 0).toFixed(3)).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3
+  });
+}
+
+function getKitSpecIngredientById(ingredientId) {
+  const safeIngredientId = String(ingredientId || '').trim();
+  if (!safeIngredientId) return null;
+  return (kitSpecIngredients || []).find((ingredient) => String(ingredient?.id || '').trim() === safeIngredientId) || null;
+}
+
+function getKitSpecIngredientLabel(ingredient) {
+  const name = String(ingredient?.name || 'Ingredient').trim() || 'Ingredient';
+  const unit = String(ingredient?.unit || 'pcs').trim() || 'pcs';
+  const qtyOnHand = formatKitSpecQtyValue(ingredient?.qtyOnHand || 0);
+  return `${name} (${unit} • On hand: ${qtyOnHand})`;
+}
+
+function buildKitSpecIngredientOptionsForRow(rowIndex) {
+  const currentIngredientId = String(kitSpecDraftRows[rowIndex]?.ingredientId || '').trim();
+  const selectedInOtherRows = new Set(
+    kitSpecDraftRows
+      .map((row, index) => (index === rowIndex ? '' : String(row?.ingredientId || '').trim()))
+      .filter(Boolean)
+  );
+
+  return ['<option value="">Select ingredient</option>']
+    .concat(kitSpecIngredients
+      .filter((ingredient) => {
+        const ingredientId = String(ingredient?.id || '').trim();
+        return ingredientId && (!selectedInOtherRows.has(ingredientId) || ingredientId === currentIngredientId);
+      })
+      .map((ingredient) => `
+        <option value="${escapeHtml(ingredient.id || '')}">${escapeHtml(getKitSpecIngredientLabel(ingredient))}</option>
+      `))
+    .join('');
+}
+
+function renderKitSpecEditor() {
+  if (!kitSpecEditorEl) return;
+  if (state.appConfig?.enforceKitSpec === false) {
+    kitSpecEditorEl.style.display = 'none';
+    kitSpecEditorEl.innerHTML = '';
+    return;
+  }
+  kitSpecEditorEl.style.display = '';
+  const selectedProductId = String(kitSpecProductSelectEl?.value || '').trim();
+  if (!selectedProductId) {
+    kitSpecEditorEl.innerHTML = '<p>Select a category and product to configure its kit specification.</p>';
+    return;
+  }
+  if (!kitSpecIngredients.length) {
+    kitSpecEditorEl.innerHTML = '<p>Add inventory ingredients first before assigning them to products.</p>';
     return;
   }
 
-  const rows = ingredients.map((x) => {
-    const usageRows = (x.usageByProduct || [])
-      .slice(0, 3)
-      .map((u) => `<li>${escapeHtml(u.productName)}: used ${formatQty(u.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</li>`)
-      .join('');
+  const rows = (Array.isArray(kitSpecDraftRows) && kitSpecDraftRows.length ? kitSpecDraftRows : [{ ingredientId: '', qtyPerProduct: '' }])
+    .map((row, index) => {
+      const selectedIngredient = getKitSpecIngredientById(row?.ingredientId);
+      const availableQty = selectedIngredient ? Number(selectedIngredient.qtyOnHand || 0) : null;
+      const unit = String(selectedIngredient?.unit || 'pcs').trim() || 'pcs';
+      const availableLabel = availableQty === null
+        ? 'Select an ingredient to set the qty limit.'
+        : availableQty > 0
+          ? `Available now: ${formatKitSpecQtyValue(availableQty)} ${unit}. Max per product: ${formatKitSpecQtyValue(availableQty)}.`
+          : `Warning: ${selectedIngredient?.name || 'This ingredient'} has no stock on hand right now.`;
+      const hintClass = availableQty !== null && availableQty <= 1 ? ' warning' : '';
+      const maxAttr = availableQty !== null && availableQty > 0 ? ` max="${escapeHtml(String(Number(availableQty.toFixed(3))))}"` : '';
 
-    return `
-      <tr>
-        <td><strong>${escapeHtml(x.name)}</strong></td>
-        <td>${formatQty(x.qtyOnHand || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
-        <td>${formatInventoryMoney(x.unitPrice || 0)}</td>
-        <td>${formatInventoryMoney(x.inventoryValue || 0)}</td>
-        <td>${formatQty(x.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
-        <td>${formatQty(x.estimatedRemainingQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
-        <td>${x.lowStock ? '<span class="low-stock-badge">Low Stock</span>' : 'OK'}</td>
-        <td>${usageRows ? `<ul class="usage-list">${usageRows}</ul>` : 'No recipe mapping yet'}</td>
-      </tr>
-    `;
-  }).join('');
+      return `
+        <div class="kit-spec-editor-row" data-kit-spec-row="${index}">
+          <select data-kit-spec-field="ingredientId">
+            ${buildKitSpecIngredientOptionsForRow(index)}
+          </select>
+          <div class="kit-spec-qty-field">
+            <input data-kit-spec-field="qtyPerProduct" type="number" min="0" step="0.001" placeholder="Qty per product" value="${escapeHtml(row.qtyPerProduct === '' ? '' : String(row.qtyPerProduct || ''))}"${maxAttr} />
+            <small class="kit-spec-qty-hint${hintClass}">${escapeHtml(availableLabel)}</small>
+          </div>
+          <button class="secondary small" type="button" data-kit-spec-remove="${index}">Remove</button>
+        </div>
+      `;
+    })
+    .join('');
 
-  inventoryTableWrapEl.innerHTML = `
-    <table class="inventory-table">
+  kitSpecEditorEl.innerHTML = rows;
+  kitSpecEditorEl.querySelectorAll('[data-kit-spec-row]').forEach((rowEl, index) => {
+    const ingredientSelect = rowEl.querySelector('[data-kit-spec-field="ingredientId"]');
+    if (ingredientSelect) ingredientSelect.value = String(kitSpecDraftRows[index]?.ingredientId || '');
+  });
+}
+
+function getSortedKitSpecCoverageProducts(products = []) {
+  return products.slice().sort((a, b) => {
+    const byCategory = String(a.category || '').localeCompare(String(b.category || ''));
+    if (byCategory !== 0) return byCategory;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+}
+
+function getKitSpecCoverageSnapshot() {
+  const products = getSortedKitSpecCoverageProducts(Array.isArray(state.products) ? state.products : []);
+  const ingredients = Array.isArray(kitSpecIngredients) ? kitSpecIngredients.slice() : [];
+  const categoryNameByKey = new Map((state.categories || []).map((category) => [String(category.key || ''), category.name || category.key]));
+  const recipeByProductId = new Map();
+  const productIdsByIngredientId = new Map();
+
+  kitSpecRecipes.forEach((recipe) => {
+    const productId = String(recipe.productId || '').trim();
+    const ingredientId = String(recipe.ingredientId || '').trim();
+    if (!recipeByProductId.has(productId)) recipeByProductId.set(productId, []);
+    recipeByProductId.get(productId).push(recipe);
+    if (ingredientId) {
+      if (!productIdsByIngredientId.has(ingredientId)) productIdsByIngredientId.set(ingredientId, new Set());
+      if (productId) productIdsByIngredientId.get(ingredientId).add(productId);
+    }
+  });
+
+  const configuredProducts = [];
+  const missingProducts = [];
+  products.forEach((product) => {
+    const recipes = recipeByProductId.get(String(product.id || '').trim()) || [];
+    if (recipes.length) {
+      configuredProducts.push(product);
+    } else {
+      missingProducts.push(product);
+    }
+  });
+
+  const unassignedIngredients = ingredients
+    .filter((ingredient) => !productIdsByIngredientId.get(String(ingredient.id || '').trim())?.size)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+  return {
+    products,
+    ingredients,
+    categoryNameByKey,
+    recipeByProductId,
+    configuredProducts,
+    missingProducts,
+    unassignedIngredients
+  };
+}
+
+function renderKitSpecCoverageSummary(snapshot) {
+  if (!kitSpecSummaryEl) return;
+  const filters = [
+    {
+      key: 'all-products',
+      label: 'All Products',
+      count: snapshot.products.length,
+      icon: '📋',
+      meta: 'Every product in the menu',
+      hoverInfo: 'Shows all products and whether each one already has a kit specification assigned.'
+    },
+    {
+      key: 'configured-products',
+      label: 'Configured',
+      count: snapshot.configuredProducts.length,
+      icon: '✅',
+      meta: 'Products already mapped',
+      hoverInfo: 'Shows only products that already have saved kit specs and ingredient mappings.'
+    },
+    {
+      key: 'missing-products',
+      label: 'Missing Specs',
+      count: snapshot.missingProducts.length,
+      icon: '🧩',
+      meta: 'Products without kit spec',
+      hoverInfo: 'Shows products that still need ingredients assigned before stock can deduct automatically.'
+    },
+    {
+      key: 'unassigned-ingredients',
+      label: 'Unused Ingredients',
+      count: snapshot.unassignedIngredients.length,
+      icon: '🧂',
+      meta: 'Ingredients not linked yet',
+      hoverInfo: 'Shows inventory ingredients that are not connected to any product kit specification yet.'
+    }
+  ];
+
+  if (!filters.some((filter) => filter.key === kitSpecCoverageFilter)) {
+    kitSpecCoverageFilter = 'all-products';
+  }
+
+  const activeFilter = filters.find((filter) => filter.key === kitSpecCoverageFilter) || filters[0];
+  kitSpecSummaryEl.innerHTML = `
+    <div class="kit-spec-summary-shell">
+      <div class="kit-spec-summary-header">
+        <span class="kit-spec-summary-eyebrow">Kit Overview</span>
+        <h3>Configuration Coverage</h3>
+      </div>
+      <div class="kit-spec-summary-buttons" role="group" aria-label="Kit specification coverage filters">
+      ${filters.map((filter) => `
+        <button
+          type="button"
+          class="kit-spec-summary-btn${filter.key === activeFilter.key ? ' active' : ''}"
+          data-kit-spec-filter="${escapeHtml(filter.key)}"
+          title="${escapeHtml(filter.hoverInfo || '')}"
+        >
+          <span class="kit-spec-summary-btn-head">
+            <span class="kit-spec-summary-icon" aria-hidden="true">${filter.icon}</span>
+            <span class="kit-spec-summary-label">${escapeHtml(filter.label)}</span>
+          </span>
+          <strong>${Number(filter.count || 0).toLocaleString('en-US')}</strong>
+          <small>${escapeHtml(filter.meta)}</small>
+          <span class="kit-spec-summary-hover-note">${escapeHtml(filter.hoverInfo || '')}</span>
+          <span class="kit-spec-summary-link">${filter.key === activeFilter.key ? 'Showing below' : 'View details ->'}</span>
+        </button>
+      `).join('')}
+      </div>
+      <div class="kit-spec-summary-caption">Showing ${escapeHtml(activeFilter.label.toLowerCase())}.</div>
+    </div>
+  `;
+}
+
+function renderKitSpecCoverageProductTable(products, snapshot, emptyLabel, options = {}) {
+  if (!products.length) {
+    kitSpecModuleEl.innerHTML = `<p class="kit-spec-empty-state">${escapeHtml(emptyLabel)}</p>`;
+    return;
+  }
+
+  const showStatusOnly = options.showStatusOnly === true;
+  const rows = products
+    .map((product) => {
+      const recipes = snapshot.recipeByProductId.get(String(product.id || '').trim()) || [];
+      const recipeSummary = showStatusOnly
+        ? (recipes.length
+          ? '<span class="kit-spec-status-badge configured">Have already kit spec</span>'
+          : '<span class="kit-spec-status-badge missing">No ingredients assigned</span>')
+        : (recipes.length
+          ? escapeHtml(recipes.map((recipe) => `${recipe.ingredientName} (${Number(recipe.qtyPerProduct || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} ${recipe.ingredientUnit || 'pcs'})`).join(', '))
+          : 'No ingredients assigned');
+      return `
+        <tr>
+          <td>${escapeHtml(snapshot.categoryNameByKey.get(String(product.category || '')) || product.category || 'Category')}</td>
+          <td><strong>${escapeHtml(product.name || 'Product')}</strong></td>
+          <td>${recipeSummary}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  kitSpecModuleEl.innerHTML = `
+    <table class="admin-inline-table">
       <thead>
         <tr>
-          <th>Ingredient</th>
-          <th>Qty On Hand</th>
-          <th>Unit Price</th>
-          <th>Inventory Value</th>
-          <th>Estimated Used</th>
-          <th>Estimated Remaining</th>
-          <th>Status</th>
-          <th>Used in Products</th>
+          <th>Category</th>
+          <th>Product</th>
+          <th>Ingredients Used</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -2933,24 +6494,694 @@ function renderInventoryReport(report) {
   `;
 }
 
-async function refreshInventoryModule() {
-  const isAdmin = canManageInventory();
-  if (inventoryIngredientFormEl) {
-    inventoryIngredientFormEl.style.display = isAdmin ? 'flex' : 'none';
-  }
-  if (inventoryAdminNoteEl) {
-    inventoryAdminNoteEl.style.display = isAdmin ? 'none' : 'block';
+function renderKitSpecCoverageIngredientTable(ingredients) {
+  if (!ingredients.length) {
+    kitSpecModuleEl.innerHTML = '<p class="kit-spec-empty-state">All available ingredients are already assigned to at least one kit spec.</p>';
+    return;
   }
 
-  if (inventorySummaryEl) inventorySummaryEl.textContent = 'Loading inventory summary...';
-  if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '<p>Loading ingredients...</p>';
+  const rows = ingredients
+    .map((ingredient) => `
+      <tr>
+        <td><strong>${escapeHtml(ingredient.name || 'Ingredient')}</strong></td>
+        <td>${escapeHtml(ingredient.unit || 'pcs')}</td>
+        <td>Not assigned to any product</td>
+      </tr>
+    `)
+    .join('');
+
+  kitSpecModuleEl.innerHTML = `
+    <table class="admin-inline-table">
+      <thead>
+        <tr>
+          <th>Ingredient</th>
+          <th>Unit</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderKitSpecCoverage() {
+  if (!kitSpecModuleEl) return;
+  const snapshot = getKitSpecCoverageSnapshot();
+  if (!snapshot.products.length) {
+    kitSpecModuleEl.innerHTML = '<p class="kit-spec-empty-state">No products available yet.</p>';
+    if (kitSpecSummaryEl) kitSpecSummaryEl.innerHTML = '<div class="kit-spec-summary-loading">No products available yet.</div>';
+    return;
+  }
+
+  renderKitSpecCoverageSummary(snapshot);
+
+  if (kitSpecCoverageFilter === 'configured-products') {
+    renderKitSpecCoverageProductTable(snapshot.configuredProducts, snapshot, 'No products have a saved kit specification yet.');
+    return;
+  }
+  if (kitSpecCoverageFilter === 'missing-products') {
+    renderKitSpecCoverageProductTable(snapshot.missingProducts, snapshot, 'All products already have a configured kit specification.');
+    return;
+  }
+  if (kitSpecCoverageFilter === 'unassigned-ingredients') {
+    renderKitSpecCoverageIngredientTable(snapshot.unassignedIngredients);
+    return;
+  }
+
+  renderKitSpecCoverageProductTable(snapshot.products, snapshot, 'No products available yet.', { showStatusOnly: true });
+}
+
+function renderKitSpecModeControl() {
+  if (!kitSpecModeControlEl || !kitSpecModeLabelEl || !kitSpecModeHintEl || !kitSpecModeToggleBtnEl) return;
+
+  const enforceKitSpec = state.appConfig?.enforceKitSpec !== false;
+  const canToggle = canManageInventory();
+
+  kitSpecModeLabelEl.textContent = enforceKitSpec ? 'Kit Spec Required' : 'Open Ordering Mode';
+  kitSpecModeHintEl.textContent = enforceKitSpec
+    ? 'Products need a valid kit spec and enough ingredient stock before they can be ordered. Paid sales deduct ingredient inventory.'
+    : 'Products can be ordered and paid without kit specs or ingredient stock checks. Sales are still recorded, but ingredient deduction is disabled.';
+  kitSpecModeControlEl.classList.toggle('disabled', !enforceKitSpec);
+  kitSpecModeToggleBtnEl.style.display = canToggle ? '' : 'none';
+  kitSpecModeToggleBtnEl.textContent = enforceKitSpec ? 'Turn Off Requirement' : 'Turn On Requirement';
+}
+
+function syncKitSpecBuilderVisibility() {
+  const enforceKitSpec = state.appConfig?.enforceKitSpec !== false;
+  if (kitSpecControlBarEl) {
+    kitSpecControlBarEl.style.display = enforceKitSpec ? 'grid' : 'none';
+  }
+  if (kitSpecEditorEl) {
+    kitSpecEditorEl.style.display = enforceKitSpec ? '' : 'none';
+    if (!enforceKitSpec) {
+      kitSpecEditorEl.innerHTML = '';
+    }
+  }
+}
+
+async function refreshKitSpecModule() {
+  if (!kitSpecModuleEl) return;
+  renderKitSpecModeControl();
+  syncKitSpecBuilderVisibility();
+  if (kitSpecNoteEl) {
+    if (state.appConfig?.enforceKitSpec === false) {
+      kitSpecNoteEl.textContent = canManageInventory()
+        ? 'Kit spec requirement is currently turned off. The Kit Builder inputs are hidden because ordering and payment no longer depend on recipes or ingredient stock.'
+        : 'Kit spec requirement is currently turned off. The Kit Builder inputs are hidden because products can be sold without ingredient checks.';
+    } else {
+      kitSpecNoteEl.textContent = canAccessAdminFeatures()
+        ? 'Assign the exact ingredients and quantity used by each product. Paid orders will deduct stock from these kit specs.'
+        : 'View-only mode. Only Administrations and Supervisor can manage kit specification.';
+    }
+  }
+  if (kitSpecModuleEl) kitSpecModuleEl.innerHTML = '<p class="kit-spec-empty-state">Loading kit specification records...</p>';
+  if (kitSpecEditorEl) kitSpecEditorEl.innerHTML = '<p class="kit-spec-empty-state">Loading product ingredients...</p>';
+  if (kitSpecSummaryEl) kitSpecSummaryEl.innerHTML = '<div class="kit-spec-summary-loading">Loading product kit coverage...</div>';
 
   try {
-    const report = await api('/api/admin/inventory/report');
-    renderInventoryReport(report);
+    const currentCategory = String(kitSpecCategorySelectEl?.value || '').trim().toLowerCase();
+    const currentProductId = String(kitSpecProductSelectEl?.value || '').trim();
+    const result = await api('/api/admin/kit-spec', {
+      headers: buildActorHeaders()
+    });
+
+    state.categories = Array.isArray(result?.categories) ? result.categories.map((x) => ({
+      key: String(x.key || '').trim().toLowerCase(),
+      name: String(x.name || '').trim() || String(x.key || ''),
+      image: String(x.image || '').trim() || getDefaultCategoryImage(x.key),
+      sortOrder: Number(x.sortOrder || 0)
+    })) : state.categories;
+    state.products = Array.isArray(result?.products) ? result.products.map((x) => ({
+      ...toClientProduct(x)
+    })) : state.products;
+    applyAppConfig(result?.appConfig || state.appConfig);
+    kitSpecIngredients = Array.isArray(result?.ingredients) ? result.ingredients : [];
+    kitSpecRecipes = Array.isArray(result?.recipes) ? result.recipes : [];
+
+    populateKitSpecCategoryOptions(currentCategory);
+    renderKitSpecProductOptions(currentProductId);
+    renderKitSpecEditor();
+    renderKitSpecCoverage();
   } catch (error) {
-    if (inventorySummaryEl) inventorySummaryEl.textContent = `Inventory error: ${error.message}`;
-    if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '';
+    if (kitSpecModuleEl) kitSpecModuleEl.innerHTML = `<p class="error">Kit specification error: ${escapeHtml(error.message)}</p>`;
+    if (kitSpecEditorEl) kitSpecEditorEl.innerHTML = '';
+    if (kitSpecSummaryEl) kitSpecSummaryEl.innerHTML = '';
+  }
+}
+
+async function handleKitSpecModeToggle() {
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can change the Kit Spec requirement.');
+    return;
+  }
+
+  const nextEnforceKitSpec = !(state.appConfig?.enforceKitSpec !== false);
+  try {
+    if (kitSpecModeToggleBtnEl) {
+      kitSpecModeToggleBtnEl.disabled = true;
+      kitSpecModeToggleBtnEl.textContent = 'Saving...';
+    }
+
+    const result = await api('/api/admin/app-config', {
+      method: 'PUT',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        enforceKitSpec: nextEnforceKitSpec
+      })
+    });
+
+    applyAppConfig(result?.appConfig || state.appConfig);
+    syncKitSpecBuilderVisibility();
+    await Promise.all([
+      refreshCatalog({ keepCategory: true }),
+      refreshKitSpecModule(),
+      canAccessAdminFeatures() ? refreshInventoryModule() : Promise.resolve()
+    ]);
+    setStatus(nextEnforceKitSpec
+      ? 'Kit Spec requirement turned on. Ordering now depends on kit specs and ingredient stock again.'
+      : 'Kit Spec requirement turned off. Products can now be ordered without kit specs, and ingredient deduction is disabled.');
+  } catch (error) {
+    setStatus(`Kit Spec mode update failed: ${error.message}`);
+  } finally {
+    if (kitSpecModeToggleBtnEl) {
+      kitSpecModeToggleBtnEl.disabled = false;
+      renderKitSpecModeControl();
+    }
+  }
+}
+
+function updateKitSpecDraftFromEditor() {
+  if (!kitSpecEditorEl) return;
+  kitSpecDraftRows = Array.from(kitSpecEditorEl.querySelectorAll('[data-kit-spec-row]')).map((rowEl) => ({
+    ingredientId: String(rowEl.querySelector('[data-kit-spec-field="ingredientId"]')?.value || '').trim(),
+    qtyPerProduct: String(rowEl.querySelector('[data-kit-spec-field="qtyPerProduct"]')?.value || '').trim()
+  }));
+}
+
+function addKitSpecDraftRow() {
+  updateKitSpecDraftFromEditor();
+  kitSpecDraftRows.push({ ingredientId: '', qtyPerProduct: '' });
+  renderKitSpecEditor();
+}
+
+function enforceKitSpecDraftQtyLimit(rowIndex, { showStatus = false } = {}) {
+  const row = kitSpecDraftRows[rowIndex];
+  if (!row) return false;
+
+  const ingredient = getKitSpecIngredientById(row.ingredientId);
+  if (!ingredient) return false;
+
+  const ingredientName = String(ingredient.name || 'Ingredient').trim() || 'Ingredient';
+  const ingredientUnit = String(ingredient.unit || 'pcs').trim() || 'pcs';
+  const availableQty = Number(ingredient.qtyOnHand || 0);
+  const rawQty = String(row.qtyPerProduct || '').trim();
+  if (!rawQty) return false;
+
+  const qtyPerProduct = Number(rawQty);
+  if (!Number.isFinite(qtyPerProduct) || qtyPerProduct <= 0) return false;
+
+  if (availableQty <= 0) {
+    row.qtyPerProduct = '';
+    if (showStatus) {
+      setStatus(`Warning: ${ingredientName} has no stock on hand. Restock it before setting qty per product.`);
+    }
+    return true;
+  }
+
+  if (qtyPerProduct > availableQty) {
+    row.qtyPerProduct = String(Number(availableQty.toFixed(3)));
+    if (showStatus) {
+      setStatus(`Warning: Qty per product for "${ingredientName}" cannot exceed ${formatKitSpecQtyValue(availableQty)} ${ingredientUnit}.`);
+    }
+    return true;
+  }
+
+  return false;
+}
+
+function handleKitSpecEditorFieldChange(fieldEl) {
+  if (!fieldEl || !kitSpecEditorEl) return;
+  const rowEl = fieldEl.closest('[data-kit-spec-row]');
+  const rowIndex = Number(rowEl?.getAttribute('data-kit-spec-row'));
+  if (!Number.isInteger(rowIndex) || rowIndex < 0) return;
+
+  updateKitSpecDraftFromEditor();
+  if (!kitSpecDraftRows[rowIndex]) return;
+
+  const fieldName = String(fieldEl.getAttribute('data-kit-spec-field') || '').trim();
+  if (fieldName === 'ingredientId') {
+    const ingredientId = String(kitSpecDraftRows[rowIndex].ingredientId || '').trim();
+    if (ingredientId) {
+      const duplicateIndex = kitSpecDraftRows.findIndex((row, index) => index !== rowIndex && String(row?.ingredientId || '').trim() === ingredientId);
+      if (duplicateIndex >= 0) {
+        kitSpecDraftRows[rowIndex].ingredientId = '';
+        if (!String(kitSpecDraftRows[rowIndex].qtyPerProduct || '').trim()) {
+          kitSpecDraftRows[rowIndex].qtyPerProduct = '';
+        }
+        setStatus('Each ingredient can only be selected once for the same product kit spec.');
+        renderKitSpecEditor();
+        return;
+      }
+
+      if (!String(kitSpecDraftRows[rowIndex].qtyPerProduct || '').trim()) {
+        const selectedIngredient = getKitSpecIngredientById(ingredientId);
+        const availableQty = Number(selectedIngredient?.qtyOnHand || 0);
+        if (availableQty > 0) {
+          kitSpecDraftRows[rowIndex].qtyPerProduct = String(Number(Math.min(1, availableQty).toFixed(3)));
+        }
+      }
+
+      enforceKitSpecDraftQtyLimit(rowIndex, { showStatus: true });
+      renderKitSpecEditor();
+      return;
+    }
+
+    renderKitSpecEditor();
+    return;
+  }
+
+  if (fieldName === 'qtyPerProduct') {
+    const didClamp = enforceKitSpecDraftQtyLimit(rowIndex, { showStatus: true });
+    if (didClamp) {
+      renderKitSpecEditor();
+    }
+    return;
+  }
+
+  if (fieldName) {
+    renderKitSpecEditor();
+  }
+}
+
+async function saveKitSpecForSelectedProduct() {
+  const productId = String(kitSpecProductSelectEl?.value || '').trim();
+  if (!productId) {
+    setStatus('Select a product first before saving the kit specification.');
+    return;
+  }
+
+  updateKitSpecDraftFromEditor();
+  const recipeItems = [];
+  for (const row of kitSpecDraftRows) {
+    const ingredientId = String(row.ingredientId || '').trim();
+    const rawQty = String(row.qtyPerProduct || '').trim();
+    if (!ingredientId && !rawQty) continue;
+    const qtyPerProduct = Number(rawQty);
+    if (!ingredientId) {
+      setStatus('Each kit spec row must have an ingredient selected.');
+      return;
+    }
+    if (!Number.isFinite(qtyPerProduct) || qtyPerProduct <= 0) {
+      setStatus('Each kit spec row must have a quantity greater than 0.');
+      return;
+    }
+    const ingredient = getKitSpecIngredientById(ingredientId);
+    if (ingredient) {
+      const availableQty = Number(ingredient.qtyOnHand || 0);
+      const ingredientName = String(ingredient.name || 'Ingredient').trim() || 'Ingredient';
+      const ingredientUnit = String(ingredient.unit || 'pcs').trim() || 'pcs';
+      if (availableQty <= 0) {
+        setStatus(`Warning: ${ingredientName} has no stock on hand. Restock it before saving this kit spec.`);
+        return;
+      }
+      if (qtyPerProduct > availableQty) {
+        setStatus(`Warning: Qty per product for "${ingredientName}" cannot exceed ${formatKitSpecQtyValue(availableQty)} ${ingredientUnit}.`);
+        return;
+      }
+    }
+    recipeItems.push({ ingredientId, qtyPerProduct });
+  }
+
+  const selectedProduct = (state.products || []).find((product) => String(product.id || '') === productId);
+  if (!selectedProduct) {
+    setStatus('Selected product was not found.');
+    return;
+  }
+
+  try {
+    if (kitSpecSaveBtnEl) {
+      kitSpecSaveBtnEl.disabled = true;
+      kitSpecSaveBtnEl.textContent = 'Saving...';
+    }
+    const result = await api(`/api/admin/kit-spec/${encodeURIComponent(productId)}`, {
+      method: 'PUT',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({ recipeItems })
+    });
+    kitSpecRecipes = kitSpecRecipes
+      .filter((recipe) => String(recipe.productId || '') !== productId)
+      .concat(Array.isArray(result?.recipes) ? result.recipes : []);
+    loadKitSpecDraftRowsForSelectedProduct();
+    renderKitSpecEditor();
+    renderKitSpecCoverage();
+    await refreshInventoryModule();
+    setStatus(`Kit specification saved for ${selectedProduct.name}.`);
+  } catch (error) {
+    setStatus(`Save kit specification failed: ${error.message}`);
+  } finally {
+    if (kitSpecSaveBtnEl) {
+      kitSpecSaveBtnEl.disabled = false;
+      kitSpecSaveBtnEl.textContent = 'Save Kit Spec';
+    }
+  }
+}
+
+function formatRoleLabel(role) {
+  const key = String(role || '').trim().toLowerCase();
+  if (key === 'administrations') return 'Administrations';
+  if (key === 'supervisor') return 'Supervisor';
+  if (key === 'encharge') return 'Encharge';
+  return key || 'Unknown';
+}
+
+function buildUserManagementHeaders() {
+  return buildActorHeaders();
+}
+
+async function refreshAdminUsers() {
+  if (adminUsersSummaryEl) adminUsersSummaryEl.innerHTML = '<div class="user-management-summary-loading">Loading users...</div>';
+  if (adminUsersListEl) adminUsersListEl.innerHTML = '<p>Loading users...</p>';
+
+  try {
+    const result = await api('/api/admin/users', {
+      headers: buildUserManagementHeaders()
+    });
+    const users = Array.isArray(result?.users) ? result.users : [];
+    const activeCount = users.filter((x) => x.isActive).length;
+    const canManage = canManageUsers();
+
+    if (adminCreateUserNoteEl) {
+      adminCreateUserNoteEl.textContent = canManage
+        ? 'Create a user account and set the initial login password.'
+        : 'View-only mode. Only Administrations can create users.';
+    }
+    if (adminCreateUserFormEl) {
+      adminCreateUserFormEl.style.display = canManage ? 'grid' : 'none';
+    }
+
+    if (adminUsersSummaryEl) {
+      const roleCounts = {
+        administrations: users.filter((user) => String(user.role || '').trim().toLowerCase() === 'administrations').length,
+        supervisor: users.filter((user) => String(user.role || '').trim().toLowerCase() === 'supervisor').length,
+        encharge: users.filter((user) => String(user.role || '').trim().toLowerCase() === 'encharge').length
+      };
+      const summaryCards = [
+        {
+          label: 'Total Users',
+          value: Number(users.length || 0).toLocaleString('en-US'),
+          icon: '👥',
+          accent: 'users',
+          meta: 'All registered POS accounts'
+        },
+        {
+          label: 'Active',
+          value: Number(activeCount || 0).toLocaleString('en-US'),
+          icon: '🟢',
+          accent: 'active',
+          meta: 'Accounts currently enabled'
+        },
+        {
+          label: 'Inactive',
+          value: Number((users.length - activeCount) || 0).toLocaleString('en-US'),
+          icon: '⏸',
+          accent: 'inactive',
+          meta: 'Accounts currently disabled'
+        },
+        {
+          label: 'Admins',
+          value: Number(roleCounts.administrations || 0).toLocaleString('en-US'),
+          icon: '🛡',
+          accent: 'admins',
+          meta: canManage ? 'You can manage roles, account status, and password reset.' : 'View-only mode. Only Administrations can manage users.'
+        }
+      ];
+
+      adminUsersSummaryEl.innerHTML = `
+        <div class="user-management-summary-shell">
+          <div class="user-management-summary-header">
+            <span class="user-management-summary-eyebrow">User Overview</span>
+            <h3>Account Status Snapshot</h3>
+          </div>
+          <div class="user-management-summary-grid">
+            ${summaryCards.map((card) => `
+              <article class="user-management-summary-card ${escapeHtml(card.accent)}">
+                <div class="user-management-summary-card-head">
+                  <span class="user-management-summary-icon" aria-hidden="true">${card.icon}</span>
+                  <span class="user-management-summary-label">${escapeHtml(card.label)}</span>
+                </div>
+                <strong>${escapeHtml(card.value)}</strong>
+                <small>${escapeHtml(card.meta)}</small>
+              </article>
+            `).join('')}
+          </div>
+          <div class="user-management-role-strip">
+            <span><strong>${Number(roleCounts.administrations || 0).toLocaleString('en-US')}</strong> Administrations</span>
+            <span><strong>${Number(roleCounts.supervisor || 0).toLocaleString('en-US')}</strong> Supervisor</span>
+            <span><strong>${Number(roleCounts.encharge || 0).toLocaleString('en-US')}</strong> Encharge</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!adminUsersListEl) return;
+    if (!users.length) {
+      adminUsersListEl.innerHTML = '<p>No users found.</p>';
+      return;
+    }
+
+    const rows = users
+      .map((user) => {
+        const roleOptions = ['administrations', 'supervisor', 'encharge']
+          .map((roleKey) => `<option value="${escapeHtml(roleKey)}" ${roleKey === user.role ? 'selected' : ''}>${escapeHtml(formatRoleLabel(roleKey))}</option>`)
+          .join('');
+        const actionsMarkup = canManage
+          ? `
+            <div class="user-management-actions" data-user-id="${escapeHtml(user.id)}">
+              <div class="user-management-action-row">
+                <select class="user-role-select">${roleOptions}</select>
+                <button type="button" class="secondary" data-user-save-role="${escapeHtml(user.id)}">Save Role</button>
+              </div>
+              <div class="user-management-action-row">
+                <button
+                  type="button"
+                  class="secondary"
+                  data-user-toggle-active="${escapeHtml(user.id)}"
+                  data-next-active="${user.isActive ? 'false' : 'true'}"
+                >
+                  ${user.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>
+              <div class="user-management-action-row">
+                <input type="password" class="user-reset-password-input" placeholder="Temp password (min 6)" />
+                <button type="button" class="secondary" data-user-reset-password="${escapeHtml(user.id)}">Reset Password</button>
+              </div>
+            </div>
+          `
+          : '<span class="status">View only</span>';
+        return `
+        <tr>
+          <td><strong>${escapeHtml(user.fullName || 'Unknown')}</strong></td>
+          <td class="user-management-email">${escapeHtml(user.email || '-')}</td>
+          <td>${escapeHtml(formatRoleLabel(user.role))}</td>
+          <td>${user.isActive ? '<span class="badge badge-paid">Active</span>' : '<span class="badge badge-pending">Inactive</span>'}</td>
+          <td>${escapeHtml(formatDate(user.lastLoginAt))}</td>
+          <td>${escapeHtml(formatDate(user.createdAt))}</td>
+          <td>${actionsMarkup}</td>
+        </tr>
+      `;
+      })
+      .join('');
+
+    adminUsersListEl.innerHTML = `
+      <table class="inventory-table user-management-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Last Login</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  } catch (error) {
+    if (adminUsersSummaryEl) adminUsersSummaryEl.innerHTML = `<p class="error">User management error: ${escapeHtml(error.message)}</p>`;
+    if (adminUsersListEl) adminUsersListEl.innerHTML = '';
+  }
+}
+
+async function handleAdminCreateUserSubmit(event) {
+  event.preventDefault();
+  if (!canManageUsers()) {
+    setStatus('Only Administrations can create users.');
+    return;
+  }
+
+  const fullName = String(adminCreateUserNameEl?.value || '').trim();
+  const email = normalizeEmail(adminCreateUserEmailEl?.value);
+  const password = String(adminCreateUserPasswordEl?.value || '');
+  const role = String(adminCreateUserRoleEl?.value || '').trim().toLowerCase();
+
+  if (!fullName || !email || !password || !role) {
+    setStatus('Name, email, password, and role are required.');
+    return;
+  }
+  if (!isValidEmail(email)) {
+    setStatus('Enter a valid email format for login.');
+    return;
+  }
+  if (password.length < 6) {
+    setStatus('Initial password must be at least 6 characters.');
+    return;
+  }
+  if (!['administrations', 'supervisor', 'encharge'].includes(role)) {
+    setStatus('Select a valid role.');
+    return;
+  }
+
+  try {
+    if (adminCreateUserBtnEl) {
+      adminCreateUserBtnEl.disabled = true;
+      adminCreateUserBtnEl.textContent = 'Creating...';
+    }
+
+    const result = await api('/api/admin/users', {
+      method: 'POST',
+      headers: buildUserManagementHeaders(),
+      body: JSON.stringify({ fullName, email, password, role })
+    });
+
+    if (adminCreateUserNameEl) adminCreateUserNameEl.value = '';
+    if (adminCreateUserEmailEl) adminCreateUserEmailEl.value = '';
+    if (adminCreateUserPasswordEl) adminCreateUserPasswordEl.value = '';
+    if (adminCreateUserRoleEl) adminCreateUserRoleEl.value = 'encharge';
+
+    const createdEmail = String(result?.user?.email || email);
+    setStatus(`User created for ${createdEmail}.`);
+    showConfirmationToast({
+      title: 'User created',
+      message: 'User account created successfully.',
+      tone: 'success',
+      duration: 4500
+    });
+    await refreshAdminUsers();
+  } catch (error) {
+    setStatus(`Create user failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Create user failed',
+      message: error.message,
+      tone: 'warning'
+    });
+  } finally {
+    if (adminCreateUserBtnEl) {
+      adminCreateUserBtnEl.disabled = false;
+      adminCreateUserBtnEl.textContent = 'Create User';
+    }
+  }
+}
+
+async function handleAdminUsersAction(event) {
+  const roleBtn = event.target.closest('[data-user-save-role]');
+  if (roleBtn) {
+    if (!canManageUsers()) {
+      setStatus('Only Administrations can update user roles.');
+      return;
+    }
+    const userId = String(roleBtn.getAttribute('data-user-save-role') || '').trim();
+    if (!userId) return;
+    const row = roleBtn.closest('tr');
+    const roleSelect = row?.querySelector('.user-role-select');
+    const role = String(roleSelect?.value || '').trim().toLowerCase();
+    if (!role) return;
+
+    try {
+      roleBtn.disabled = true;
+      roleBtn.textContent = 'Saving...';
+      await api(`/api/admin/users/${encodeURIComponent(userId)}/role`, {
+        method: 'PATCH',
+        headers: buildUserManagementHeaders(),
+        body: JSON.stringify({ role })
+      });
+      await refreshAdminUsers();
+      setStatus('User role updated.');
+    } catch (error) {
+      setStatus(`Update role failed: ${error.message}`);
+    } finally {
+      roleBtn.disabled = false;
+      roleBtn.textContent = 'Save Role';
+    }
+    return;
+  }
+
+  const toggleBtn = event.target.closest('[data-user-toggle-active]');
+  if (toggleBtn) {
+    if (!canManageUsers()) {
+      setStatus('Only Administrations can activate/deactivate users.');
+      return;
+    }
+    const userId = String(toggleBtn.getAttribute('data-user-toggle-active') || '').trim();
+    const nextActive = String(toggleBtn.getAttribute('data-next-active') || '').trim() === 'true';
+    if (!userId) return;
+
+    try {
+      toggleBtn.disabled = true;
+      toggleBtn.textContent = 'Saving...';
+      await api(`/api/admin/users/${encodeURIComponent(userId)}/status`, {
+        method: 'PATCH',
+        headers: buildUserManagementHeaders(),
+        body: JSON.stringify({ isActive: nextActive })
+      });
+      await refreshAdminUsers();
+      setStatus(`User account ${nextActive ? 'activated' : 'deactivated'}.`);
+    } catch (error) {
+      setStatus(`Update status failed: ${error.message}`);
+    } finally {
+      toggleBtn.disabled = false;
+    }
+    return;
+  }
+
+  const resetBtn = event.target.closest('[data-user-reset-password]');
+  if (resetBtn) {
+    if (!canManageUsers()) {
+      setStatus('Only Administrations can reset user passwords.');
+      return;
+    }
+    const userId = String(resetBtn.getAttribute('data-user-reset-password') || '').trim();
+    if (!userId) return;
+    const row = resetBtn.closest('tr');
+    const passwordInput = row?.querySelector('.user-reset-password-input');
+    const password = String(passwordInput?.value || '');
+    if (password.length < 6) {
+      setStatus('Temporary password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Resetting...';
+      await api(`/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+        method: 'POST',
+        headers: buildUserManagementHeaders(),
+        body: JSON.stringify({ password })
+      });
+      if (passwordInput) passwordInput.value = '';
+      setStatus('User password reset completed.');
+      showConfirmationToast({
+        title: 'Password reset',
+        message: 'Temporary password was updated successfully.',
+        tone: 'success'
+      });
+    } catch (error) {
+      setStatus(`Reset password failed: ${error.message}`);
+    } finally {
+      resetBtn.disabled = false;
+      resetBtn.textContent = 'Reset Password';
+    }
   }
 }
 
@@ -2964,7 +7195,7 @@ async function handleIngredientSubmit(event) {
   const name = String(ingredientNameInputEl?.value || '').trim();
   const qtyOnHand = Number(ingredientQtyInputEl?.value || 0);
   const unitPrice = Number(ingredientPriceInputEl?.value || 0);
-  const unit = String(ingredientUnitInputEl?.value || '').trim() || 'pcs';
+  const unit = String(ingredientUnitInputEl?.value || '').trim();
 
   if (!name) {
     setStatus('Ingredient name is required.');
@@ -2976,6 +7207,10 @@ async function handleIngredientSubmit(event) {
   }
   if (!Number.isFinite(unitPrice) || unitPrice < 0) {
     setStatus('Unit price must be a valid number >= 0.');
+    return;
+  }
+  if (!unit) {
+    setStatus('UOM / unit of measure is required.');
     return;
   }
 
@@ -2996,8 +7231,9 @@ async function handleIngredientSubmit(event) {
     if (ingredientNameInputEl) ingredientNameInputEl.value = '';
     if (ingredientQtyInputEl) ingredientQtyInputEl.value = '';
     if (ingredientPriceInputEl) ingredientPriceInputEl.value = '';
-    if (ingredientUnitInputEl) ingredientUnitInputEl.value = 'pcs';
+    if (ingredientUnitInputEl) ingredientUnitInputEl.value = '';
     await refreshInventoryModule();
+    await refreshKitSpecModule();
     setStatus(`Ingredient "${name}" added successfully.`);
   } catch (error) {
     setStatus(`Add ingredient failed: ${error.message}`);
@@ -3009,16 +7245,424 @@ async function handleIngredientSubmit(event) {
   }
 }
 
+function resetInventoryBulkEditorInputs() {
+  if (!inventoryBulkEditorEl) return;
+  inventoryBulkEditorEl.querySelectorAll('.inventory-bulk-qty-input, .inventory-bulk-price-input').forEach((input) => {
+    input.value = '';
+  });
+  const bulkStatusEl = inventoryBulkEditorEl.querySelector('#inventoryBulkStatus');
+  if (bulkStatusEl) bulkStatusEl.textContent = 'Blank fields remain unchanged.';
+}
+
+function syncInventoryBulkToggleButton() {
+  if (!inventoryBulkToggleBtnEl) return;
+  const canShow = canManageInventory() && activeInventoryView === 'ingredients';
+  inventoryBulkToggleBtnEl.style.display = canShow ? '' : 'none';
+  inventoryBulkToggleBtnEl.textContent = inventoryBulkEditorOpen ? 'Hide Bulk Edit' : 'Bulk Edit';
+  inventoryBulkToggleBtnEl.setAttribute('aria-expanded', inventoryBulkEditorOpen ? 'true' : 'false');
+  inventoryBulkToggleBtnEl.classList.toggle('active', inventoryBulkEditorOpen);
+}
+
+function toggleInventoryBulkEditor() {
+  if (!canManageInventory() || activeInventoryView !== 'ingredients') return;
+  inventoryBulkEditorOpen = !inventoryBulkEditorOpen;
+  syncInventoryBulkToggleButton();
+  if (latestInventoryReportData) {
+    renderInventoryReport(latestInventoryReportData);
+    return;
+  }
+  refreshInventoryModule().catch((error) => {
+    inventoryBulkEditorOpen = false;
+    syncInventoryBulkToggleButton();
+    setStatus(`Inventory refresh failed: ${error.message}`);
+  });
+}
+
+async function handleInventoryBulkEditSubmit(event) {
+  event.preventDefault();
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can bulk edit ingredients.');
+    return;
+  }
+  if (!inventoryBulkEditorEl) return;
+
+  const bulkStatusEl = inventoryBulkEditorEl.querySelector('#inventoryBulkStatus');
+  const bulkApplyBtnEl = inventoryBulkEditorEl.querySelector('#inventoryBulkApplyBtn');
+  const qtyMode = String(inventoryBulkEditorEl.querySelector('#inventoryBulkQtyMode')?.value || 'replace').trim().toLowerCase();
+  const rows = Array.from(inventoryBulkEditorEl.querySelectorAll('[data-bulk-ingredient-id]'));
+
+  const updates = [];
+  for (const row of rows) {
+    const ingredientId = String(row.getAttribute('data-bulk-ingredient-id') || '').trim();
+    const name = String(row.getAttribute('data-bulk-name') || '').trim();
+    const unit = String(row.getAttribute('data-bulk-unit') || '').trim() || 'pcs';
+    const currentQty = Number(row.getAttribute('data-bulk-qty') || 0);
+    const currentPrice = Number(row.getAttribute('data-bulk-price') || 0);
+    const qtyRaw = String(row.querySelector('.inventory-bulk-qty-input')?.value || '').trim();
+    const priceRaw = String(row.querySelector('.inventory-bulk-price-input')?.value || '').trim();
+    if (!ingredientId || (!qtyRaw && !priceRaw)) continue;
+
+    let qtyOnHand = currentQty;
+    let unitPrice = currentPrice;
+
+    if (qtyRaw) {
+      const parsedQty = Number(qtyRaw);
+      if (!Number.isFinite(parsedQty) || parsedQty < 0) {
+        if (bulkStatusEl) bulkStatusEl.textContent = `Invalid qty for "${name}". Use a number greater than or equal to 0.`;
+        return;
+      }
+      qtyOnHand = qtyMode === 'add'
+        ? Math.round((currentQty + parsedQty) * 1000) / 1000
+        : parsedQty;
+    }
+
+    if (priceRaw) {
+      const parsedPrice = Number(priceRaw);
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+        if (bulkStatusEl) bulkStatusEl.textContent = `Invalid unit price for "${name}". Use a number greater than or equal to 0.`;
+        return;
+      }
+      unitPrice = Math.round(parsedPrice * 100) / 100;
+    }
+
+    updates.push({
+      ingredientId,
+      name,
+      unit,
+      qtyOnHand,
+      unitPrice
+    });
+  }
+
+  if (!updates.length) {
+    if (bulkStatusEl) bulkStatusEl.textContent = 'No bulk changes entered yet.';
+    return;
+  }
+
+  try {
+    if (bulkApplyBtnEl) {
+      bulkApplyBtnEl.disabled = true;
+      bulkApplyBtnEl.textContent = 'Applying...';
+    }
+    if (bulkStatusEl) bulkStatusEl.textContent = `Applying ${updates.length} ingredient update(s)...`;
+
+    for (const update of updates) {
+      await api(`/api/admin/inventory/ingredients/${encodeURIComponent(update.ingredientId)}`, {
+        method: 'PUT',
+        headers: {
+          'x-user-role': String(activeAuthSession?.role || '')
+        },
+        body: JSON.stringify({
+          name: update.name,
+          qtyOnHand: update.qtyOnHand,
+          unitPrice: update.unitPrice,
+          unit: update.unit
+        })
+      });
+    }
+
+    await refreshInventoryModule();
+    await refreshKitSpecModule();
+    setStatus(`Bulk updated ${updates.length} ingredient(s).`);
+  } catch (error) {
+    if (bulkStatusEl) bulkStatusEl.textContent = `Bulk update failed: ${error.message}`;
+  } finally {
+    if (bulkApplyBtnEl) {
+      bulkApplyBtnEl.disabled = false;
+      bulkApplyBtnEl.textContent = 'Apply Bulk Update';
+    }
+  }
+}
+
+function openInventoryEditModal() {
+  if (!inventoryEditModalEl) return;
+  inventoryEditModalEl.classList.add('open');
+  inventoryEditModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeInventoryEditModal() {
+  if (!inventoryEditModalEl) return;
+  inventoryEditModalEl.classList.remove('open');
+  inventoryEditModalEl.setAttribute('aria-hidden', 'true');
+  inventoryEditContext = null;
+  if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = '';
+}
+
+function openInventoryDeleteModal() {
+  if (!inventoryDeleteModalEl) return;
+  inventoryDeleteModalEl.classList.add('open');
+  inventoryDeleteModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeInventoryDeleteModal() {
+  if (!inventoryDeleteModalEl) return;
+  inventoryDeleteModalEl.classList.remove('open');
+  inventoryDeleteModalEl.setAttribute('aria-hidden', 'true');
+  inventoryDeleteContext = null;
+  if (inventoryDeleteMessageEl) inventoryDeleteMessageEl.textContent = 'Delete this ingredient?';
+  if (inventoryDeleteStatusEl) {
+    inventoryDeleteStatusEl.textContent = 'This action is only allowed when the ingredient is not assigned to any product.';
+  }
+  if (inventoryDeleteConfirmBtnEl) {
+    inventoryDeleteConfirmBtnEl.disabled = false;
+    inventoryDeleteConfirmBtnEl.textContent = 'Delete Ingredient';
+  }
+}
+
+function openInventoryHistoryModal() {
+  if (!inventoryHistoryModalEl) return;
+  inventoryHistoryModalEl.classList.add('open');
+  inventoryHistoryModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closeInventoryHistoryModal() {
+  if (!inventoryHistoryModalEl) return;
+  inventoryHistoryModalEl.classList.remove('open');
+  inventoryHistoryModalEl.setAttribute('aria-hidden', 'true');
+  inventoryHistoryContext = null;
+  if (inventoryHistorySummaryEl) inventoryHistorySummaryEl.textContent = 'Loading ingredient history...';
+  if (inventoryHistoryTableWrapEl) inventoryHistoryTableWrapEl.innerHTML = '<p>Loading movement history...</p>';
+}
+
+async function handleInventoryEditClick(buttonEl) {
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can edit ingredients.');
+    return;
+  }
+  const ingredientId = String(buttonEl?.getAttribute('data-inventory-edit') || '').trim();
+  const currentName = String(buttonEl?.getAttribute('data-ingredient-name') || '').trim();
+  const currentQty = String(buttonEl?.getAttribute('data-ingredient-qty') || '').trim();
+  const currentUnitPrice = String(buttonEl?.getAttribute('data-ingredient-unit-price') || '').trim();
+  const currentUnit = String(buttonEl?.getAttribute('data-ingredient-unit') || '').trim();
+  const assignedCount = Number(buttonEl?.getAttribute('data-assigned-count') || 0);
+  if (!ingredientId) return;
+  inventoryEditContext = {
+    ingredientId,
+    assignedCount,
+    originalName: currentName
+  };
+  if (inventoryEditNameInputEl) inventoryEditNameInputEl.value = currentName;
+  if (inventoryEditQtyInputEl) inventoryEditQtyInputEl.value = currentQty;
+  if (inventoryEditPriceInputEl) inventoryEditPriceInputEl.value = currentUnitPrice;
+  if (inventoryEditUnitInputEl) inventoryEditUnitInputEl.value = currentUnit;
+  if (inventoryEditAssignedNoteEl) {
+    inventoryEditAssignedNoteEl.textContent = assignedCount > 0
+      ? `"${currentName}" is assigned to ${assignedCount} product(s). Updating its name or UOM will also affect the linked kit specifications.`
+      : 'This ingredient is not assigned to any product yet. You can update it freely.';
+  }
+  if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = '';
+  openInventoryEditModal();
+  if (inventoryEditNameInputEl) inventoryEditNameInputEl.focus();
+}
+
+async function handleInventoryEditSubmit(event) {
+  event.preventDefault();
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can edit ingredients.');
+    return;
+  }
+  const ingredientId = String(inventoryEditContext?.ingredientId || '').trim();
+  if (!ingredientId) return;
+
+  const name = String(inventoryEditNameInputEl?.value || '').trim();
+  const qtyOnHand = Number(inventoryEditQtyInputEl?.value || 0);
+  const unitPrice = Number(inventoryEditPriceInputEl?.value || 0);
+  const unit = String(inventoryEditUnitInputEl?.value || '').trim();
+
+  if (!name) {
+    if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = 'Ingredient name is required.';
+    if (inventoryEditNameInputEl) inventoryEditNameInputEl.focus();
+    return;
+  }
+  if (!Number.isFinite(qtyOnHand) || qtyOnHand < 0) {
+    if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = 'Quantity must be a valid number >= 0.';
+    if (inventoryEditQtyInputEl) inventoryEditQtyInputEl.focus();
+    return;
+  }
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = 'Unit price must be a valid number >= 0.';
+    if (inventoryEditPriceInputEl) inventoryEditPriceInputEl.focus();
+    return;
+  }
+  if (!unit) {
+    if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = 'UOM / unit of measure is required.';
+    if (inventoryEditUnitInputEl) inventoryEditUnitInputEl.focus();
+    return;
+  }
+
+  try {
+    if (inventoryEditSaveBtnEl) {
+      inventoryEditSaveBtnEl.disabled = true;
+      inventoryEditSaveBtnEl.textContent = 'Saving...';
+    }
+    await api(`/api/admin/inventory/ingredients/${encodeURIComponent(ingredientId)}`, {
+      method: 'PUT',
+      headers: {
+        'x-user-role': String(activeAuthSession?.role || '')
+      },
+      body: JSON.stringify({ name, qtyOnHand, unitPrice, unit })
+    });
+    closeInventoryEditModal();
+    await refreshInventoryModule();
+    await refreshKitSpecModule();
+    setStatus(`Ingredient "${name}" updated.`);
+  } catch (error) {
+    if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = `Update ingredient failed: ${error.message}`;
+  } finally {
+    if (inventoryEditSaveBtnEl) {
+      inventoryEditSaveBtnEl.disabled = false;
+      inventoryEditSaveBtnEl.textContent = 'Save Ingredient';
+    }
+  }
+}
+
+async function handleInventoryDeleteClick(buttonEl) {
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can delete ingredients.');
+    return;
+  }
+  const ingredientId = String(buttonEl?.getAttribute('data-inventory-delete') || '').trim();
+  const ingredientName = String(buttonEl?.getAttribute('data-ingredient-name') || '').trim() || 'Ingredient';
+  const assignedCount = Number(buttonEl?.getAttribute('data-assigned-count') || 0);
+  if (!ingredientId) return;
+  if (assignedCount > 0) {
+    setStatus(`"${ingredientName}" is assigned to ${assignedCount} product(s). Remove it from kit specification first before deleting.`);
+    return;
+  }
+
+  inventoryDeleteContext = { ingredientId, ingredientName };
+  if (inventoryDeleteMessageEl) {
+    inventoryDeleteMessageEl.textContent = `Delete ingredient "${ingredientName}"?`;
+  }
+  if (inventoryDeleteStatusEl) {
+    inventoryDeleteStatusEl.textContent = 'This only works when no product is using the ingredient. The record will be removed from Ingredients.';
+  }
+  openInventoryDeleteModal();
+  if (inventoryDeleteConfirmBtnEl) inventoryDeleteConfirmBtnEl.focus();
+}
+
+async function handleInventoryHistoryClick(buttonEl) {
+  const ingredientId = String(buttonEl?.getAttribute('data-inventory-history') || '').trim();
+  const ingredientName = String(buttonEl?.getAttribute('data-ingredient-name') || '').trim() || 'Ingredient';
+  const ingredientUnit = String(buttonEl?.getAttribute('data-ingredient-unit') || '').trim() || 'pcs';
+  if (!ingredientId) return;
+
+  inventoryHistoryContext = { ingredientId, ingredientName, ingredientUnit };
+  if (inventoryHistorySummaryEl) inventoryHistorySummaryEl.textContent = `Loading history for ${ingredientName}...`;
+  if (inventoryHistoryTableWrapEl) inventoryHistoryTableWrapEl.innerHTML = '<p>Loading movement history...</p>';
+  openInventoryHistoryModal();
+
+  try {
+    const result = await api(`/api/admin/inventory/ingredients/${encodeURIComponent(ingredientId)}/history`, {
+      headers: {
+        'x-user-role': String(activeAuthSession?.role || '')
+      }
+    });
+    const ingredient = result?.ingredient || {};
+    const history = Array.isArray(result?.history) ? result.history : [];
+    const safeUnit = String(ingredient.unit || ingredientUnit || 'pcs');
+    if (inventoryHistorySummaryEl) {
+      inventoryHistorySummaryEl.textContent = [
+        `Ingredient: ${ingredient.name || ingredientName}`,
+        `Current Qty On Hand: ${Number(ingredient.qtyOnHand || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${safeUnit}`,
+        `Movement Records: ${history.length}`
+      ].join('\n');
+    }
+
+    if (inventoryHistoryTableWrapEl) {
+      inventoryHistoryTableWrapEl.innerHTML = history.length
+        ? `
+          <table class="inventory-table inventory-monitor-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Movement</th>
+                <th>Qty</th>
+                <th>Before</th>
+                <th>After</th>
+                <th>Reference</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${history.map((row) => `
+                <tr>
+                  <td>${escapeHtml(formatDate(row.createdAt))}</td>
+                  <td><span class="inventory-movement-badge ${escapeHtml(String(row.movementType || '').toLowerCase())}">${escapeHtml(String(row.movementType || 'ADJUST'))}</span></td>
+                  <td>${Number(row.quantity || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(safeUnit)}</td>
+                  <td>${row.beforeQty === null || row.beforeQty === undefined ? '—' : `${Number(row.beforeQty || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(safeUnit)}`}</td>
+                  <td>${row.afterQty === null || row.afterQty === undefined ? '—' : `${Number(row.afterQty || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(safeUnit)}`}</td>
+                  <td>${escapeHtml(row.invoiceReference ? `Invoice ${row.invoiceReference}` : (row.referenceType || 'Manual'))}</td>
+                  <td>${escapeHtml(row.notes || 'Inventory movement')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `
+        : '<p>No movement history recorded yet for this ingredient.</p>';
+    }
+  } catch (error) {
+    if (inventoryHistorySummaryEl) inventoryHistorySummaryEl.textContent = `Ingredient history failed: ${error.message}`;
+    if (inventoryHistoryTableWrapEl) inventoryHistoryTableWrapEl.innerHTML = '';
+  }
+}
+
+async function submitInventoryDelete() {
+  if (!canManageInventory()) {
+    setStatus('Only Administrations can delete ingredients.');
+    return;
+  }
+  const ingredientId = String(inventoryDeleteContext?.ingredientId || '').trim();
+  const ingredientName = String(inventoryDeleteContext?.ingredientName || '').trim() || 'Ingredient';
+  if (!ingredientId) return;
+  try {
+    if (inventoryDeleteConfirmBtnEl) {
+      inventoryDeleteConfirmBtnEl.disabled = true;
+      inventoryDeleteConfirmBtnEl.textContent = 'Deleting...';
+    }
+    await api(`/api/admin/inventory/ingredients/${encodeURIComponent(ingredientId)}`, {
+      method: 'DELETE',
+      headers: {
+        'x-user-role': String(activeAuthSession?.role || '')
+      }
+    });
+    closeInventoryDeleteModal();
+    await refreshInventoryModule();
+    await refreshKitSpecModule();
+    setStatus(`Ingredient "${ingredientName}" deleted.`);
+  } catch (error) {
+    if (inventoryDeleteStatusEl) inventoryDeleteStatusEl.textContent = `Delete ingredient failed: ${error.message}`;
+  } finally {
+    if (inventoryDeleteConfirmBtnEl) {
+      inventoryDeleteConfirmBtnEl.disabled = false;
+      inventoryDeleteConfirmBtnEl.textContent = 'Delete Ingredient';
+    }
+  }
+}
+
 async function refreshSalesReport(range = activeSalesRange) {
   try {
     activeSalesRange = range;
     saveUserUiState({ salesRange: activeSalesRange });
-    const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
+    if (!canAccessAdminFeatures()) return;
+    if (adminRangeEl && (range === 'daily' || range === 'weekly')) {
+      adminRangeEl.value = range;
+    }
+    const report = await api(`/api/admin/overview?range=${encodeURIComponent(range)}`, {
+      headers: buildActorHeaders()
+    });
     renderSalesReport(report);
-    await refreshDetailedSalesReport();
+    await Promise.all([
+      refreshAdminTransactions(),
+      refreshSalesOpsDashboard()
+    ]);
   } catch (error) {
-    salesSummaryEl.textContent = `Sales report error: ${error.message}`;
-    salesListEl.innerHTML = '';
+    latestAdminOverview = null;
+    if (salesSummaryEl) salesSummaryEl.textContent = `Sales report error: ${error.message}`;
+    if (salesListEl) salesListEl.innerHTML = '';
+    if (salesDetailedGridEl) salesDetailedGridEl.innerHTML = '';
+    if (topProductsListEl) topProductsListEl.innerHTML = '';
+    if (adminStatsEl) adminStatsEl.innerHTML = '';
   }
 }
 
@@ -3094,7 +7738,14 @@ async function handleCheckout() {
       try {
         const { invoice } = await api('/api/invoices', {
           method: 'POST',
-          body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+          body: JSON.stringify({
+            items,
+            paymentMethod,
+            discountAmount,
+            discountProfile: normalizeInvoiceDiscountProfile(getSelectedDiscountProfile()),
+            orderType: state.orderType,
+            ...getCashierInvoiceContext()
+          })
         });
         state.activeInvoice = invoice;
         const paid = await api('/api/payments/cash', {
@@ -3130,7 +7781,14 @@ async function handleCheckout() {
 
     const { invoice } = await api('/api/invoices', {
       method: 'POST',
-      body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+      body: JSON.stringify({
+        items,
+        paymentMethod,
+        discountAmount,
+        discountProfile: normalizeInvoiceDiscountProfile(getSelectedDiscountProfile()),
+        orderType: state.orderType,
+        ...getCashierInvoiceContext()
+      })
     });
 
     state.activeInvoice = invoice;
@@ -3167,11 +7825,21 @@ async function handleCheckout() {
     `;
 
     const openBtn = document.getElementById('openCheckout');
-    openBtn.addEventListener('click', () => {
-      window.open(checkout.checkoutUrl, '_blank', 'noopener');
-    });
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        window.open(checkout.checkoutUrl, '_blank', 'noopener');
+      });
+    }
 
-    window.open(checkout.checkoutUrl, '_blank', 'noopener');
+    const hostedCheckoutWindow = window.open(checkout.checkoutUrl, '_blank', 'noopener');
+    if (!hostedCheckoutWindow) {
+      showConfirmationToast({
+        title: 'Popup blocked',
+        message: 'Use the "Open Hosted Checkout" button to continue the payment.',
+        tone: 'warning',
+        duration: 3200
+      });
+    }
     setStatus(`${eWalletLabel} checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment...\nReference: ${checkout.reference}\n\nPayment will be auto-verified every 10 seconds.`);
 
     await pollInvoice(invoice.id);
@@ -3200,33 +7868,109 @@ async function refreshAdminTransactions() {
     if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
     if (range) url += `range=${encodeURIComponent(range)}&`;
 
-    const { transactions } = await api(url);
+    const { transactions } = await api(url, {
+      headers: buildActorHeaders()
+    });
     renderAdminTransactions(transactions);
-    renderAdminStats(transactions);
   } catch (error) {
     adminTransactionsEl.innerHTML = `<p class="error">Error loading transactions: ${error.message}</p>`;
   }
 }
 
-function renderAdminStats(transactions) {
-  const total = transactions.length;
-  const paid = transactions.filter((t) => t.status === 'PAID');
-  const pending = transactions.filter((t) => t.status === 'PENDING');
+async function requestHoldForVoid(invoiceId = null) {
+  const targetInvoiceId = String(invoiceId || state.lastPaidInvoice?.id || '').trim();
+  if (!targetInvoiceId) {
+    setStatus('No paid receipt is available to hold for void.');
+    return;
+  }
 
-  const totalRevenue = paid.reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
-  const cashRevenue = paid
-    .filter((t) => t.paymentMethod === 'cash')
-    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
-  const gcashRevenue = paid
-    .filter((t) => t.paymentMethod === 'gcash' || t.paymentMethod === 'paymaya')
-    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+  const reason = String(window.prompt('Enter the note for admin review before this receipt is voided:', '') || '').trim();
+  if (!reason) {
+    setStatus('A note is required to place a receipt on hold for void.');
+    return;
+  }
 
-  statTotalEl.textContent = total;
-  statPaidEl.textContent = paid.length;
-  statPendingEl.textContent = pending.length;
-  statRevenueEl.textContent = money(totalRevenue);
-  statCashEl.textContent = money(cashRevenue);
-  statGcashEl.textContent = money(gcashRevenue);
+  try {
+    const { invoice } = await api(`/api/admin/invoices/${encodeURIComponent(targetInvoiceId)}/status`, {
+      method: 'PATCH',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        status: 'HOLD_FOR_VOID',
+        reason
+      })
+    });
+    if (state.lastPaidInvoice && String(state.lastPaidInvoice.id || '') === targetInvoiceId) {
+      state.lastPaidInvoice = invoice;
+      renderReceipt(invoice);
+      renderPaymentReceiptModal(invoice);
+    }
+    if (state.activeInvoice && String(state.activeInvoice.id || '') === targetInvoiceId) {
+      state.activeInvoice = invoice;
+    }
+    setStatus('Receipt placed on hold for admin void review.');
+    try {
+      const summary = await refreshLatestShiftSummary();
+      if (shiftMonitorModalEl?.classList.contains('open') && summary) {
+        renderShiftSummary(shiftMonitorSummaryEl, summary);
+      }
+    } catch (_error) {
+      // Keep the hold request successful even if the summary refresh fails.
+    }
+    if (canAccessAdminFeatures()) {
+      await Promise.all([
+        refreshAdminTransactions(),
+        refreshSalesReport(activeSalesRange),
+        refreshCashierMonitoring(),
+        refreshShiftManagement()
+      ]);
+    }
+  } catch (error) {
+    setStatus(`Hold for void failed: ${error.message}`);
+  }
+}
+
+function renderAdminStats(report) {
+  if (!adminStatsEl) return;
+  const metrics = report?.metrics || {};
+  const monthly = report?.monthlyClosing?.summary || {};
+
+  adminStatsEl.innerHTML = `
+    <article class="overview-health-card">
+      <span>Pending Payments</span>
+      <strong>${Number(metrics.pendingTransactions || 0)}</strong>
+      <small>Invoices waiting for payment confirmation</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Voided Sales</span>
+      <strong>${Number(metrics.voidedTransactions || 0)}</strong>
+      <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Low Stock</span>
+      <strong>${Number(metrics.lowStockIngredients || 0)}</strong>
+      <small>Ingredients at or below reorder level</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Discrepancy Alerts</span>
+      <strong>${Number(metrics.discrepancyAlerts || 0)}</strong>
+      <small>Shift reviews needing reconciliation</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Unsynced Operations</span>
+      <strong>${Number(metrics.unsyncedOperations || 0)}</strong>
+      <small>Offline queue items waiting to sync</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Monthly Expenses</span>
+      <strong>${money(metrics.monthlyExpenses || 0)}</strong>
+      <small>${Number(monthly.expenseCount || 0)} expense entry(s) this month</small>
+    </article>
+    <article class="overview-health-card">
+      <span>Inventory Snapshot</span>
+      <strong>${money(monthly.inventoryValueSnapshot || 0)}</strong>
+      <small>Current stock value tied to this month closing view</small>
+    </article>
+  `;
 }
 
 function renderAdminTransactions(transactions) {
@@ -3236,18 +7980,33 @@ function renderAdminTransactions(transactions) {
   }
 
   const rows = transactions.map((t) => {
-    const statusClass = t.status === 'PAID' ? 'badge-paid' : 'badge-pending';
+    const normalizedStatus = String(t.status || '').toUpperCase();
+    const statusClass = normalizedStatus === 'PAID'
+      ? 'badge-paid'
+      : normalizedStatus === 'HOLD_FOR_VOID'
+        ? 'badge-hold-void'
+      : normalizedStatus === 'CANCELLED'
+        ? 'badge-cancelled'
+        : normalizedStatus === 'VOIDED'
+          ? 'badge-voided'
+          : 'badge-pending';
     const methodClass = t.paymentMethod === 'cash' ? 'badge-cash' : 'badge-gcash';
 
-    const verifyBtn = (t.status === 'PENDING' && t.paymentMethod !== 'cash')
+    const verifyBtn = (normalizedStatus === 'PENDING' && t.paymentMethod !== 'cash')
       ? `<button class="verify-btn small" data-verify="${t.id}">Verify</button>`
       : '';
-    const receiptBtn = (t.status === 'PAID')
+    const receiptBtn = (normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID' || normalizedStatus === 'VOIDED')
       ? `<button class="secondary small" data-receipt="${t.id}">Receipt</button>`
+      : '';
+    const voidBtn = (normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID')
+      ? `<button class="secondary small" data-invoice-status="${t.id}" data-next-status="VOIDED">Void</button>`
       : '';
 
     const paidInfo = t.payment
-      ? `<div class="txn-paid-info">Paid: ${money(t.payment.amountPaid)} at ${formatDate(t.payment.paidAt)}</div>`
+      ? `<div class="txn-paid-info">Sale: ${money(t.total || 0)} | Tendered: ${money(t.payment.amountPaid || 0)} | Change: ${money(t.payment.change || 0)} at ${formatDate(t.payment.paidAt)}</div>`
+      : '';
+    const lifecycleInfo = (normalizedStatus === 'CANCELLED' || normalizedStatus === 'VOIDED' || normalizedStatus === 'HOLD_FOR_VOID')
+      ? `<div class="txn-paid-info">${escapeHtml(getOverviewMixLabel(normalizedStatus))}${t.statusReason ? `: ${escapeHtml(t.statusReason)}` : ''}${t.statusChangedAt ? ` • ${escapeHtml(formatDate(t.statusChangedAt))}` : ''}${t.statusChangedByEmail ? ` • ${escapeHtml(t.statusChangedByEmail)}` : ''}</div>`
       : '';
 
     // Customer information from PayMongo billing
@@ -3274,7 +8033,7 @@ function renderAdminTransactions(transactions) {
         <div class="txn-main">
           <button class="txn-ref receipt-link" data-receipt="${t.id}">${t.reference}</button>
           <div class="txn-badges">
-            <span class="badge ${statusClass}">${t.status}</span>
+            <span class="badge ${statusClass}">${escapeHtml(getOverviewMixLabel(normalizedStatus) || t.status)}</span>
             <span class="badge ${methodClass} method-badge">
               <img class="payment-method-icon" src="${getPaymentMethodIcon(t.paymentMethod)}" alt="${getPaymentMethodLabel(t.paymentMethod)}" />
               ${getPaymentMethodLabel(t.paymentMethod)}
@@ -3285,17 +8044,2103 @@ function renderAdminTransactions(transactions) {
           <div class="txn-amount">${money(t.total)}</div>
           <div class="txn-date">${formatDate(t.createdAt)}</div>
           ${paidInfo}
+          ${lifecycleInfo}
           ${customerInfoHtml}
         </div>
         <div class="txn-actions">
           ${verifyBtn}
           ${receiptBtn}
+          ${voidBtn}
         </div>
       </div>
     `;
   });
 
   adminTransactionsEl.innerHTML = rows.join('');
+}
+
+function getAdminRangeSearchParams() {
+  const params = new URLSearchParams();
+  const range = getAdminRangeQueryValue();
+  if (range) params.set('range', range);
+  return params;
+}
+
+function formatDiscrepancyPill(discrepancy) {
+  const value = Number(discrepancy || 0);
+  const type = value >= 0 ? 'over' : 'short';
+  const label = value >= 0
+    ? `Over ${money(Math.abs(value))}`
+    : `Short ${money(Math.abs(value))}`;
+  return `<span class="discrepancy-pill ${type}">${escapeHtml(label)}</span>`;
+}
+
+function formatReviewStatusPill(status) {
+  const normalized = String(status || 'pending').trim().toLowerCase() || 'pending';
+  const label = normalized === 'approved'
+    ? 'Reviewed / Cleared'
+    : normalized === 'investigate'
+      ? 'Under Investigation'
+      : 'Pending Review';
+  return `<span class="review-status-pill ${escapeHtml(normalized)}">${escapeHtml(label)}</span>`;
+}
+
+function formatReviewDetails(row) {
+  const note = String(row?.reviewNote || '').trim();
+  const reviewedAt = row?.reviewedAt ? formatDate(row.reviewedAt) : '';
+  const reviewedBy = String(row?.reviewedByEmail || '').trim();
+  if (!note && !reviewedAt && !reviewedBy) return '—';
+
+  const parts = [];
+  if (note) parts.push(escapeHtml(note));
+  if (reviewedBy) parts.push(`By ${escapeHtml(reviewedBy)}`);
+  if (reviewedAt) parts.push(`At ${escapeHtml(reviewedAt)}`);
+  return parts.join('<br />');
+}
+
+function renderCashierMonitoring(cashiers = []) {
+  if (!cashierMonitoringListEl) return;
+  if (!Array.isArray(cashiers) || !cashiers.length) {
+    cashierMonitoringListEl.innerHTML = '<p>No active operators right now.</p>';
+    return;
+  }
+
+  const rows = cashiers.map((row) => `
+    <tr>
+      <td><strong>${escapeHtml(row.cashierName || 'Operator')}</strong><br /><small>${escapeHtml(formatRoleLabel(row.cashierRole || 'encharge'))} | ${escapeHtml(row.cashierEmail || '-')}</small></td>
+      <td>${escapeHtml(row.drawerName || 'Drawer')}</td>
+      <td>${escapeHtml(formatDate(row.loginTime))}</td>
+      <td>${money(row.startingCash || 0)}</td>
+      <td>${money(row.currentSales || 0)}</td>
+      <td>${money(row.holdForVoidAmount || 0)}<br /><small>${Number(row.holdForVoidCount || 0)} receipt(s)</small></td>
+      <td>${money(row.cashWithdrawals || 0)}</td>
+      <td>${money(row.currentDrawerBalance || 0)}</td>
+      <td>${Number(row.totalTransactions || 0)}</td>
+      <td><span class="cashier-status-badge">${escapeHtml(String(row.status || 'active').toUpperCase())}</span></td>
+    </tr>
+  `).join('');
+
+  cashierMonitoringListEl.innerHTML = `
+    <table class="admin-inline-table">
+      <thead>
+        <tr>
+          <th>Operator</th>
+          <th>Drawer</th>
+          <th>Shift Start</th>
+          <th>Cash on Hand</th>
+          <th>Current Sales</th>
+          <th>Hold for Void</th>
+          <th>Admin Deductions</th>
+          <th>Current Drawer Cash</th>
+          <th>Transactions</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshCashierMonitoring() {
+  if (!cashierMonitoringListEl || !canAccessAdminFeatures()) return;
+  cashierMonitoringListEl.innerHTML = '<p>Loading active cashiers...</p>';
+  try {
+    const result = await api('/api/admin/cashiers/active', {
+      headers: buildActorHeaders()
+    });
+    renderCashierMonitoring(Array.isArray(result?.cashiers) ? result.cashiers : []);
+  } catch (error) {
+    cashierMonitoringListEl.innerHTML = `<p class="error">Cashier monitoring error: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function renderCashDrawerAdmin(result) {
+  const drawers = Array.isArray(result?.drawers) ? result.drawers : [];
+  const recentMovements = Array.isArray(result?.recentMovements) ? result.recentMovements : [];
+  const summary = result?.summary || {};
+
+  if (cashDrawerAdminNoteEl) {
+    cashDrawerAdminNoteEl.textContent = canManageCashDrawer()
+      ? 'Create drawer names here first. Cashiers will choose from these drawers when starting a shift, and each drawer keeps its own running balance.'
+      : 'Drawer balances and movements are visible here. Only Administrations can create drawers or deduct cash.';
+  }
+
+  if (cashDrawerCreateFormEl) {
+    const canEdit = canManageCashDrawer();
+    Array.from(cashDrawerCreateFormEl.elements || []).forEach((element) => {
+      if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
+        element.disabled = !canEdit;
+      }
+    });
+  }
+
+  if (cashDrawerSummaryEl) {
+    const summaryCards = [
+      {
+        label: 'Registered Drawers',
+        value: Number(summary.drawerCount || 0).toLocaleString('en-US'),
+        note: 'Named drawers available for shift assignment.'
+      },
+      {
+        label: 'Active Drawers',
+        value: Number(summary.activeDrawers || 0).toLocaleString('en-US'),
+        note: 'Drawers currently assigned to an active cashier.'
+      },
+      {
+        label: 'Total Drawer Cash',
+        value: money(summary.totalCurrentDrawerCash || 0),
+        note: 'Combined running balance across all drawers.'
+      },
+      {
+        label: 'Logged Deductions',
+        value: money(summary.totalWithdrawals || 0),
+        note: 'Recorded cash pull-outs from drawer balances.'
+      }
+    ];
+
+    cashDrawerSummaryEl.innerHTML = `
+      <div class="cash-drawer-summary-shell">
+        ${summaryCards.map((card, index) => `
+          <article class="cash-drawer-summary-card${index === 2 ? ' highlight' : ''}">
+            <span class="cash-drawer-summary-label">${escapeHtml(card.label)}</span>
+            <strong class="cash-drawer-summary-value">${escapeHtml(card.value)}</strong>
+            <small class="cash-drawer-summary-note">${escapeHtml(card.note)}</small>
+          </article>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  if (cashDrawerListEl) {
+    if (!drawers.length) {
+      cashDrawerListEl.innerHTML = '<p>No drawers created yet.</p>';
+    } else {
+      const rows = drawers.map((drawer) => `
+        <tr>
+          <td><strong>${escapeHtml(drawer.name || 'Drawer')}</strong></td>
+          <td>${money(drawer.currentAmount || 0)}</td>
+          <td>${drawer.activeCashierName ? escapeHtml(drawer.activeCashierName) : 'Idle'}</td>
+          <td>
+            ${canManageCashDrawer()
+              ? `
+                <div class="inventory-actions">
+                  <button class="secondary small" type="button" data-drawer-withdraw="${escapeHtml(drawer.id || '')}" data-drawer-name="${escapeHtml(drawer.name || 'Drawer')}">Deduct Cash</button>
+                  <button
+                    class="secondary small"
+                    type="button"
+                    data-drawer-edit="${escapeHtml(drawer.id || '')}"
+                    data-drawer-name="${escapeHtml(drawer.name || 'Drawer')}"
+                    data-drawer-initial-balance="${escapeHtml(String(Number(drawer.initialBalance || 0)))}"
+                    ${drawer.canEdit ? '' : 'disabled title="Edit is only available before this drawer has any transactions or shift history."'}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    class="secondary small"
+                    type="button"
+                    data-drawer-delete="${escapeHtml(drawer.id || '')}"
+                    data-drawer-name="${escapeHtml(drawer.name || 'Drawer')}"
+                    ${drawer.canDelete ? '' : 'disabled title="Delete is only available before this drawer has any transactions or shift history."'}
+                  >
+                    Delete
+                  </button>
+                </div>
+                ${drawer.canEdit && drawer.canDelete
+                  ? ''
+                  : '<small class="inventory-assigned-note">Edit/Delete disabled after the first drawer transaction or shift history.</small>'}
+              `
+              : 'View only'}
+          </td>
+        </tr>
+      `).join('');
+
+      cashDrawerListEl.innerHTML = `
+        <table class="admin-inline-table">
+          <thead>
+            <tr>
+              <th>Drawer Name</th>
+              <th>Current Amount</th>
+              <th>Current Cashier</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+  }
+
+  if (!cashDrawerMovementsListEl) return;
+  if (!recentMovements.length) {
+    cashDrawerMovementsListEl.innerHTML = '<p>No drawer movements recorded yet.</p>';
+    return;
+  }
+
+  const movementRows = recentMovements.map((row) => `
+    <tr>
+      <td>${escapeHtml(formatDate(row.createdAt))}</td>
+      <td><strong>${escapeHtml(row.drawerName || 'Drawer')}</strong></td>
+      <td>${escapeHtml(String(row.movementType || 'withdrawal').toUpperCase())}</td>
+      <td>${money(row.amount || 0)}</td>
+      <td>${escapeHtml(row.note || '-')}</td>
+      <td>${escapeHtml(row.performedByName || row.performedByEmail || '-')}</td>
+    </tr>
+  `).join('');
+
+  cashDrawerMovementsListEl.innerHTML = `
+    <table class="admin-inline-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Drawer</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Note</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>${movementRows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshCashDrawerAdmin() {
+  if (!cashDrawerSummaryEl || !canAccessAdminFeatures()) return;
+  if (cashDrawerSummaryEl) cashDrawerSummaryEl.textContent = 'Loading cash drawer summary...';
+  if (cashDrawerListEl) cashDrawerListEl.innerHTML = '<p>Loading drawers...</p>';
+  if (cashDrawerMovementsListEl) cashDrawerMovementsListEl.innerHTML = '<p>Loading cash drawer activity...</p>';
+  try {
+    const result = await api('/api/admin/cash-drawer', {
+      headers: buildActorHeaders()
+    });
+    renderCashDrawerAdmin(result);
+  } catch (error) {
+    if (cashDrawerSummaryEl) cashDrawerSummaryEl.textContent = `Cash drawer error: ${error.message}`;
+    if (cashDrawerListEl) cashDrawerListEl.innerHTML = '';
+    if (cashDrawerMovementsListEl) cashDrawerMovementsListEl.innerHTML = '';
+  }
+}
+
+async function handleCashDrawerCreate(event) {
+  event.preventDefault();
+  if (!canManageCashDrawer()) {
+    setStatus('Only Administrations can create drawers.');
+    return;
+  }
+
+  const name = String(cashDrawerNameInputEl?.value || '').trim();
+  const initialBalance = parseNonNegativeAmount(cashDrawerInitialBalanceInputEl?.value);
+  if (!name) {
+    setStatus('Enter a drawer name.');
+    return;
+  }
+  if (!syncCashDrawerInitialBalanceValidity()) {
+    cashDrawerInitialBalanceInputEl?.reportValidity();
+    setStatus('Enter a first drawer amount greater than 0.');
+    return;
+  }
+  if (initialBalance === null || initialBalance <= 0) {
+    setStatus('Enter a first drawer amount greater than 0.');
+    return;
+  }
+
+  try {
+    if (cashDrawerCreateBtnEl) {
+      cashDrawerCreateBtnEl.disabled = true;
+      cashDrawerCreateBtnEl.textContent = 'Creating...';
+    }
+    await api('/api/admin/drawers', {
+      method: 'POST',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({ name, initialBalance })
+    });
+    if (cashDrawerNameInputEl) cashDrawerNameInputEl.value = '';
+    if (cashDrawerInitialBalanceInputEl) cashDrawerInitialBalanceInputEl.value = '';
+    setStatus(`Drawer "${name}" created.`);
+    await refreshCashDrawerAdmin();
+  } catch (error) {
+    setStatus(`Create drawer failed: ${error.message}`);
+  } finally {
+    if (cashDrawerCreateBtnEl) {
+      cashDrawerCreateBtnEl.disabled = false;
+      cashDrawerCreateBtnEl.textContent = 'Create Drawer';
+    }
+  }
+}
+
+function syncCashDrawerInitialBalanceValidity() {
+  if (!cashDrawerInitialBalanceInputEl) return true;
+  const rawValue = String(cashDrawerInitialBalanceInputEl.value || '').trim();
+  if (!rawValue) {
+    cashDrawerInitialBalanceInputEl.setCustomValidity('');
+    return true;
+  }
+
+  const amount = Number(rawValue);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    cashDrawerInitialBalanceInputEl.setCustomValidity('Amount must be greater than 0 only.');
+    return false;
+  }
+
+  cashDrawerInitialBalanceInputEl.setCustomValidity('');
+  return true;
+}
+
+async function handleCashDrawerWithdrawClick(drawerId, drawerName) {
+  if (!canManageCashDrawer()) {
+    setStatus('Only Administrations can deduct cash from the drawer.');
+    return;
+  }
+  if (!drawerId) return;
+
+  const rawAmount = window.prompt(`How much will be deducted from ${drawerName || 'this drawer'}?`, '');
+  if (rawAmount === null) return;
+  const amount = parseNonNegativeAmount(rawAmount);
+  if (amount === null || amount <= 0) {
+    setStatus('Enter a deduction amount greater than 0.');
+    return;
+  }
+
+  const note = String(window.prompt('Enter a note for this deduction:', '') || '').trim();
+  if (!note) {
+    setStatus('A note is required so the deduction is documented.');
+    return;
+  }
+
+  try {
+    await api(`/api/admin/drawers/${encodeURIComponent(drawerId)}/withdraw`, {
+      method: 'POST',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        amount,
+        note,
+        performedByName: activeAuthSession?.name || activeAuthSession?.email || 'Administrator'
+      })
+    });
+    setStatus(`Cash deduction recorded for ${drawerName || 'drawer'}: ${money(amount)}.`);
+    await Promise.all([
+      refreshCashDrawerAdmin(),
+      refreshCashierMonitoring(),
+      refreshShiftManagement()
+    ]);
+  } catch (error) {
+    setStatus(`Cash drawer deduction failed: ${error.message}`);
+  }
+}
+
+async function handleCashDrawerEditClick(drawerId, drawerName, initialBalance) {
+  if (!canManageCashDrawer()) {
+    setStatus('Only Administrations can edit drawers.');
+    return;
+  }
+  if (!drawerId) return;
+
+  const nextNameRaw = window.prompt('Edit drawer name:', drawerName || '');
+  if (nextNameRaw === null) return;
+  const nextName = String(nextNameRaw || '').trim();
+  if (!nextName) {
+    setStatus('Drawer name is required.');
+    return;
+  }
+
+  const balancePrompt = window.prompt(`Edit the first amount for ${nextName}:`, String(Number(initialBalance || 0)));
+  if (balancePrompt === null) return;
+  const nextInitialBalance = parseNonNegativeAmount(balancePrompt);
+  if (nextInitialBalance === null || nextInitialBalance <= 0) {
+    setStatus('The first drawer amount must be greater than 0.');
+    return;
+  }
+
+  try {
+    await api(`/api/admin/drawers/${encodeURIComponent(drawerId)}`, {
+      method: 'PUT',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        name: nextName,
+        initialBalance: nextInitialBalance
+      })
+    });
+    setStatus(`Drawer "${nextName}" updated.`);
+    await refreshCashDrawerAdmin();
+  } catch (error) {
+    setStatus(`Edit drawer failed: ${error.message}`);
+  }
+}
+
+async function handleCashDrawerDeleteClick(drawerId, drawerName) {
+  if (!canManageCashDrawer()) {
+    setStatus('Only Administrations can delete drawers.');
+    return;
+  }
+  if (!drawerId) return;
+
+  const confirmed = window.confirm(`Delete drawer "${drawerName || 'Drawer'}"? This is only allowed before the drawer has any transactions or shift history.`);
+  if (!confirmed) return;
+
+  try {
+    await api(`/api/admin/drawers/${encodeURIComponent(drawerId)}`, {
+      method: 'DELETE',
+      headers: buildActorHeaders()
+    });
+    setStatus(`Drawer "${drawerName || 'Drawer'}" deleted.`);
+    await refreshCashDrawerAdmin();
+  } catch (error) {
+    setStatus(`Delete drawer failed: ${error.message}`);
+  }
+}
+
+function renderShiftManagement(result) {
+  const shifts = Array.isArray(result?.shifts) ? result.shifts : [];
+  const summary = result?.summary || {};
+
+  if (shiftManagementSummaryEl) {
+    shiftManagementSummaryEl.innerHTML = `
+      <div class="operations-metrics-grid">
+        <article class="operations-metric-card highlight">
+          <span>Shift Activity</span>
+          <strong>${Number(summary.total || 0)}</strong>
+          <small>Active ${Number(summary.active || 0)} | Logged Out ${Number(summary.loggedOut || 0)}</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Review Queue</span>
+          <strong>${Number(summary.pendingReview || 0)}</strong>
+          <small>${Number(summary.discrepancyCount || 0)} shift(s) with discrepancy</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Opening Adjustments</span>
+          <strong>${money(summary.openingAdjustments || 0)}</strong>
+          <small>Manual changes applied at shift start</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>On Hold for Void</span>
+          <strong>${money(summary.holdForVoidAmount || 0)}</strong>
+          <small>${Number(summary.holdForVoidCount || 0)} receipt(s) waiting for admin void review</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Drawer Deductions</span>
+          <strong>${money(summary.cashWithdrawals || 0)}</strong>
+          <small>Recorded cash pull-outs in selected range</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Cash Tendered</span>
+          <strong>${money(summary.cashTendered || 0)}</strong>
+          <small>Customer cash received before change</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Change Given</span>
+          <strong>${money(summary.changeGiven || 0)}</strong>
+          <small>Cash returned to customers</small>
+        </article>
+        <article class="operations-metric-card highlight">
+          <span>Net Cash</span>
+          <strong>${money(summary.netCashRetained || 0)}</strong>
+          <small>Cash retained after change and deductions</small>
+        </article>
+      </div>
+    `;
+  }
+
+  if (!shiftManagementListEl) return;
+  if (!shifts.length) {
+    shiftManagementListEl.innerHTML = '<p>No operator shift records found.</p>';
+    return;
+  }
+
+  const rows = shifts.map((row) => `
+    <tr>
+      <td><strong>${escapeHtml(row.cashierName || 'Operator')}</strong><br /><small>${escapeHtml(formatRoleLabel(row.cashierRole || 'encharge'))}</small></td>
+      <td>${escapeHtml(row.drawerName || 'Drawer')}</td>
+      <td>${escapeHtml(formatDate(row.shiftStartAt))}</td>
+      <td>${escapeHtml(formatDate(row.shiftEndAt))}</td>
+      <td>${row.previousDrawerBalance === null || row.previousDrawerBalance === undefined ? '—' : money(row.previousDrawerBalance)}</td>
+      <td>${money(row.startingCash || 0)}</td>
+      <td>${Number(row.openingAdjustment || 0) === 0 ? 'Verified' : formatDiscrepancyPill(row.openingAdjustment)}</td>
+      <td>${money(row.expectedCash || 0)}</td>
+      <td>${money(row.cashWithdrawals || 0)}</td>
+      <td>${money(row.holdForVoidAmount || 0)}<br /><small>${Number(row.holdForVoidCount || 0)} receipt(s)</small></td>
+      <td>${money(row.cashTendered || 0)}</td>
+      <td>${money(row.changeGiven || 0)}</td>
+      <td>${money(row.netCashRetained || 0)}</td>
+      <td>${row.endingCash === null || row.endingCash === undefined ? '—' : money(row.endingCash)}</td>
+      <td>${Number(row.discrepancy || 0) === 0 ? 'Balanced' : formatDiscrepancyPill(row.discrepancy)}</td>
+      <td>${Number(row.discrepancy || 0) === 0 ? 'None' : formatReviewStatusPill(row.reviewStatus)}</td>
+      <td>${formatReviewDetails(row)}</td>
+      <td><span class="cashier-status-badge">${escapeHtml(String(row.status || '-').replace('_', ' '))}</span></td>
+    </tr>
+  `).join('');
+
+  shiftManagementListEl.innerHTML = `
+    <table class="admin-inline-table">
+      <thead>
+        <tr>
+          <th>Operator</th>
+          <th>Drawer</th>
+          <th>Shift Start</th>
+          <th>Shift End</th>
+          <th>Previous Drawer</th>
+          <th>Starting</th>
+          <th>Opening Adjustment</th>
+          <th>Expected</th>
+          <th>Drawer Deductions</th>
+          <th>Hold for Void</th>
+          <th>Tendered</th>
+          <th>Change</th>
+          <th>Net Cash</th>
+          <th>Actual</th>
+          <th>Discrepancy</th>
+          <th>Review</th>
+          <th>Review Note</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshShiftManagement() {
+  if (!shiftManagementListEl || !canAccessAdminFeatures()) return;
+  if (shiftManagementListEl) shiftManagementListEl.innerHTML = '<p>Loading shifts...</p>';
+  if (shiftManagementSummaryEl) shiftManagementSummaryEl.textContent = 'Loading shift summary...';
+  try {
+    const params = getAdminRangeSearchParams();
+    const query = params.toString();
+    const result = await api(`/api/admin/shifts${query ? `?${query}` : ''}`, {
+      headers: buildActorHeaders()
+    });
+    renderShiftManagement(result);
+  } catch (error) {
+    if (shiftManagementSummaryEl) shiftManagementSummaryEl.textContent = `Shift management error: ${error.message}`;
+    if (shiftManagementListEl) shiftManagementListEl.innerHTML = '';
+  }
+}
+
+function renderDiscrepancyAlerts(result) {
+  const alerts = Array.isArray(result?.alerts) ? result.alerts : [];
+  const summary = result?.summary || {};
+
+  if (discrepancySummaryEl) {
+    discrepancySummaryEl.innerHTML = `
+      <div class="operations-metrics-grid compact">
+        <article class="operations-metric-card highlight">
+          <span>Total Alerts</span>
+          <strong>${Number(summary.totalAlerts || 0)}</strong>
+          <small>All discrepancy cases in selected range</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Pending Review</span>
+          <strong>${Number(summary.pendingReview || 0)}</strong>
+          <small>Still waiting for manager action</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Reviewed / Cleared</span>
+          <strong>${Number(summary.approved || 0)}</strong>
+          <small>Reviewed and closed with no further action</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>Under Investigation</span>
+          <strong>${Number(summary.investigate || 0)}</strong>
+          <small>Needs follow-up before closure</small>
+        </article>
+      </div>
+    `;
+  }
+
+  if (!discrepancyAlertsListEl) return;
+  if (!alerts.length) {
+    discrepancyAlertsListEl.innerHTML = '<p>No discrepancies in the selected range.</p>';
+    return;
+  }
+
+  const rows = alerts.map((row) => `
+    <tr>
+      <td><strong>${escapeHtml(row.cashierName || 'Cashier')}</strong></td>
+      <td>${escapeHtml(row.drawerName || 'Drawer')}</td>
+      <td>${escapeHtml(formatDate(row.shiftStartAt))}</td>
+      <td>${money(row.expectedCash || 0)}</td>
+      <td>${row.endingCash === null || row.endingCash === undefined ? '—' : money(row.endingCash)}</td>
+      <td>${formatDiscrepancyPill(row.discrepancy)}</td>
+      <td>${formatReviewStatusPill(row.reviewStatus)}</td>
+      <td>${formatReviewDetails(row)}</td>
+      <td>
+        ${String(row.reviewStatus || '').toLowerCase() === 'approved'
+          ? '<span class="review-action-text">Finalized</span>'
+          : `
+            <button class="secondary small" type="button" data-shift-review="${escapeHtml(row.shiftId)}" data-review-status="approved">Approve / Reconcile</button>
+            <button class="secondary small" type="button" data-shift-review="${escapeHtml(row.shiftId)}" data-review-status="investigate">Investigate</button>
+          `}
+      </td>
+    </tr>
+  `).join('');
+
+  discrepancyAlertsListEl.innerHTML = `
+    <table class="admin-inline-table">
+      <thead>
+        <tr>
+          <th>Cashier</th>
+          <th>Drawer</th>
+          <th>Shift Start</th>
+          <th>Expected</th>
+          <th>Ending</th>
+          <th>Difference</th>
+          <th>Review</th>
+          <th>Review Note</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshDiscrepancyAlerts() {
+  if (!discrepancyAlertsListEl || !canAccessAdminFeatures()) return;
+  if (discrepancySummaryEl) discrepancySummaryEl.textContent = 'Loading discrepancy alerts...';
+  discrepancyAlertsListEl.innerHTML = '<p>Loading discrepancy alerts...</p>';
+  try {
+    const params = getAdminRangeSearchParams();
+    const query = params.toString();
+    const result = await api(`/api/admin/discrepancies${query ? `?${query}` : ''}`, {
+      headers: buildActorHeaders()
+    });
+    renderDiscrepancyAlerts(result);
+  } catch (error) {
+    if (discrepancySummaryEl) discrepancySummaryEl.textContent = `Discrepancy alert error: ${error.message}`;
+    if (discrepancyAlertsListEl) discrepancyAlertsListEl.innerHTML = '';
+  }
+}
+
+function renderSalesOpsDashboard(result) {
+  latestSalesOpsDashboard = result || null;
+  const totals = result?.totals || {};
+  const rows = Array.isArray(result?.hourlySales) ? result.hourlySales : [];
+  const weekdayRows = Array.isArray(result?.weekdaySales) ? result.weekdaySales : [];
+  const peakHour = rows.reduce((best, row) => {
+    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
+  }, null);
+  const bestSalesDay = weekdayRows.reduce((best, row) => {
+    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
+  }, null);
+  const busiestDay = weekdayRows.reduce((best, row) => {
+    return Number(row?.transactions || 0) > Number(best?.transactions || 0) ? row : best;
+  }, null);
+  const averagePerHour = rows.length
+    ? rows.reduce((sum, row) => sum + Number(row.totalSales || 0), 0) / rows.length
+    : 0;
+  const activeWeekdays = weekdayRows.filter((row) => Number(row?.totalSales || 0) > 0 || Number(row?.transactions || 0) > 0);
+
+  if (salesOpsSummaryEl) {
+    salesOpsSummaryEl.innerHTML = `
+      <div class="sales-ops-summary-grid">
+        <article class="sales-ops-summary-card highlight">
+          <span>Total Sales</span>
+          <strong>${money(totals.totalSales || 0)}</strong>
+          <small>${Number(totals.totalTransactions || 0)} transaction(s) in selected range</small>
+        </article>
+        <article class="sales-ops-summary-card">
+          <span>Best Sales Day</span>
+          <strong>${escapeHtml(bestSalesDay?.fullLabel || '—')}</strong>
+          <small>${money(bestSalesDay?.totalSales || 0)} in paid sales for the selected range</small>
+        </article>
+        <article class="sales-ops-summary-card">
+          <span>Busiest Day</span>
+          <strong>${escapeHtml(busiestDay?.fullLabel || '—')}</strong>
+          <small>${Number(busiestDay?.transactions || 0)} paid order(s) as customer traffic proxy</small>
+        </article>
+        <article class="sales-ops-summary-card">
+          <span>Peak Hour</span>
+          <strong>${escapeHtml(peakHour?.label || '—')}</strong>
+          <small>${money(peakHour?.totalSales || 0)} | Avg per hour ${money(averagePerHour)}</small>
+        </article>
+        <article class="sales-ops-summary-card">
+          <span>Cash Flow</span>
+          <strong>${money(totals.netCashRetained || 0)}</strong>
+          <small>Tendered ${money(totals.cashTendered || 0)} | Change ${money(totals.changeGiven || 0)}</small>
+        </article>
+        <article class="sales-ops-summary-card">
+          <span>Digital Sales</span>
+          <strong>${money(totals.digitalSales || 0)}</strong>
+          <small>Cash sales ${money(totals.cashSales || 0)}</small>
+        </article>
+      </div>
+    `;
+  }
+
+  if (!hourlySalesGraphEl) return;
+
+  const maxSales = Math.max(...rows.map((x) => Number(x.totalSales || 0)), 0);
+  const barChartMarkup = rows.length
+    ? `
+      <section class="sales-ops-panel">
+        <div class="sales-ops-panel-head">
+          <h3>Hourly Sales Bar Graph</h3>
+        </div>
+        <div class="sales-ops-bar-chart sales-ops-bar-chart-minimal">
+          ${rows.map((row) => {
+            const amount = Number(row.totalSales || 0);
+            const height = maxSales > 0 && amount > 0 ? Math.max(10, Math.round((amount / maxSales) * 112)) : 4;
+            const label = String(row.label || '--').trim();
+            const compactValue = amount > 0
+              ? new Intl.NumberFormat('en-PH', { notation: 'compact', maximumFractionDigits: 1 }).format(amount)
+              : '0';
+            return `
+              <div class="sales-ops-bar-column sales-ops-bar-column-minimal" title="${escapeHtml(`${label}: ${money(amount)}`)}">
+                <div class="sales-ops-bar-track sales-ops-bar-track-minimal">
+                  <span class="sales-ops-bar-fill sales-ops-bar-fill-minimal${amount <= 0 ? ' is-zero' : ''}" style="height:${height}px;"></span>
+                </div>
+                <span class="sales-ops-bar-label sales-ops-bar-label-minimal">${escapeHtml(label)}</span>
+                <small class="sales-ops-bar-value-minimal">${escapeHtml(compactValue)}</small>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `
+    : `
+      <section class="sales-ops-panel">
+        <div class="sales-ops-panel-head">
+          <h3>Hourly Sales Bar Graph</h3>
+        </div>
+        <p>No hourly sales data.</p>
+      </section>
+    `;
+
+  const weekdayMaxSales = Math.max(...weekdayRows.map((row) => Number(row?.totalSales || 0)), 0);
+  const weekdayChartMarkup = weekdayRows.length
+    ? `
+      <section class="sales-ops-panel">
+        <div class="sales-ops-panel-head">
+          <h3>Weekday Sales Performance</h3>
+          <span>${activeWeekdays.length || 0} day(s) with paid sales</span>
+        </div>
+        <div class="sales-ops-bar-chart sales-ops-weekday-chart">
+          ${weekdayRows.map((row) => {
+            const amount = Number(row?.totalSales || 0);
+            const height = weekdayMaxSales > 0 ? Math.max(6, Math.round((amount / weekdayMaxSales) * 160)) : 0;
+            return `
+              <div class="sales-ops-bar-column sales-ops-weekday-column">
+                <span class="sales-ops-bar-value">${money(amount)}</span>
+                <div class="sales-ops-bar-track sales-ops-weekday-track">
+                  <span class="sales-ops-bar-fill sales-ops-weekday-fill" style="height:${height}px;"></span>
+                </div>
+                <span class="sales-ops-bar-label">${escapeHtml(row?.label || '--')}</span>
+                <small class="sales-ops-weekday-meta">${Number(row?.transactions || 0)} order(s)</small>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="sales-ops-weekday-note">
+          <strong>Reading guide:</strong>
+          <span>Sales bars show total peso sales per weekday. Order count is a proxy for customer volume.</span>
+        </div>
+      </section>
+    `
+    : `
+      <section class="sales-ops-panel">
+        <div class="sales-ops-panel-head">
+          <h3>Weekday Sales Performance</h3>
+        </div>
+        <p>No weekday sales data yet.</p>
+      </section>
+    `;
+
+  hourlySalesGraphEl.innerHTML = `
+    <div class="sales-ops-dashboard-grid">
+      ${barChartMarkup}
+      ${weekdayChartMarkup}
+    </div>
+  `;
+}
+
+async function refreshSalesOpsDashboard() {
+  if (!salesOpsSummaryEl || !canAccessAdminFeatures()) return;
+  if (salesOpsSummaryEl) salesOpsSummaryEl.textContent = 'Loading sales operations dashboard...';
+  if (hourlySalesGraphEl) hourlySalesGraphEl.innerHTML = '<p>Loading hourly sales...</p>';
+  try {
+    const params = getAdminRangeSearchParams();
+    const query = params.toString();
+    const result = await api(`/api/admin/sales/dashboard${query ? `?${query}` : ''}`, {
+      headers: buildActorHeaders()
+    });
+    renderSalesOpsDashboard(result);
+  } catch (error) {
+    if (salesOpsSummaryEl) salesOpsSummaryEl.textContent = `Sales operations error: ${error.message}`;
+    if (hourlySalesGraphEl) hourlySalesGraphEl.innerHTML = '';
+  }
+}
+
+function renderMonthlyClosing(result) {
+  const monthValue = String(result?.month || getMonthlyClosingSelectedMonth()).trim();
+  const summary = result?.summary || {};
+  const expenses = Array.isArray(result?.expenses) ? result.expenses : [];
+  const expenseByCategory = Array.isArray(result?.expenseByCategory) ? result.expenseByCategory : [];
+  const topProducts = Array.isArray(result?.topProducts) ? result.topProducts : [];
+  const canEdit = canManageUsers();
+
+  if (monthlyClosingAdminNoteEl) {
+    monthlyClosingAdminNoteEl.textContent = canEdit
+      ? 'Administrations can log monthly operating expenses here. Supervisor can review the closing summary.'
+      : 'View-only mode. Only Administrations can add monthly expenses.';
+  }
+
+  if (monthlyExpenseFormEl) {
+    Array.from(monthlyExpenseFormEl.elements || []).forEach((element) => {
+      if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
+        element.disabled = !canEdit;
+      }
+    });
+  }
+
+  if (monthlyClosingSummaryEl) {
+    monthlyClosingSummaryEl.textContent = [
+      `${formatMonthLabel(monthValue)} Closing`,
+      `Gross Sales: ${money(summary.totalSales || 0)}`,
+      `Expenses: ${money(summary.totalExpenses || 0)}`,
+      `Net Sales After Expenses: ${money(summary.netSalesAfterExpenses || 0)}`,
+      `Cash Sales: ${money(summary.cashSales || 0)}`,
+      `Digital Sales: ${money(summary.digitalSales || 0)}`,
+      `Drawer Withdrawals: ${money(summary.drawerWithdrawals || 0)}`,
+      `Shift Discrepancies: ${money(summary.totalDiscrepancy || 0)}`,
+      `Expenses Logged: ${Number(summary.expenseCount || 0)}`
+    ].join(' | ');
+  }
+
+  if (!monthlyExpenseListEl) return;
+
+  const categoryMarkup = expenseByCategory.length
+    ? `
+      <div class="monthly-closing-block">
+        <h3>Expense Categories</h3>
+        <table class="admin-inline-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Entries</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${expenseByCategory.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.category || 'Uncategorized')}</td>
+                <td>${Number(row.count || 0)}</td>
+                <td>${money(row.totalAmount || 0)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+    : `
+      <div class="monthly-closing-block">
+        <h3>Expense Categories</h3>
+        <p>No expenses logged for this month yet.</p>
+      </div>
+    `;
+
+  const topProductsMarkup = topProducts.length
+    ? `
+      <div class="monthly-closing-block">
+        <h3>Top Products This Month</h3>
+        <table class="admin-inline-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Qty Sold</th>
+              <th>Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topProducts.slice(0, 5).map((row) => `
+              <tr>
+                <td>${escapeHtml(row.productName || 'Product')}</td>
+                <td>${Number(row.qtySold || 0)}</td>
+                <td>${money(row.totalSales || 0)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+    : `
+      <div class="monthly-closing-block">
+        <h3>Top Products This Month</h3>
+        <p>No paid sales yet for this month.</p>
+      </div>
+    `;
+
+  const expensesMarkup = expenses.length
+    ? `
+      <div class="monthly-closing-block full-width-block">
+        <h3>Expense Ledger</h3>
+        <table class="admin-inline-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${expenses.map((row) => `
+              <tr>
+                <td>${escapeHtml(formatDate(row.expenseDate))}</td>
+                <td>${escapeHtml(row.category || 'Uncategorized')}</td>
+                <td>${escapeHtml(row.description || '-')}</td>
+                <td>${money(row.amount || 0)}</td>
+                <td>${escapeHtml(row.note || '-')}</td>
+                <td>${escapeHtml(row.createdByName || row.createdByEmail || '-')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+    : `
+      <div class="monthly-closing-block full-width-block">
+        <h3>Expense Ledger</h3>
+        <p>No expenses logged for this month.</p>
+      </div>
+    `;
+
+  monthlyExpenseListEl.innerHTML = `
+    <div class="monthly-closing-grid">
+      ${categoryMarkup}
+      ${topProductsMarkup}
+      ${expensesMarkup}
+    </div>
+  `;
+}
+
+async function refreshMonthlyClosingModule() {
+  if (!monthlyClosingSummaryEl || !canAccessAdminFeatures()) return;
+  const monthValue = getMonthlyClosingSelectedMonth();
+  if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
+    monthlyClosingMonthInputEl.value = monthValue;
+  }
+  if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.textContent = 'Loading monthly closing summary...';
+  if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '<p>Loading monthly expenses...</p>';
+  try {
+    const result = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
+      headers: buildActorHeaders()
+    });
+    renderMonthlyClosing(result);
+  } catch (error) {
+    if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.textContent = `Monthly closing error: ${error.message}`;
+    if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '';
+  }
+}
+
+async function handleMonthlyExpenseSubmit(event) {
+  event.preventDefault();
+  if (!canManageUsers()) {
+    setStatus('Only Administrations can add monthly expenses.');
+    return;
+  }
+
+  const expenseDate = String(monthlyExpenseDateInputEl?.value || '').trim();
+  const category = String(monthlyExpenseCategoryInputEl?.value || '').trim();
+  const description = String(monthlyExpenseDescriptionInputEl?.value || '').trim();
+  const amount = parseNonNegativeAmount(monthlyExpenseAmountInputEl?.value);
+  const note = String(monthlyExpenseNoteInputEl?.value || '').trim();
+
+  if (!expenseDate) {
+    setStatus('Select the expense date.');
+    return;
+  }
+  if (!category) {
+    setStatus('Enter the expense category.');
+    return;
+  }
+  if (!description) {
+    setStatus('Enter the expense description.');
+    return;
+  }
+  if (amount === null || amount <= 0) {
+    setStatus('Enter an expense amount greater than 0.');
+    return;
+  }
+
+  try {
+    if (monthlyExpenseSaveBtnEl) {
+      monthlyExpenseSaveBtnEl.disabled = true;
+      monthlyExpenseSaveBtnEl.textContent = 'Saving...';
+    }
+    await api('/api/admin/expenses', {
+      method: 'POST',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        expenseDate,
+        category,
+        description,
+        amount,
+        note,
+        createdByName: activeAuthSession?.name || activeAuthSession?.email || 'Administrator'
+      })
+    });
+    if (monthlyExpenseCategoryInputEl) monthlyExpenseCategoryInputEl.value = '';
+    if (monthlyExpenseDescriptionInputEl) monthlyExpenseDescriptionInputEl.value = '';
+    if (monthlyExpenseAmountInputEl) monthlyExpenseAmountInputEl.value = '';
+    if (monthlyExpenseNoteInputEl) monthlyExpenseNoteInputEl.value = '';
+    setStatus(`Expense saved for ${formatMonthLabel(getMonthlyClosingSelectedMonth())}.`);
+    await refreshMonthlyClosingModule();
+  } catch (error) {
+    setStatus(`Monthly expense save failed: ${error.message}`);
+  } finally {
+    if (monthlyExpenseSaveBtnEl) {
+      monthlyExpenseSaveBtnEl.disabled = false;
+      monthlyExpenseSaveBtnEl.textContent = 'Add Expense';
+    }
+  }
+}
+
+async function refreshAdminOperationsModules() {
+  if (!canAccessAdminFeatures()) return;
+  await Promise.all([
+    refreshCashierMonitoring(),
+    refreshCashDrawerAdmin(),
+    refreshShiftManagement(),
+    refreshDiscrepancyAlerts(),
+    refreshSalesOpsDashboard(),
+    refreshMonthlyClosingModule()
+  ]);
+}
+
+async function handleShiftReviewAction(shiftId, reviewStatus) {
+  if (!shiftId || !reviewStatus) return;
+  const actionLabel = String(reviewStatus).toLowerCase() === 'approved'
+    ? 'Approve / Reconcile'
+    : 'Investigate';
+  const promptText = String(reviewStatus).toLowerCase() === 'approved'
+    ? 'Enter the reconciliation note. Explain what caused the discrepancy and how it was resolved:'
+    : 'Enter the investigation note. Explain the issue found or next action needed:';
+  const rawNote = window.prompt(promptText, '');
+  if (rawNote === null) return;
+  const note = String(rawNote || '').trim();
+  if (!note) {
+    setStatus(`${actionLabel} requires a review note.`);
+    return;
+  }
+  try {
+    await api(`/api/admin/shifts/${encodeURIComponent(shiftId)}/review`, {
+      method: 'PATCH',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({ reviewStatus, reviewNote: note })
+    });
+    setStatus(`Discrepancy marked as ${actionLabel.toLowerCase()}.`);
+    await refreshDiscrepancyAlerts();
+    await refreshShiftManagement();
+  } catch (error) {
+    setStatus(`Discrepancy review failed: ${error.message}`);
+  }
+}
+
+function setLatestAdminReport(report) {
+  latestAdminReport = report || null;
+  if (reportDownloadBtn) reportDownloadBtn.disabled = !latestAdminReport;
+  if (reportPrintBtn) reportPrintBtn.disabled = !latestAdminReport;
+}
+
+const ADMIN_REPORT_DEFINITIONS = {
+  'daily-sales': {
+    title: 'Daily Sales Report',
+    columns: [
+      { key: 'reference', label: 'Reference' },
+      { key: 'method', label: 'Method' },
+      { key: 'amountPaid', label: 'Sale Amount' },
+      { key: 'tenderedAmount', label: 'Tendered' },
+      { key: 'changeAmount', label: 'Change' },
+      { key: 'paidAt', label: 'Paid At' }
+    ]
+  },
+  'monthly-closing': {
+    title: 'Monthly Closing Report',
+    columns: [
+      { key: 'date', label: 'Date' },
+      { key: 'category', label: 'Category' },
+      { key: 'description', label: 'Description' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'note', label: 'Note' },
+      { key: 'createdAt', label: 'Created' }
+    ]
+  },
+  'cashier-shift': {
+    title: 'Cashier Shift Report',
+    columns: [
+      { key: 'cashierName', label: 'Cashier' },
+      { key: 'drawerName', label: 'Drawer' },
+      { key: 'shiftStartAt', label: 'Shift Start' },
+      { key: 'shiftEndAt', label: 'Shift End' },
+      { key: 'totalSales', label: 'Total Sales' },
+      { key: 'totalTransactions', label: 'Transactions' },
+      { key: 'netCashRetained', label: 'Net Cash' },
+      { key: 'cashWithdrawals', label: 'Withdrawals' },
+      { key: 'discrepancy', label: 'Discrepancy' }
+    ]
+  },
+  transactions: {
+    title: 'Transactions Report',
+    columns: [
+      { key: 'reference', label: 'Reference' },
+      { key: 'status', label: 'Status' },
+      { key: 'orderType', label: 'Order Type' },
+      { key: 'paymentMethod', label: 'Payment Method', get: (row) => row?.payment?.method || row?.paymentMethod || '—' },
+      { key: 'cashierName', label: 'Cashier' },
+      { key: 'total', label: 'Total' },
+      { key: 'paidAt', label: 'Paid At', get: (row) => row?.payment?.paidAt || row?.updatedAt || row?.createdAt },
+      { key: 'createdAt', label: 'Created' }
+    ]
+  },
+  'product-sales': {
+    title: 'Product Sales Report',
+    columns: [
+      { key: 'productName', label: 'Product' },
+      { key: 'qtySold', label: 'Qty Sold' },
+      { key: 'totalSales', label: 'Total Sales' }
+    ]
+  },
+  discrepancy: {
+    title: 'Discrepancy Report',
+    columns: [
+      { key: 'cashierName', label: 'Cashier' },
+      { key: 'drawerName', label: 'Drawer' },
+      { key: 'shiftStartAt', label: 'Shift Start' },
+      { key: 'shiftEndAt', label: 'Shift End' },
+      { key: 'expectedCash', label: 'Expected Cash' },
+      { key: 'endingCash', label: 'Ending Cash' },
+      { key: 'discrepancy', label: 'Difference' },
+      { key: 'reviewStatus', label: 'Review' },
+      { key: 'reviewNote', label: 'Review Note' }
+    ]
+  }
+};
+
+function formatAdminReportFieldLabel(key) {
+  return String(key || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Field';
+}
+
+function isAdminReportMoneyKey(key) {
+  const normalized = String(key || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (/(transactions|shifts|products|discrepancies|count|qty|quantity)/i.test(normalized)) return false;
+  return /(amount|sales|cash|change|value|price|expense|withdrawal|ticket|retained|balance)/i.test(normalized);
+}
+
+function isAdminReportDateKey(key) {
+  return /(date|at|start|end|created|updated|paid)/i.test(String(key || ''));
+}
+
+function formatAdminReportNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value ?? '—');
+  if (Number.isInteger(n)) return n.toLocaleString('en-PH');
+  return n.toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatAdminReportValue(value, key = '') {
+  if (value === null || value === undefined || value === '') return '—';
+  if (key === 'discrepancy') return formatDiscrepancyAmount(value);
+  if (typeof value === 'number') {
+    return isAdminReportMoneyKey(key) ? money(value) : formatAdminReportNumber(value);
+  }
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (isAdminReportDateKey(key) && typeof value === 'string') return formatDate(value);
+  if (Array.isArray(value)) return value.length ? value.map((item) => formatAdminReportValue(item)).join(', ') : '—';
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([childKey, childValue]) => `${formatAdminReportFieldLabel(childKey)}: ${formatAdminReportValue(childValue, childKey)}`)
+      .join(' | ');
+  }
+  return String(value);
+}
+
+function getAdminReportDefinition(report) {
+  return ADMIN_REPORT_DEFINITIONS[String(report?.reportType || '').trim().toLowerCase()] || null;
+}
+
+function getAdminReportRows(report) {
+  return Array.isArray(report?.rows) ? report.rows : [];
+}
+
+function getAdminReportColumns(report) {
+  const definition = getAdminReportDefinition(report);
+  if (definition?.columns?.length) return definition.columns;
+  const firstRow = getAdminReportRows(report)[0];
+  return firstRow
+    ? Object.keys(firstRow).map((key) => ({ key, label: formatAdminReportFieldLabel(key) }))
+    : [];
+}
+
+function getAdminReportCellValue(row, column) {
+  if (typeof column?.get === 'function') return column.get(row);
+  return row?.[column?.key];
+}
+
+function flattenAdminReportSummary(summary, prefix = '') {
+  return Object.entries(summary || {}).flatMap(([key, value]) => {
+    const label = prefix ? `${prefix} ${formatAdminReportFieldLabel(key)}` : formatAdminReportFieldLabel(key);
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return flattenAdminReportSummary(value, label);
+    }
+    return [{ key, label, value }];
+  });
+}
+
+function getAdminReportSummaryEntries(report) {
+  return flattenAdminReportSummary(report?.summary || {});
+}
+
+function getAdminReportPeriodLabel(report) {
+  if (String(report?.reportType || '') === 'monthly-closing' && report?.month) {
+    return formatMonthLabel(report.month);
+  }
+  const rangeLabel = String(report?.range?.label || 'custom').trim().toUpperCase();
+  const dateFrom = report?.range?.dateFrom ? formatDate(report.range.dateFrom) : '—';
+  const dateTo = report?.range?.dateTo ? formatDate(report.range.dateTo) : '—';
+  return `${rangeLabel} • ${dateFrom} to ${dateTo}`;
+}
+
+function buildAdminReportTableMarkup(title, rows, columns, emptyMessage = 'No rows available.') {
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  const normalizedColumns = Array.isArray(columns) ? columns : [];
+  return `
+    <section class="report-preview-table-card">
+      <div class="report-preview-table-head">
+        <h4>${escapeHtml(title)}</h4>
+        <span>${normalizedRows.length} row(s)</span>
+      </div>
+      ${normalizedRows.length && normalizedColumns.length
+        ? `
+          <div class="report-preview-table-wrap">
+            <table class="admin-inline-table report-preview-table">
+              <thead>
+                <tr>
+                  ${normalizedColumns.map((column) => `<th>${escapeHtml(column.label || formatAdminReportFieldLabel(column.key))}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${normalizedRows.map((row) => `
+                  <tr>
+                    ${normalizedColumns.map((column) => `<td>${escapeHtml(formatAdminReportValue(getAdminReportCellValue(row, column), column.key || column.label || ''))}</td>`).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+        : `<p class="report-preview-empty">${escapeHtml(emptyMessage)}</p>`}
+    </section>
+  `;
+}
+
+function buildAdminReportExtraSections(report) {
+  if (String(report?.reportType || '') !== 'monthly-closing') return '';
+  const expenseByCategory = Array.isArray(report?.expenseByCategory) ? report.expenseByCategory : [];
+  const topProducts = Array.isArray(report?.topProducts) ? report.topProducts : [];
+  return [
+    buildAdminReportTableMarkup(
+      'Expense Categories',
+      expenseByCategory,
+      [
+        { key: 'category', label: 'Category' },
+        { key: 'count', label: 'Entries' },
+        { key: 'totalAmount', label: 'Total Amount' }
+      ],
+      'No expense category breakdown available.'
+    ),
+    buildAdminReportTableMarkup(
+      'Top Products Snapshot',
+      topProducts,
+      [
+        { key: 'productName', label: 'Product' },
+        { key: 'qtySold', label: 'Qty Sold' },
+        { key: 'totalSales', label: 'Total Sales' }
+      ],
+      'No top product data available.'
+    )
+  ].join('');
+}
+
+function renderReportPreview(report) {
+  if (!reportsPreviewEl) return;
+  if (!report) {
+    reportsPreviewEl.innerHTML = '<p>No report generated yet.</p>';
+    return;
+  }
+
+  const definition = getAdminReportDefinition(report);
+  const title = definition?.title || 'Admin Report';
+  const summaryEntries = getAdminReportSummaryEntries(report);
+  const rows = getAdminReportRows(report);
+  const columns = getAdminReportColumns(report);
+
+  reportsPreviewEl.innerHTML = `
+    <div class="report-preview-shell">
+      <div class="report-preview-header">
+        <div class="report-preview-header-copy">
+          <span class="report-preview-eyebrow">${escapeHtml(report.reportType || 'report')}</span>
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(getAdminReportPeriodLabel(report))}</p>
+        </div>
+        <div class="report-preview-meta">
+          <span>Generated</span>
+          <strong>${escapeHtml(formatDate(report.generatedAt || new Date().toISOString()))}</strong>
+        </div>
+      </div>
+      ${summaryEntries.length
+        ? `
+          <div class="report-preview-summary-grid">
+            ${summaryEntries.map((entry) => `
+              <article class="report-preview-summary-card">
+                <span>${escapeHtml(entry.label)}</span>
+                <strong>${escapeHtml(formatAdminReportValue(entry.value, entry.key))}</strong>
+              </article>
+            `).join('')}
+          </div>
+        `
+        : ''}
+      ${buildAdminReportTableMarkup('Main Rows', rows, columns, 'No rows found for this report.')}
+      ${buildAdminReportExtraSections(report)}
+    </div>
+  `;
+}
+
+function escapeXml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function sanitizeWorksheetName(name) {
+  return String(name || 'Report')
+    .replace(/[\\/*?:[\]]/g, ' ')
+    .trim()
+    .slice(0, 31) || 'Report';
+}
+
+const ZIP_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let j = 0; j < 8; j += 1) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i += 1) {
+    crc = ZIP_CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function writeUint16LE(view, offset, value) {
+  view.setUint16(offset, value & 0xFFFF, true);
+}
+
+function writeUint32LE(view, offset, value) {
+  view.setUint32(offset, value >>> 0, true);
+}
+
+function getZipDosDateTime(date = new Date()) {
+  const year = Math.max(1980, date.getFullYear());
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = Math.floor(date.getSeconds() / 2);
+  return {
+    time: (hours << 11) | (minutes << 5) | seconds,
+    date: ((year - 1980) << 9) | (month << 5) | day
+  };
+}
+
+function concatUint8Arrays(chunks) {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const output = new Uint8Array(totalLength);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return output;
+}
+
+function createZip(entries) {
+  const encoder = new TextEncoder();
+  const now = getZipDosDateTime(new Date());
+  const localChunks = [];
+  const centralChunks = [];
+  let offset = 0;
+
+  entries.forEach((entry) => {
+    const nameBytes = encoder.encode(entry.name);
+    const dataBytes = typeof entry.data === 'string' ? encoder.encode(entry.data) : entry.data;
+    const crc = crc32(dataBytes);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const localView = new DataView(localHeader.buffer);
+    writeUint32LE(localView, 0, 0x04034b50);
+    writeUint16LE(localView, 4, 20);
+    writeUint16LE(localView, 6, 0);
+    writeUint16LE(localView, 8, 0);
+    writeUint16LE(localView, 10, now.time);
+    writeUint16LE(localView, 12, now.date);
+    writeUint32LE(localView, 14, crc);
+    writeUint32LE(localView, 18, dataBytes.length);
+    writeUint32LE(localView, 22, dataBytes.length);
+    writeUint16LE(localView, 26, nameBytes.length);
+    writeUint16LE(localView, 28, 0);
+    localHeader.set(nameBytes, 30);
+    localChunks.push(localHeader, dataBytes);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(centralHeader.buffer);
+    writeUint32LE(centralView, 0, 0x02014b50);
+    writeUint16LE(centralView, 4, 20);
+    writeUint16LE(centralView, 6, 20);
+    writeUint16LE(centralView, 8, 0);
+    writeUint16LE(centralView, 10, 0);
+    writeUint16LE(centralView, 12, now.time);
+    writeUint16LE(centralView, 14, now.date);
+    writeUint32LE(centralView, 16, crc);
+    writeUint32LE(centralView, 20, dataBytes.length);
+    writeUint32LE(centralView, 24, dataBytes.length);
+    writeUint16LE(centralView, 28, nameBytes.length);
+    writeUint16LE(centralView, 30, 0);
+    writeUint16LE(centralView, 32, 0);
+    writeUint16LE(centralView, 34, 0);
+    writeUint16LE(centralView, 36, 0);
+    writeUint32LE(centralView, 38, 0);
+    writeUint32LE(centralView, 42, offset);
+    centralHeader.set(nameBytes, 46);
+    centralChunks.push(centralHeader);
+
+    offset += localHeader.length + dataBytes.length;
+  });
+
+  const centralDirectory = concatUint8Arrays(centralChunks);
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  writeUint32LE(endView, 0, 0x06054b50);
+  writeUint16LE(endView, 4, 0);
+  writeUint16LE(endView, 6, 0);
+  writeUint16LE(endView, 8, entries.length);
+  writeUint16LE(endView, 10, entries.length);
+  writeUint32LE(endView, 12, centralDirectory.length);
+  writeUint32LE(endView, 16, offset);
+  writeUint16LE(endView, 20, 0);
+
+  return concatUint8Arrays([...localChunks, centralDirectory, endRecord]);
+}
+
+function getExcelColumnName(index) {
+  let n = index + 1;
+  let label = '';
+  while (n > 0) {
+    const remainder = (n - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    n = Math.floor((n - 1) / 26);
+  }
+  return label;
+}
+
+function buildXlsxInlineStringCell(ref, value, styleId = 0) {
+  return `<c r="${ref}" t="inlineStr" s="${styleId}"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
+}
+
+function buildAdminReportExcelRows(report, maxColumns) {
+  const definition = getAdminReportDefinition(report);
+  const title = definition?.title || 'Admin Report';
+  const summaryEntries = getAdminReportSummaryEntries(report);
+  const mainColumns = getAdminReportColumns(report);
+  const mainRows = getAdminReportRows(report);
+  const extraSections = [];
+  let mainTableHeaderRow = null;
+  let mainTableLastRow = null;
+
+  if (String(report?.reportType || '') === 'monthly-closing') {
+    extraSections.push({
+      title: 'Expense Categories',
+      rows: Array.isArray(report?.expenseByCategory) ? report.expenseByCategory : [],
+      columns: [
+        { key: 'category', label: 'Category' },
+        { key: 'count', label: 'Entries' },
+        { key: 'totalAmount', label: 'Total Amount' }
+      ]
+    });
+    extraSections.push({
+      title: 'Top Products Snapshot',
+      rows: Array.isArray(report?.topProducts) ? report.topProducts : [],
+      columns: [
+        { key: 'productName', label: 'Product' },
+        { key: 'qtySold', label: 'Qty Sold' },
+        { key: 'totalSales', label: 'Total Sales' }
+      ]
+    });
+  }
+
+  const rows = [
+    {
+      height: 28,
+      cells: [{ value: title, styleId: 1, span: maxColumns }]
+    },
+    {
+      cells: [
+        { value: 'Report Type', styleId: 2 },
+        { value: report.reportType || 'report', styleId: 3, span: Math.max(1, maxColumns - 1) }
+      ]
+    },
+    {
+      cells: [
+        { value: 'Period', styleId: 2 },
+        { value: getAdminReportPeriodLabel(report), styleId: 3, span: Math.max(1, maxColumns - 1) }
+      ]
+    },
+    {
+      cells: [
+        { value: 'Generated', styleId: 2 },
+        { value: formatDate(report.generatedAt || new Date().toISOString()), styleId: 3, span: Math.max(1, maxColumns - 1) }
+      ]
+    },
+    { height: 8, cells: [] }
+  ];
+
+  if (summaryEntries.length) {
+    rows.push({
+      height: 22,
+      cells: [{ value: 'Summary', styleId: 5, span: maxColumns }]
+    });
+    summaryEntries.forEach((entry) => {
+      rows.push({
+        cells: [
+          { value: entry.label, styleId: 2 },
+          { value: formatAdminReportValue(entry.value, entry.key), styleId: 3, span: Math.max(1, maxColumns - 1) }
+        ]
+      });
+    });
+    rows.push({ height: 8, cells: [] });
+  }
+
+  const pushSection = (sectionTitle, sectionRows, sectionColumns, options = {}) => {
+    rows.push({
+      height: 22,
+      cells: [{ value: sectionTitle, styleId: 5, span: maxColumns }]
+    });
+    if (!sectionRows.length || !sectionColumns.length) {
+      rows.push({
+        cells: [{ value: 'No rows available.', styleId: 6, span: maxColumns }]
+      });
+      rows.push({ height: 8, cells: [] });
+      return;
+    }
+    const headerRowNumber = rows.length + 1;
+    rows.push({
+      height: 22,
+      cells: sectionColumns.map((column) => ({
+        value: column.label || formatAdminReportFieldLabel(column.key),
+        styleId: 4
+      }))
+    });
+    if (options.trackMainTable) {
+      mainTableHeaderRow = headerRowNumber;
+      mainTableLastRow = headerRowNumber;
+    }
+    sectionRows.forEach((row) => {
+      const dataRowNumber = rows.length + 1;
+      rows.push({
+        cells: sectionColumns.map((column) => ({
+          value: formatAdminReportValue(getAdminReportCellValue(row, column), column.key || column.label || ''),
+          styleId: dataRowNumber % 2 === 0 ? 0 : 7
+        }))
+      });
+      if (options.trackMainTable) {
+        mainTableLastRow = dataRowNumber;
+      }
+    });
+    rows.push({ height: 8, cells: [] });
+  };
+
+  pushSection('Main Rows', mainRows, mainColumns, { trackMainTable: true });
+  extraSections.forEach((section) => pushSection(section.title, section.rows, section.columns));
+
+  return {
+    rows,
+    mainTableHeaderRow,
+    mainTableLastRow
+  };
+}
+
+function buildAdminReportExcelWorkbook(report) {
+  const definition = getAdminReportDefinition(report);
+  const title = definition?.title || 'Admin Report';
+  const worksheetName = sanitizeWorksheetName(title);
+  const mainColumns = getAdminReportColumns(report);
+  const extraColumnCounts = String(report?.reportType || '') === 'monthly-closing'
+    ? [3, 3]
+    : [];
+  const maxColumns = Math.max(2, mainColumns.length || 0, ...extraColumnCounts);
+  const {
+    rows,
+    mainTableHeaderRow,
+    mainTableLastRow
+  } = buildAdminReportExcelRows(report, maxColumns);
+  const mergeRanges = [];
+  const worksheetRowsXml = rows.map((row, rowIndex) => {
+    const rowNumber = rowIndex + 1;
+    if (!row.cells.length) return `<row r="${rowNumber}"${row.height ? ` ht="${row.height}" customHeight="1"` : ''}/>`;
+    let columnIndex = 0;
+    const cellsXml = row.cells.map((cell) => {
+      const ref = `${getExcelColumnName(columnIndex)}${rowNumber}`;
+      const span = Math.max(1, Number(cell.span || 1));
+      const startColumn = columnIndex;
+      columnIndex += span;
+      if (span > 1) {
+        mergeRanges.push(`${getExcelColumnName(startColumn)}${rowNumber}:${getExcelColumnName(columnIndex - 1)}${rowNumber}`);
+      }
+      return buildXlsxInlineStringCell(ref, cell.value, cell.styleId || 0);
+    }).join('');
+    return `<row r="${rowNumber}"${row.height ? ` ht="${row.height}" customHeight="1"` : ''}>${cellsXml}</row>`;
+  }).join('');
+  const lastColumn = getExcelColumnName(maxColumns - 1);
+  const lastRow = rows.length || 1;
+  const generatedIso = new Date().toISOString();
+  const freezePaneXml = mainTableHeaderRow
+    ? `
+    <sheetViews>
+      <sheetView workbookViewId="0">
+        <pane ySplit="${Math.max(0, mainTableHeaderRow - 1)}" topLeftCell="A${mainTableHeaderRow}" activePane="bottomLeft" state="frozen"/>
+        <selection pane="bottomLeft" activeCell="A${mainTableHeaderRow}" sqref="A${mainTableHeaderRow}"/>
+      </sheetView>
+    </sheetViews>`
+    : `
+    <sheetViews>
+      <sheetView workbookViewId="0"/>
+    </sheetViews>`;
+  const autoFilterXml = mainTableHeaderRow && mainTableLastRow && mainTableLastRow >= mainTableHeaderRow
+    ? `<autoFilter ref="A${mainTableHeaderRow}:${lastColumn}${mainTableLastRow}"/>`
+    : '';
+  const mergeCellsXml = mergeRanges.length
+    ? `
+  <mergeCells count="${mergeRanges.length}">
+    ${mergeRanges.map((range) => `<mergeCell ref="${range}"/>`).join('')}
+  </mergeCells>`
+    : '';
+
+  const files = [
+    {
+      name: '[Content_Types].xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`
+    },
+    {
+      name: '_rels/.rels',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`
+    },
+    {
+      name: 'docProps/app.xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>POS System</Application>
+  <DocSecurity>0</DocSecurity>
+  <ScaleCrop>false</ScaleCrop>
+  <HeadingPairs>
+    <vt:vector size="2" baseType="variant">
+      <vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant>
+      <vt:variant><vt:i4>1</vt:i4></vt:variant>
+    </vt:vector>
+  </HeadingPairs>
+  <TitlesOfParts>
+    <vt:vector size="1" baseType="lpstr">
+      <vt:lpstr>${escapeXml(worksheetName)}</vt:lpstr>
+    </vt:vector>
+  </TitlesOfParts>
+  <Company>POS System</Company>
+  <LinksUpToDate>false</LinksUpToDate>
+  <SharedDoc>false</SharedDoc>
+  <HyperlinksChanged>false</HyperlinksChanged>
+  <AppVersion>16.0300</AppVersion>
+</Properties>`
+    },
+    {
+      name: 'docProps/core.xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>${escapeXml(title)}</dc:title>
+  <dc:creator>POS System</dc:creator>
+  <cp:lastModifiedBy>POS System</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${escapeXml(generatedIso)}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${escapeXml(generatedIso)}</dcterms:modified>
+</cp:coreProperties>`
+    },
+    {
+      name: 'xl/workbook.xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="${escapeXml(worksheetName)}" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+    },
+    {
+      name: 'xl/_rels/workbook.xml.rels',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+    },
+    {
+      name: 'xl/styles.xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="5">
+    <font><sz val="11"/><name val="Calibri"/></font>
+    <font><b/><sz val="18"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><name val="Calibri"/></font>
+    <font><i/><sz val="11"/><color rgb="FF6B4C39"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+  </fonts>
+  <fills count="6">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF5E6D8"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF5A3521"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFF8F1"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFDF2E6"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFD8C1AE"/></left>
+      <right style="thin"><color rgb="FFD8C1AE"/></right>
+      <top style="thin"><color rgb="FFD8C1AE"/></top>
+      <bottom style="thin"><color rgb="FFD8C1AE"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="8">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+  </cellXfs>
+  <cellStyles count="1">
+    <cellStyle name="Normal" xfId="0" builtinId="0"/>
+  </cellStyles>
+</styleSheet>`
+    },
+    {
+      name: 'xl/worksheets/sheet1.xml',
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:${lastColumn}${lastRow}"/>
+  ${freezePaneXml}
+  <sheetFormatPr defaultRowHeight="15"/>
+  <cols>
+    ${Array.from({ length: maxColumns }, (_, index) => {
+      const width = index === 0 ? 26 : index === 1 ? 34 : 20;
+      return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
+    }).join('')}
+  </cols>
+  <sheetData>
+    ${worksheetRowsXml}
+  </sheetData>
+  ${autoFilterXml}
+  ${mergeCellsXml}
+</worksheet>`
+    }
+  ];
+
+  return createZip(files);
+}
+
+async function generateAdminReport(reportType, label, extraParams = null) {
+  if (!canAccessAdminFeatures()) return;
+  if (reportsStatusEl) reportsStatusEl.textContent = `Generating ${label} report...`;
+
+  try {
+    const params = extraParams instanceof URLSearchParams
+      ? new URLSearchParams(extraParams.toString())
+      : getAdminRangeSearchParams();
+    const query = params.toString();
+    const report = await api(`/api/admin/reports/${encodeURIComponent(reportType)}${query ? `?${query}` : ''}`, {
+      headers: buildActorHeaders()
+    });
+    setLatestAdminReport(report);
+    renderReportPreview(report);
+    if (reportsStatusEl) {
+      reportsStatusEl.textContent = `${label} report generated. You can now download the Excel file or print it.`;
+    }
+  } catch (error) {
+    setLatestAdminReport(null);
+    if (reportsStatusEl) reportsStatusEl.textContent = `${label} report error: ${error.message}`;
+    if (reportsPreviewEl) reportsPreviewEl.innerHTML = '';
+  }
+}
+
+function downloadLatestAdminReport() {
+  if (!latestAdminReport) return;
+  const workbookXlsx = buildAdminReportExcelWorkbook(latestAdminReport);
+  const blob = new Blob([workbookXlsx], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  anchor.href = url;
+  anchor.download = `${latestAdminReport.reportType || 'admin-report'}-${stamp}.xlsx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function printLatestAdminReport() {
+  if (!latestAdminReport) return;
+  const printWindow = window.open('', '_blank', 'width=980,height=860');
+  if (!printWindow) {
+    if (reportsStatusEl) reportsStatusEl.textContent = 'Print blocked by the browser. Allow pop-ups and try again.';
+    return;
+  }
+  if (reportsStatusEl) reportsStatusEl.textContent = 'Opening print preview...';
+  printWindow.document.open();
+  printWindow.document.write(buildAdminReportExportDocument(latestAdminReport, { excelMode: false, printMode: true }));
+  printWindow.document.close();
+}
+
+function buildAdminReportExportDocument(report, { excelMode = false, printMode = false } = {}) {
+  const definition = getAdminReportDefinition(report);
+  const title = definition?.title || 'Admin Report';
+  const summaryEntries = getAdminReportSummaryEntries(report);
+  const rows = getAdminReportRows(report);
+  const columns = getAdminReportColumns(report);
+  const workbookTitle = escapeHtml(title);
+  const summaryMarkup = summaryEntries.length
+    ? `
+      <div class="sheet-summary-grid">
+        ${summaryEntries.map((entry) => `
+          <div class="sheet-summary-card">
+            <span>${escapeHtml(entry.label)}</span>
+            <strong>${escapeHtml(formatAdminReportValue(entry.value, entry.key))}</strong>
+          </div>
+        `).join('')}
+      </div>
+    `
+    : '';
+
+  const mainTableMarkup = buildAdminReportTableMarkup('Main Rows', rows, columns, 'No rows found for this report.');
+  const extraSectionsMarkup = buildAdminReportExtraSections(report);
+
+  return `
+    <html ${excelMode ? 'xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"' : ''}>
+      <head>
+        <meta charset="utf-8" />
+        <title>${workbookTitle}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            color: #2b1a10;
+            padding: 20px;
+            margin: 0;
+            background: #ffffff;
+          }
+          .sheet-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 16px;
+          }
+          .sheet-toolbar button {
+            border: 1px solid #d8c1ae;
+            border-radius: 10px;
+            background: #fff8f1;
+            color: #4a2d1d;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+          }
+          .sheet-eyebrow {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #8a5b3d;
+            margin-bottom: 6px;
+          }
+          .sheet-header h1 {
+            margin: 0 0 4px;
+            font-size: 24px;
+            color: #4a2d1d;
+          }
+          .sheet-header p,
+          .sheet-meta {
+            margin: 0;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #6b4c39;
+          }
+          .sheet-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+          }
+          .sheet-summary-card {
+            border: 1px solid #d8c1ae;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fffaf5;
+          }
+          .sheet-summary-card span {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8a5b3d;
+            margin-bottom: 6px;
+          }
+          .sheet-summary-card strong {
+            font-size: 16px;
+            color: #4a2d1d;
+          }
+          .report-preview-table-card {
+            margin-bottom: 16px;
+          }
+          .report-preview-table-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+          }
+          .report-preview-table-head h4 {
+            margin: 0;
+            font-size: 16px;
+            color: #4a2d1d;
+          }
+          .report-preview-table-head span,
+          .report-preview-empty {
+            font-size: 12px;
+            color: #6b4c39;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          th,
+          td {
+            border: 1px solid #d8c1ae;
+            padding: 8px 10px;
+            font-size: 12px;
+            text-align: left;
+            vertical-align: top;
+          }
+          th {
+            background: #f5e6d8;
+            color: #4a2d1d;
+            font-weight: 700;
+          }
+          td {
+            background: #ffffff;
+          }
+          @page {
+            margin: 0.45in;
+          }
+          @media print {
+            body {
+              padding: 0;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        </style>
+        ${printMode
+          ? `
+            <script>
+              window.addEventListener('load', function () {
+                window.setTimeout(function () {
+                  window.focus();
+                  window.print();
+                }, 250);
+              });
+              window.addEventListener('afterprint', function () {
+                window.close();
+              });
+            </script>
+          `
+          : ''}
+      </head>
+      <body>
+        ${printMode
+          ? `
+            <div class="sheet-toolbar no-print">
+              <button type="button" onclick="window.print()">Print</button>
+              <button type="button" onclick="window.close()">Close</button>
+            </div>
+          `
+          : ''}
+        <div class="sheet-header">
+          <div>
+            <span class="sheet-eyebrow">${escapeHtml(report.reportType || 'report')}</span>
+            <h1>${workbookTitle}</h1>
+            <p>${escapeHtml(getAdminReportPeriodLabel(report))}</p>
+          </div>
+          <p class="sheet-meta">Generated: ${escapeHtml(formatDate(report.generatedAt || new Date().toISOString()))}</p>
+        </div>
+        ${summaryMarkup}
+        ${mainTableMarkup}
+        ${extraSectionsMarkup}
+      </body>
+    </html>
+  `;
 }
 
 function escapeHtml(str) {
@@ -3306,6 +10151,88 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+async function updateInvoiceStatus(invoiceId, nextStatus) {
+  const normalizedStatus = String(nextStatus || '').trim().toUpperCase();
+  const actionLabel = normalizedStatus === 'VOIDED'
+    ? 'void'
+    : normalizedStatus === 'HOLD_FOR_VOID'
+      ? 'hold for void'
+      : 'cancel';
+  const promptLabel = normalizedStatus === 'VOIDED'
+    ? 'Enter the reason for voiding this paid invoice:'
+    : normalizedStatus === 'HOLD_FOR_VOID'
+      ? 'Enter the note for admin review before this receipt is voided:'
+    : 'Enter the reason for cancelling this pending invoice:';
+  const reason = String(window.prompt(promptLabel, '') || '').trim();
+  if (!reason) {
+    setStatus(`A reason is required to ${actionLabel} the invoice.`);
+    return;
+  }
+
+  try {
+    await api(`/api/admin/invoices/${encodeURIComponent(invoiceId)}/status`, {
+      method: 'PATCH',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        status: normalizedStatus,
+        reason
+      })
+    });
+    setStatus(`Invoice ${actionLabel}ed successfully.`);
+    await refreshSalesReport(activeSalesRange);
+    await Promise.all([
+      refreshAdminTransactions(),
+      refreshCashierMonitoring(),
+      refreshShiftManagement()
+    ]);
+    try {
+      const summary = await refreshLatestShiftSummary();
+      if (shiftMonitorModalEl?.classList.contains('open') && summary) {
+        renderShiftSummary(shiftMonitorSummaryEl, summary);
+      }
+    } catch (_error) {
+      // Keep the lifecycle update successful even if the shift monitor refresh fails.
+    }
+  } catch (error) {
+    setStatus(`Invoice ${actionLabel} failed: ${error.message}`);
+  }
+}
+
+async function cancelActivePendingInvoice(reason, successMessage = 'Pending invoice cancelled.') {
+  const activeInvoiceId = String(state.activeInvoice?.id || state.scanQrContext?.invoiceId || '').trim();
+  const activeStatus = String(state.activeInvoice?.status || '').trim().toUpperCase();
+  if (!activeInvoiceId || activeStatus !== 'PENDING') {
+    resetAfterSale();
+    return false;
+  }
+  let cancelled = false;
+
+  try {
+    const { invoice } = await api(`/api/admin/invoices/${encodeURIComponent(activeInvoiceId)}/status`, {
+      method: 'PATCH',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        status: 'CANCELLED',
+        reason
+      })
+    });
+    state.activeInvoice = invoice || null;
+    cancelled = true;
+    setStatus(successMessage);
+    if (canAccessAdminFeatures()) {
+      await refreshSalesReport(activeSalesRange);
+    }
+  } catch (error) {
+    setStatus(`Pending invoice cancellation failed: ${error.message}`);
+  } finally {
+    if (cancelled) {
+      resetAfterSale();
+    }
+  }
+
+  return cancelled;
 }
 
 async function verifyPayment(invoiceId) {
@@ -3321,15 +10248,35 @@ async function verifyPayment(invoiceId) {
     });
 
     if (result.verified || result.alreadyPaid) {
-      alert(`? Payment verified! Invoice ${result.invoice.reference} is now PAID.`);
+      const reference = String(result?.invoice?.reference || invoiceId);
+      setStatus(`Payment verified. Invoice ${reference} is now PAID.`);
+      showConfirmationToast({
+        title: 'Payment verified',
+        message: `Invoice ${reference} is now marked as paid.`,
+        tone: 'success'
+      });
     } else {
-      alert(`? Payment not yet completed.\nStatus: ${result.sessionStatus || 'unknown'}\n${result.message}`);
+      const sessionStatus = String(result?.sessionStatus || 'unknown').toUpperCase();
+      const message = String(result?.message || 'Payment is still pending.');
+      setStatus(`Payment still pending. Status: ${sessionStatus}. ${message}`);
+      showConfirmationToast({
+        title: 'Payment still pending',
+        message: `Status: ${sessionStatus}. ${message}`,
+        tone: 'warning',
+        duration: 3200
+      });
     }
 
     await refreshAdminTransactions();
     await refreshSalesReport(activeSalesRange);
   } catch (error) {
-    alert(`? Verification failed: ${error.message}`);
+    setStatus(`Verification failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Verification failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 3200
+    });
     await refreshAdminTransactions();
   }
 }
@@ -3339,17 +10286,24 @@ async function verifyAllPending() {
     adminVerifyAllBtn.textContent = 'Verifying...';
     adminVerifyAllBtn.disabled = true;
 
-    const filterStatus = adminFilterEl.value;
     const range = adminRangeEl.value;
 
     let url = '/api/admin/transactions?status=PENDING&';
     if (range) url += `range=${encodeURIComponent(range)}&`;
 
-    const { transactions } = await api(url);
+    const { transactions } = await api(url, {
+      headers: buildActorHeaders()
+    });
     const gcashPending = transactions.filter((t) => t.paymentMethod !== 'cash');
 
     if (!gcashPending.length) {
-      alert('No pending E-Payment transactions to verify.');
+      setStatus('No pending E-Payment transactions to verify.');
+      showConfirmationToast({
+        title: 'Nothing to verify',
+        message: 'There are no pending e-payment transactions in the selected range.',
+        tone: 'warning',
+        duration: 2600
+      });
       adminVerifyAllBtn.textContent = 'Verify All Pending';
       adminVerifyAllBtn.disabled = false;
       return;
@@ -3369,12 +10323,25 @@ async function verifyAllPending() {
       }
     }
 
-    alert(`Verification complete!\n? Verified: ${verified}\n? Still pending: ${gcashPending.length - verified - failed}\n? Errors: ${failed}`);
+    const stillPending = gcashPending.length - verified - failed;
+    setStatus(`Verification complete. Verified: ${verified}, Still pending: ${stillPending}, Errors: ${failed}.`);
+    showConfirmationToast({
+      title: failed > 0 ? 'Verification completed with warnings' : 'Verification completed',
+      message: `Verified: ${verified}, Still pending: ${stillPending}, Errors: ${failed}`,
+      tone: failed > 0 ? 'warning' : 'success',
+      duration: 3600
+    });
 
     await refreshAdminTransactions();
     await refreshSalesReport(activeSalesRange);
   } catch (error) {
-    alert(`Verification error: ${error.message}`);
+    setStatus(`Verification error: ${error.message}`);
+    showConfirmationToast({
+      title: 'Verification error',
+      message: error.message,
+      tone: 'warning',
+      duration: 3200
+    });
   } finally {
     adminVerifyAllBtn.textContent = 'Verify All Pending';
     adminVerifyAllBtn.disabled = false;
@@ -3385,13 +10352,25 @@ async function viewReceipt(invoiceId) {
   try {
     const { invoice } = await api(`/api/invoices/${invoiceId}`);
     if (!invoice) {
-      alert('Receipt not found.');
+      setStatus('Receipt not found.');
+      showConfirmationToast({
+        title: 'Receipt not found',
+        message: 'The selected receipt could not be loaded.',
+        tone: 'warning',
+        duration: 2600
+      });
       return;
     }
     renderAdminReceiptModal(invoice);
     openAdminReceiptModal();
   } catch (error) {
-    alert(`Unable to load receipt: ${error.message}`);
+    setStatus(`Unable to load receipt: ${error.message}`);
+    showConfirmationToast({
+      title: 'Receipt load failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 3200
+    });
   }
 }
 
@@ -3417,17 +10396,20 @@ function setupEventListeners() {
   cartEl.addEventListener('click', onProductClick);
   paymentMethodEl.addEventListener('change', onPaymentMethodChange);
   if (dineInCheckoutBtn) {
-    dineInCheckoutBtn.addEventListener('click', () => {
+    dineInCheckoutBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before selecting an order type.')) return;
       setOrderType('dine-in');
     });
   }
   if (takeOutCheckoutBtn) {
-    takeOutCheckoutBtn.addEventListener('click', () => {
+    takeOutCheckoutBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before selecting an order type.')) return;
       setOrderType('take-out');
     });
   }
   if (cashPaymentBtn) {
-    cashPaymentBtn.addEventListener('click', () => {
+    cashPaymentBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before taking a cash payment.')) return;
       if (!state.orderType) {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
@@ -3440,6 +10422,7 @@ function setupEventListeners() {
   }
   if (cashPayBtn) {
     cashPayBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a cash payment.')) return;
       if (!state.orderType) {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
@@ -3455,6 +10438,7 @@ function setupEventListeners() {
   }
   if (ePaymentBtn) {
     ePaymentBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before processing an e-payment.')) return;
       if (!state.orderType) {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
@@ -3472,6 +10456,7 @@ function setupEventListeners() {
   }
   if (chooseGcashBtn) {
     chooseGcashBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a GCash payment.')) return;
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. GCash checkout is unavailable.');
         return;
@@ -3483,6 +10468,7 @@ function setupEventListeners() {
   }
   if (choosePaymayaBtn) {
     choosePaymayaBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a PayMaya payment.')) return;
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. PayMaya checkout is unavailable.');
         return;
@@ -3494,6 +10480,7 @@ function setupEventListeners() {
   }
   if (chooseScanQrBtn) {
     chooseScanQrBtn.addEventListener('click', async () => {
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a QR payment.')) return;
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. QR checkout is unavailable.');
         return;
@@ -3510,21 +10497,31 @@ function setupEventListeners() {
     scanQrFinishBtn.addEventListener('click', finishScanQrPayment);
   }
   if (scanQrCancelBtn) {
-    scanQrCancelBtn.addEventListener('click', closeScanQrModal);
-  }
-  if (discountInputEl) {
-    discountInputEl.addEventListener('input', () => {
-      const raw = Number(discountInputEl.value || 0);
-      const subtotal = getCartTotal();
-      if (!Number.isFinite(raw) || raw <= 0) {
-        state.discountAmount = 0;
-      } else {
-        state.discountAmount = Math.min(raw, subtotal);
+    scanQrCancelBtn.addEventListener('click', async () => {
+      if (String(state.activeInvoice?.status || '').trim().toUpperCase() === 'PENDING') {
+        await cancelActivePendingInvoice(
+          'Customer cancelled the QR checkout before payment was completed.',
+          'QR checkout cancelled.'
+        );
+        return;
       }
+      closeScanQrModal();
+    });
+  }
+  if (discountProfileSelectEl) {
+    discountProfileSelectEl.addEventListener('change', () => {
+      state.selectedDiscountProfileId = String(discountProfileSelectEl.value || '').trim();
       renderCart();
     });
   }
-  clearBtn.addEventListener('click', () => {
+  clearBtn.addEventListener('click', async () => {
+    if (String(state.activeInvoice?.status || '').trim().toUpperCase() === 'PENDING') {
+      await cancelActivePendingInvoice(
+        'Customer cancelled the checkout before payment was completed.',
+        'Pending invoice cancelled and cart cleared.'
+      );
+      return;
+    }
     resetAfterSale();
     setStatus('Cleared. Ready.');
   });
@@ -3542,13 +10539,538 @@ function setupEventListeners() {
   if (adminNavKitSpecBtn) {
     adminNavKitSpecBtn.addEventListener('click', () => switchAdminPanel('kit-spec'));
   }
+  if (adminNavUsersBtn) {
+    adminNavUsersBtn.addEventListener('click', () => switchAdminPanel('users'));
+  }
+  if (adminNavOperationsBtn) {
+    adminNavOperationsBtn.addEventListener('click', () => switchAdminPanel('operations'));
+  }
+  if (adminNavReceiptTemplatesBtn) {
+    adminNavReceiptTemplatesBtn.addEventListener('click', () => switchAdminPanel('receipt-templates'));
+  }
+  if (adminNavReportsBtn) {
+    adminNavReportsBtn.addEventListener('click', () => switchAdminPanel('reports'));
+  }
+  if (adminNavOthersBtn) {
+    adminNavOthersBtn.addEventListener('click', () => switchAdminPanel('others'));
+  }
+  if (receiptTemplateFormEl) {
+    receiptTemplateFormEl.addEventListener('input', () => {
+      renderReceiptTemplatePreview();
+      updateReceiptTemplateEditorState();
+    });
+    receiptTemplateFormEl.addEventListener('change', () => {
+      renderReceiptTemplatePreview();
+      updateReceiptTemplateEditorState();
+    });
+  }
+  if (receiptTemplatePreviewAreaEl) {
+    receiptTemplatePreviewAreaEl.addEventListener('mousedown', startReceiptTemplatePreviewDrag);
+  }
+  window.addEventListener('mousemove', continueReceiptTemplatePreviewDrag);
+  window.addEventListener('mouseup', stopReceiptTemplatePreviewDrag);
+  if (receiptTemplateLogoUrlInputEl) {
+    receiptTemplateLogoUrlInputEl.addEventListener('input', () => {
+      const key = state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY;
+      if (getStoredReceiptTemplateLogo(key)) {
+        setStoredReceiptTemplateLogo(key, '');
+        if (receiptTemplateLogoFileInputEl) receiptTemplateLogoFileInputEl.value = '';
+      }
+      renderReceiptTemplatePreview();
+      updateReceiptTemplateEditorState();
+    });
+  }
+  if (receiptTemplateLogoFileInputEl) {
+    receiptTemplateLogoFileInputEl.addEventListener('change', async () => {
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can upload a local receipt logo.');
+        if (receiptTemplateLogoFileInputEl) receiptTemplateLogoFileInputEl.value = '';
+        return;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(receiptTemplateLogoFileInputEl);
+        if (!dataUrl) return;
+        setStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY, dataUrl);
+        renderReceiptTemplatePreview();
+        updateReceiptTemplateEditorState();
+        setStatus('Receipt logo uploaded to this browser for the selected template.');
+      } catch (error) {
+        setStatus(`Receipt logo upload failed: ${error.message}`);
+      }
+    });
+  }
+  if (receiptTemplateLogoClearBtnEl) {
+    receiptTemplateLogoClearBtnEl.addEventListener('click', () => {
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can clear a local receipt logo.');
+        return;
+      }
+      setStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY, '');
+      if (receiptTemplateLogoFileInputEl) receiptTemplateLogoFileInputEl.value = '';
+      renderReceiptTemplatePreview();
+      updateReceiptTemplateEditorState();
+      setStatus('Local receipt logo removed for this template.');
+    });
+  }
+  if (receiptTemplateResetBtnEl) {
+    receiptTemplateResetBtnEl.addEventListener('click', () => {
+      populateReceiptTemplateEditor(getActiveReceiptTemplate());
+      setStatus('Receipt template editor reset to the active template.');
+    });
+  }
+  if (receiptTemplateSaveNewBtnEl) {
+    receiptTemplateSaveNewBtnEl.addEventListener('click', async () => {
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can save receipt templates.');
+        return;
+      }
+      const draft = collectReceiptTemplateDraft();
+      if (!draft.name) {
+        setStatus('Enter a receipt template name first.');
+        receiptTemplateNameInputEl?.focus();
+        return;
+      }
+      const sourceLogoKey = state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY;
+      try {
+        const result = await api('/api/admin/receipt-templates', {
+          method: 'POST',
+          headers: buildActorHeaders(),
+          body: JSON.stringify({
+            name: draft.name,
+            settings: draft.settings
+          })
+        });
+        moveStoredReceiptTemplateLogo(sourceLogoKey, result?.template?.id || draft.id);
+        await refreshReceiptTemplatesModule();
+        populateReceiptTemplateEditor(result?.template || draft);
+        setStatus(`Receipt template "${draft.name}" saved.`);
+      } catch (error) {
+        setStatus(`Receipt template save failed: ${error.message}`);
+      }
+    });
+  }
+  if (receiptTemplateUpdateBtnEl) {
+    receiptTemplateUpdateBtnEl.addEventListener('click', async () => {
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can update receipt templates.');
+        return;
+      }
+      const draft = collectReceiptTemplateDraft();
+      if (!state.receiptTemplateEditorId) {
+        setStatus('Load a saved template before updating it.');
+        return;
+      }
+      try {
+        const result = await api(`/api/admin/receipt-templates/${encodeURIComponent(state.receiptTemplateEditorId)}`, {
+          method: 'PUT',
+          headers: buildActorHeaders(),
+          body: JSON.stringify({
+            name: draft.name,
+            settings: draft.settings
+          })
+        });
+        await refreshReceiptTemplatesModule();
+        populateReceiptTemplateEditor(result?.template || draft);
+        setStatus(`Receipt template "${draft.name}" updated.`);
+      } catch (error) {
+        setStatus(`Receipt template update failed: ${error.message}`);
+      }
+    });
+  }
+  if (receiptTemplateActivateBtnEl) {
+    receiptTemplateActivateBtnEl.addEventListener('click', async () => {
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can activate receipt templates.');
+        setReceiptTemplatesStatus('Only Administrations can activate receipt templates.', 'error');
+        return;
+      }
+      const selectedId = state.receiptTemplateEditorId;
+      if (!selectedId) {
+        setStatus('Load a saved template before activating it.');
+        setReceiptTemplatesStatus('Load a saved template before activating it.', 'error');
+        return;
+      }
+      try {
+        const result = await api(`/api/admin/receipt-templates/${encodeURIComponent(selectedId)}/activate`, {
+          method: 'PUT',
+          headers: buildActorHeaders()
+        });
+        const activatedTemplate = normalizeReceiptTemplate(result?.template || state.receiptTemplates.find((template) => template.id === selectedId));
+        state.receiptTemplateEditorId = activatedTemplate.id || selectedId;
+        applyReceiptTemplatesState({
+          templates: state.receiptTemplates.map((template) => ({
+            ...template,
+            isActive: template.id === selectedId
+          })),
+          activeReceiptTemplate: activatedTemplate,
+          statusMessage: `Success: receipt template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
+          statusTone: 'success'
+        });
+        setStatus(`Receipt template "${activatedTemplate.name || 'selected'}" is now active for transaction printing.`);
+        showConfirmationToast({
+          title: 'Receipt Template Active',
+          message: `${activatedTemplate.name || 'Selected template'} is now used for transaction receipts.`
+        });
+      } catch (error) {
+        setReceiptTemplatesStatus(`Receipt template activation failed: ${error.message}`, 'error');
+        setStatus(`Receipt template activation failed: ${error.message}`);
+      }
+    });
+  }
+  if (receiptTemplateListEl) {
+    receiptTemplateListEl.addEventListener('click', async (event) => {
+      const loadBtn = event.target.closest('[data-receipt-template-load]');
+      if (loadBtn) {
+        const templateId = String(loadBtn.getAttribute('data-receipt-template-load') || '').trim();
+        const template = state.receiptTemplates.find((row) => row.id === templateId);
+        if (template) {
+          populateReceiptTemplateEditor(template);
+          setStatus(`Loaded receipt template "${template.name}".`);
+        }
+        return;
+      }
+
+      const activateBtn = event.target.closest('[data-receipt-template-activate]');
+      if (activateBtn) {
+        if (!canManageReceiptTemplates()) {
+          setStatus('Only Administrations can activate receipt templates.');
+          setReceiptTemplatesStatus('Only Administrations can activate receipt templates.', 'error');
+          return;
+        }
+        const templateId = String(activateBtn.getAttribute('data-receipt-template-activate') || '').trim();
+        if (!templateId) return;
+        try {
+          const result = await api(`/api/admin/receipt-templates/${encodeURIComponent(templateId)}/activate`, {
+            method: 'PUT',
+            headers: buildActorHeaders()
+          });
+          const activatedTemplate = normalizeReceiptTemplate(result?.template || state.receiptTemplates.find((template) => template.id === templateId));
+          state.receiptTemplateEditorId = activatedTemplate.id || templateId;
+          applyReceiptTemplatesState({
+            templates: state.receiptTemplates.map((template) => ({
+              ...template,
+              isActive: template.id === templateId
+            })),
+            activeReceiptTemplate: activatedTemplate,
+            statusMessage: `Success: receipt template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
+            statusTone: 'success'
+          });
+          setStatus(`Receipt template "${activatedTemplate.name || 'selected'}" is now active for transaction printing.`);
+          showConfirmationToast({
+            title: 'Receipt Template Active',
+            message: `${activatedTemplate.name || 'Selected template'} is now used for transaction receipts.`
+          });
+        } catch (error) {
+          setReceiptTemplatesStatus(`Receipt template activation failed: ${error.message}`, 'error');
+          setStatus(`Receipt template activation failed: ${error.message}`);
+        }
+        return;
+      }
+
+      const deleteBtn = event.target.closest('[data-receipt-template-delete]');
+      if (!deleteBtn) return;
+      if (!canManageReceiptTemplates()) {
+        setStatus('Only Administrations can delete receipt templates.');
+        return;
+      }
+      const templateId = String(deleteBtn.getAttribute('data-receipt-template-delete') || '').trim();
+      const template = state.receiptTemplates.find((row) => row.id === templateId);
+      if (!templateId || !template) return;
+      const confirmed = window.confirm(`Delete receipt template "${template.name}"?`);
+      if (!confirmed) return;
+      try {
+        await api(`/api/admin/receipt-templates/${encodeURIComponent(templateId)}`, {
+          method: 'DELETE',
+          headers: buildActorHeaders()
+        });
+        setStoredReceiptTemplateLogo(templateId, '');
+        if (state.receiptTemplateEditorId === templateId) {
+          state.receiptTemplateEditorId = null;
+        }
+        await refreshReceiptTemplatesModule();
+        setStatus(`Receipt template "${template.name}" deleted.`);
+      } catch (error) {
+        setStatus(`Receipt template delete failed: ${error.message}`);
+      }
+    });
+  }
   if (inventoryIngredientFormEl) {
     inventoryIngredientFormEl.addEventListener('submit', handleIngredientSubmit);
   }
-  adminRefreshBtn.addEventListener('click', refreshAdminTransactions);
+  if (inventoryBulkToggleBtnEl) {
+    inventoryBulkToggleBtnEl.addEventListener('click', () => {
+      toggleInventoryBulkEditor();
+    });
+  }
+  if (inventoryBulkEditorEl) {
+    inventoryBulkEditorEl.addEventListener('submit', (event) => {
+      if (event.target?.id !== 'inventoryBulkEditForm') return;
+      handleInventoryBulkEditSubmit(event).catch((error) => {
+        const bulkStatusEl = inventoryBulkEditorEl.querySelector('#inventoryBulkStatus');
+        if (bulkStatusEl) bulkStatusEl.textContent = `Bulk update failed: ${error.message}`;
+      });
+    });
+    inventoryBulkEditorEl.addEventListener('click', (event) => {
+      const resetBtn = event.target.closest('#inventoryBulkResetBtn');
+      if (!resetBtn) return;
+      resetInventoryBulkEditorInputs();
+    });
+  }
+  if (inventoryTableWrapEl) {
+    inventoryTableWrapEl.addEventListener('click', (e) => {
+      const historyBtn = e.target.closest('[data-inventory-history]');
+      if (historyBtn) {
+        handleInventoryHistoryClick(historyBtn);
+        return;
+      }
+      const editBtn = e.target.closest('[data-inventory-edit]');
+      if (editBtn) {
+        handleInventoryEditClick(editBtn);
+        return;
+      }
+      const deleteBtn = e.target.closest('[data-inventory-delete]');
+      if (deleteBtn) {
+        handleInventoryDeleteClick(deleteBtn);
+      }
+    });
+  }
+  if (inventorySummaryEl) {
+    inventorySummaryEl.addEventListener('click', (e) => {
+      const insightCard = e.target.closest('[data-inventory-view]');
+      if (!insightCard || !latestInventoryReportData) return;
+      const nextView = String(insightCard.getAttribute('data-inventory-view') || 'ingredients').trim() || 'ingredients';
+      activeInventoryView = nextView;
+      renderInventoryReport(latestInventoryReportData);
+    });
+    inventorySummaryEl.addEventListener('keydown', (e) => {
+      const insightCard = e.target.closest('[data-inventory-view]');
+      if (!insightCard || !latestInventoryReportData) return;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      const nextView = String(insightCard.getAttribute('data-inventory-view') || 'ingredients').trim() || 'ingredients';
+      activeInventoryView = nextView;
+      renderInventoryReport(latestInventoryReportData);
+    });
+  }
+  if (inventoryAlertsWrapEl) {
+    inventoryAlertsWrapEl.addEventListener('click', (e) => {
+      const closeBtn = e.target.closest('[data-inventory-view]');
+      if (!closeBtn || !latestInventoryReportData) return;
+      activeInventoryView = String(closeBtn.getAttribute('data-inventory-view') || 'ingredients').trim() || 'ingredients';
+      renderInventoryReport(latestInventoryReportData);
+    });
+  }
+  if (inventoryEditCloseBtnEl) {
+    inventoryEditCloseBtnEl.addEventListener('click', closeInventoryEditModal);
+  }
+  if (inventoryEditFormEl) {
+    inventoryEditFormEl.addEventListener('submit', (event) => {
+      handleInventoryEditSubmit(event).catch((error) => {
+        if (inventoryEditStatusEl) inventoryEditStatusEl.textContent = `Update ingredient failed: ${error.message}`;
+      });
+    });
+  }
+  if (inventoryDeleteCloseBtnEl) {
+    inventoryDeleteCloseBtnEl.addEventListener('click', closeInventoryDeleteModal);
+  }
+  if (inventoryDeleteConfirmBtnEl) {
+    inventoryDeleteConfirmBtnEl.addEventListener('click', () => {
+      submitInventoryDelete().catch((error) => {
+        if (inventoryDeleteStatusEl) inventoryDeleteStatusEl.textContent = `Delete ingredient failed: ${error.message}`;
+      });
+    });
+  }
+  if (inventoryHistoryCloseBtnEl) {
+    inventoryHistoryCloseBtnEl.addEventListener('click', closeInventoryHistoryModal);
+  }
+  if (kitSpecCategorySelectEl) {
+    kitSpecCategorySelectEl.addEventListener('change', () => {
+      renderKitSpecProductOptions();
+      renderKitSpecEditor();
+      renderKitSpecCoverage();
+    });
+  }
+  if (kitSpecProductSelectEl) {
+    kitSpecProductSelectEl.addEventListener('change', () => {
+      loadKitSpecDraftRowsForSelectedProduct();
+      renderKitSpecEditor();
+    });
+  }
+  if (kitSpecAddRowBtnEl) {
+    kitSpecAddRowBtnEl.addEventListener('click', addKitSpecDraftRow);
+  }
+  if (kitSpecSaveBtnEl) {
+    kitSpecSaveBtnEl.addEventListener('click', () => {
+      saveKitSpecForSelectedProduct().catch((error) => {
+        setStatus(`Save kit specification failed: ${error.message}`);
+      });
+    });
+  }
+  if (kitSpecModeToggleBtnEl) {
+    kitSpecModeToggleBtnEl.addEventListener('click', () => {
+      handleKitSpecModeToggle().catch((error) => {
+        setStatus(`Kit Spec mode update failed: ${error.message}`);
+      });
+    });
+  }
+  if (kitSpecSummaryEl) {
+    kitSpecSummaryEl.addEventListener('click', (e) => {
+      const filterBtn = e.target.closest('[data-kit-spec-filter]');
+      if (!filterBtn) return;
+      kitSpecCoverageFilter = String(filterBtn.getAttribute('data-kit-spec-filter') || 'all-products').trim() || 'all-products';
+      renderKitSpecCoverage();
+    });
+  }
+  if (kitSpecEditorEl) {
+    kitSpecEditorEl.addEventListener('change', (e) => {
+      const fieldEl = e.target.closest('[data-kit-spec-field]');
+      if (!fieldEl) return;
+      handleKitSpecEditorFieldChange(fieldEl);
+    });
+    kitSpecEditorEl.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-kit-spec-remove]');
+      if (!removeBtn) return;
+      updateKitSpecDraftFromEditor();
+      const index = Number(removeBtn.getAttribute('data-kit-spec-remove'));
+      if (!Number.isInteger(index) || index < 0) return;
+      kitSpecDraftRows.splice(index, 1);
+      if (!kitSpecDraftRows.length) {
+        kitSpecDraftRows = [{ ingredientId: '', qtyPerProduct: '' }];
+      }
+      renderKitSpecEditor();
+    });
+  }
+  if (adminCreateUserFormEl) {
+    adminCreateUserFormEl.addEventListener('submit', handleAdminCreateUserSubmit);
+  }
+  if (adminUsersListEl) {
+    adminUsersListEl.addEventListener('click', handleAdminUsersAction);
+  }
+  adminRefreshBtn.addEventListener('click', () => {
+    const selectedRange = String(adminRangeEl?.value || '').trim().toLowerCase();
+    if (selectedRange === 'daily' || selectedRange === 'weekly') {
+      refreshSalesReport(selectedRange);
+      return;
+    }
+    refreshAdminTransactions();
+  });
   adminVerifyAllBtn.addEventListener('click', verifyAllPending);
   adminFilterEl.addEventListener('change', refreshAdminTransactions);
-  adminRangeEl.addEventListener('change', refreshAdminTransactions);
+  adminRangeEl.addEventListener('change', () => {
+    const selectedRange = String(adminRangeEl?.value || '').trim().toLowerCase();
+    if (selectedRange === 'daily' || selectedRange === 'weekly') {
+      refreshSalesReport(selectedRange);
+      return;
+    }
+    refreshAdminTransactions();
+  });
+  if (cashierMonitoringRefreshBtn) {
+    cashierMonitoringRefreshBtn.addEventListener('click', refreshCashierMonitoring);
+  }
+  if (cashDrawerCreateFormEl) {
+    cashDrawerCreateFormEl.addEventListener('submit', handleCashDrawerCreate);
+  }
+  if (cashDrawerInitialBalanceInputEl) {
+    cashDrawerInitialBalanceInputEl.addEventListener('input', syncCashDrawerInitialBalanceValidity);
+    cashDrawerInitialBalanceInputEl.addEventListener('invalid', () => {
+      syncCashDrawerInitialBalanceValidity();
+    });
+  }
+  if (cashDrawerListEl) {
+    cashDrawerListEl.addEventListener('click', (e) => {
+      const withdrawBtn = e.target.closest('[data-drawer-withdraw]');
+      if (withdrawBtn) {
+        const drawerId = String(withdrawBtn.getAttribute('data-drawer-withdraw') || '').trim();
+        const drawerName = String(withdrawBtn.getAttribute('data-drawer-name') || '').trim() || 'Drawer';
+        handleCashDrawerWithdrawClick(drawerId, drawerName);
+        return;
+      }
+
+      const editBtn = e.target.closest('[data-drawer-edit]');
+      if (editBtn) {
+        const drawerId = String(editBtn.getAttribute('data-drawer-edit') || '').trim();
+        const drawerName = String(editBtn.getAttribute('data-drawer-name') || '').trim() || 'Drawer';
+        const initialBalance = Number(editBtn.getAttribute('data-drawer-initial-balance') || 0);
+        handleCashDrawerEditClick(drawerId, drawerName, initialBalance);
+        return;
+      }
+
+      const deleteBtn = e.target.closest('[data-drawer-delete]');
+      if (deleteBtn) {
+        const drawerId = String(deleteBtn.getAttribute('data-drawer-delete') || '').trim();
+        const drawerName = String(deleteBtn.getAttribute('data-drawer-name') || '').trim() || 'Drawer';
+        handleCashDrawerDeleteClick(drawerId, drawerName);
+      }
+    });
+  }
+  if (shiftManagementRefreshBtn) {
+    shiftManagementRefreshBtn.addEventListener('click', refreshShiftManagement);
+  }
+  if (discrepancyRefreshBtn) {
+    discrepancyRefreshBtn.addEventListener('click', refreshDiscrepancyAlerts);
+  }
+  if (discrepancyAlertsListEl) {
+    discrepancyAlertsListEl.addEventListener('click', (e) => {
+      const reviewBtn = e.target.closest('[data-shift-review]');
+      if (!reviewBtn) return;
+      const shiftId = String(reviewBtn.getAttribute('data-shift-review') || '').trim();
+      const reviewStatus = String(reviewBtn.getAttribute('data-review-status') || '').trim().toLowerCase();
+      handleShiftReviewAction(shiftId, reviewStatus);
+    });
+  }
+  if (reportDailySalesBtn) {
+    reportDailySalesBtn.addEventListener('click', () => generateAdminReport('daily-sales', 'Daily Sales'));
+  }
+  if (reportMonthlyClosingBtn) {
+    reportMonthlyClosingBtn.addEventListener('click', () => {
+      const params = new URLSearchParams();
+      params.set('month', getMonthlyClosingSelectedMonth());
+      generateAdminReport('monthly-closing', 'Monthly Closing', params);
+    });
+  }
+  if (reportShiftBtn) {
+    reportShiftBtn.addEventListener('click', () => generateAdminReport('cashier-shift', 'Cashier Shift'));
+  }
+  if (reportTransactionsBtn) {
+    reportTransactionsBtn.addEventListener('click', () => generateAdminReport('transactions', 'Transactions'));
+  }
+  if (reportProductsBtn) {
+    reportProductsBtn.addEventListener('click', () => generateAdminReport('product-sales', 'Product Sales'));
+  }
+  if (reportDiscrepancyBtn) {
+    reportDiscrepancyBtn.addEventListener('click', () => generateAdminReport('discrepancy', 'Discrepancy'));
+  }
+  if (reportDownloadBtn) {
+    reportDownloadBtn.addEventListener('click', downloadLatestAdminReport);
+  }
+  if (reportPrintBtn) {
+    reportPrintBtn.addEventListener('click', printLatestAdminReport);
+  }
+  if (monthlyClosingRefreshBtnEl) {
+    monthlyClosingRefreshBtnEl.addEventListener('click', refreshMonthlyClosingModule);
+  }
+  if (monthlyExpenseFormEl) {
+    monthlyExpenseFormEl.addEventListener('submit', (event) => {
+      handleMonthlyExpenseSubmit(event).catch((error) => {
+        setStatus(`Monthly expense save failed: ${error.message}`);
+      });
+    });
+  }
+  if (discountProfileFormEl) {
+    discountProfileFormEl.addEventListener('submit', (event) => {
+      handleDiscountProfileSubmit(event).catch((error) => {
+        setStatus(`Discount type save failed: ${error.message}`);
+      });
+    });
+  }
+  if (discountProfilesListEl) {
+    discountProfilesListEl.addEventListener('change', handleDiscountProfileListChange);
+    discountProfilesListEl.addEventListener('click', (event) => {
+      handleDiscountProfileListClick(event).catch((error) => {
+        setStatus(`Discount type update failed: ${error.message}`);
+      });
+    });
+  }
   salesListEl.addEventListener('click', (e) => {
     const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
     if (receiptId) {
@@ -3561,6 +11083,15 @@ function setupEventListeners() {
     const verifyId = e.target.closest('[data-verify]')?.getAttribute('data-verify');
     if (verifyId) {
       verifyPayment(verifyId);
+      return;
+    }
+    const statusBtn = e.target.closest('[data-invoice-status]');
+    if (statusBtn) {
+      const invoiceId = String(statusBtn.getAttribute('data-invoice-status') || '').trim();
+      const nextStatus = String(statusBtn.getAttribute('data-next-status') || '').trim();
+      if (invoiceId && nextStatus) {
+        updateInvoiceStatus(invoiceId, nextStatus);
+      }
       return;
     }
     const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
@@ -3592,6 +11123,20 @@ function setupEventListeners() {
   if (receiptPrintBtn) {
     receiptPrintBtn.addEventListener('click', printReceiptFromModal);
   }
+  if (statusHoldForVoidBtn) {
+    statusHoldForVoidBtn.addEventListener('click', () => {
+      requestHoldForVoid().catch((error) => {
+        setStatus(`Hold for void failed: ${error.message}`);
+      });
+    });
+  }
+  if (receiptHoldForVoidBtn) {
+    receiptHoldForVoidBtn.addEventListener('click', () => {
+      requestHoldForVoid().catch((error) => {
+        setStatus(`Hold for void failed: ${error.message}`);
+      });
+    });
+  }
   if (statusPrintReceiptBtn) {
     statusPrintReceiptBtn.addEventListener('click', openLatestReceiptPreview);
   }
@@ -3615,6 +11160,91 @@ function setupEventListeners() {
   }
   if (menuProductEditorListEl) {
     menuProductEditorListEl.addEventListener('click', handleMenuProductEditorClick);
+  }
+  if (shiftMonitorToggleBtn) {
+    shiftMonitorToggleBtn.addEventListener('click', async () => {
+      if (!activeAuthSession?.email) return;
+      openShiftMonitorModal();
+      await showShiftMonitorSummary();
+    });
+  }
+  if (shiftMonitorCloseBtn) {
+    shiftMonitorCloseBtn.addEventListener('click', closeShiftMonitorModal);
+  }
+  if (shiftMonitorRefreshBtn) {
+    shiftMonitorRefreshBtn.addEventListener('click', async () => {
+      await showShiftMonitorSummary();
+    });
+  }
+  if (cashoutCancelBtn) {
+    cashoutCancelBtn.addEventListener('click', closeCashoutSummaryModal);
+  }
+  if (cashoutSaveReportBtn) {
+    cashoutSaveReportBtn.addEventListener('click', async () => {
+      if (!latestShiftSummary) {
+        latestShiftSummary = await refreshLatestShiftSummary();
+      }
+      const endingCash = parseCashoutEndingCash({ requireValue: true });
+      if (endingCash === null) {
+        setStatus('Enter ending cash before saving report.');
+        cashoutEndingCashInputEl?.reportValidity();
+        cashoutEndingCashInputEl?.focus();
+        return;
+      }
+      const report = buildCashoutReport(latestShiftSummary, endingCash);
+      downloadCashoutReport(report);
+      setStatus('Cashier shift summary report saved.');
+    });
+  }
+  if (cashoutPrintReportBtn) {
+    cashoutPrintReportBtn.addEventListener('click', async () => {
+      if (!latestShiftSummary) {
+        latestShiftSummary = await refreshLatestShiftSummary();
+      }
+      const endingCash = parseCashoutEndingCash({ requireValue: true });
+      if (endingCash === null) {
+        setStatus('Enter ending cash before printing summary.');
+        cashoutEndingCashInputEl?.reportValidity();
+        cashoutEndingCashInputEl?.focus();
+        return;
+      }
+      const report = buildCashoutReport(latestShiftSummary, endingCash);
+      printCashoutReport(report);
+    });
+  }
+  if (cashoutConfirmBtn) {
+    cashoutConfirmBtn.addEventListener('click', async () => {
+      if (!latestShiftSummary) {
+        latestShiftSummary = await refreshLatestShiftSummary();
+      }
+      const endingCash = parseCashoutEndingCash({ requireValue: true });
+      if (endingCash === null) {
+        setStatus('Enter ending cash before signing out.');
+        cashoutEndingCashInputEl?.reportValidity();
+        cashoutEndingCashInputEl?.focus();
+        return;
+      }
+
+      if (cashierShiftState?.shiftId) {
+        try {
+          const result = await api(`/api/shifts/${encodeURIComponent(cashierShiftState.shiftId)}/end`, {
+            method: 'POST',
+            headers: buildActorHeaders(),
+            body: JSON.stringify({ endingCash })
+          });
+          latestShiftSummary = toShiftSummaryView(result?.summary, result?.shift) || latestShiftSummary;
+        } catch (error) {
+          setStatus(`Shift sign-out sync failed: ${error.message}`);
+          return;
+        }
+      }
+
+      renderShiftSummary(cashoutSummaryEl, latestShiftSummary, {
+        endingCash: Number(latestShiftSummary?.endingCash ?? endingCash)
+      });
+      updateCashoutDiscrepancyStatus(latestShiftSummary);
+      await finalizeLogout();
+    });
   }
   if (offlineSyncBtn) {
     offlineSyncBtn.addEventListener('click', () => {
@@ -3657,6 +11287,12 @@ function setupEventListeners() {
       }
       closeMenuEditor();
       closeAdminReceiptModal();
+      closeShiftMonitorModal();
+      closeCashoutSummaryModal();
+      closeInventoryEditModal();
+      closeInventoryDeleteModal();
+      closeInventoryHistoryModal();
+      closeCashDrawerControlModal();
       closeAdminLogin();
       closeAdminDashboard();
     }
@@ -3664,7 +11300,18 @@ function setupEventListeners() {
 }
 
 async function init() {
+  if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
+    monthlyClosingMonthInputEl.value = getCurrentMonthValue();
+  }
+  if (monthlyExpenseDateInputEl && !monthlyExpenseDateInputEl.value) {
+    monthlyExpenseDateInputEl.value = new Date().toISOString().slice(0, 10);
+  }
   const persistedUiState = readUserUiState();
+  const persistedAdminPanel = normalizeAdminPanelName(persistedUiState.adminPanel);
+  const shouldRestoreAdminDashboard = Boolean(persistedUiState.adminOpen) && canAccessAdminFeatures();
+  if (shouldRestoreAdminDashboard) {
+    await openAdminDashboard({ panelName: persistedAdminPanel, persist: false });
+  }
   const persistedCategory = String(persistedUiState.activeCategory || '').trim().toLowerCase();
   if (persistedCategory) {
     state.activeCategory = persistedCategory;
@@ -3697,21 +11344,24 @@ async function init() {
   registerServiceWorker();
 
   setupEventListeners();
+  setLatestAdminReport(null);
   updateReceiptActionVisibility();
+  applyActiveReceiptTemplate();
   startConnectivityMonitor();
   updatePaymentActionAvailability();
   setPaymentMethod('cash');
   setStatus('Select order type first: Dine In or Take Out.');
-  await Promise.all([configPromise, catalogPromise]);
+  const [configResult] = await Promise.all([configPromise, catalogPromise]);
+  applyAppConfig(configResult?.appConfig || state.appConfig);
+  applyReceiptTemplatesState({
+    activeReceiptTemplate: configResult?.activeReceiptTemplate || state.activeReceiptTemplate || DEFAULT_RECEIPT_TEMPLATE
+  });
   await refreshSalesReport(activeSalesRange);
 
   if (canAccessAdminFeatures()) {
     warmMenuEditorInBackground();
   }
 
-  if (persistedUiState.adminOpen && canAccessAdminFeatures()) {
-    await openAdminDashboard();
-  }
 }
 
 bootstrap().catch((error) => {

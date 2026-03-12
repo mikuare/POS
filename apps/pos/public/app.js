@@ -1,0 +1,3957 @@
+﻿const state = {
+  categories: [],
+  products: [],
+  cart: {},
+  activeInvoice: null,
+  lastPaidInvoice: null,
+  scanQrContext: null,
+  poller: null,
+  activeCategory: 'main-dish',
+  orderType: null,
+  cashPromptActive: false,
+  discountAmount: 0,
+  productsRendered: false,
+  authBusy: false,
+  logoutBusy: false,
+  connectivity: {
+    mode: 'checking',
+    queuedOperations: 0,
+    queuedInvoices: 0,
+    storageBackend: 'checking',
+    fallbackCount: 0,
+    supabaseEnabled: true,
+    supabaseReachable: false,
+    serverReachable: false
+  }
+};
+
+// -- POS Tab Elements --
+const productsEl = document.getElementById('products');
+const cartEl = document.getElementById('cart');
+const addToCartConfettiEl = document.getElementById('addToCartConfetti');
+const yummyOrderEmojiEl = document.getElementById('yummyOrderEmoji');
+const subtotalValueEl = document.getElementById('subtotalValue');
+const discountInputEl = document.getElementById('discountInput');
+const totalDueValueEl = document.getElementById('totalDueValue');
+const statusEl = document.getElementById('status');
+const paymentMethodEl = document.getElementById('paymentMethod');
+const amountTenderedEl = document.getElementById('amountTendered');
+const cashPayBtn = document.getElementById('cashPayBtn');
+const clearBtn = document.getElementById('clearBtn');
+const dineInCheckoutBtn = document.getElementById('dineInCheckoutBtn');
+const takeOutCheckoutBtn = document.getElementById('takeOutCheckoutBtn');
+const cashPaymentBtn = document.getElementById('cashPaymentBtn');
+const ePaymentBtn = document.getElementById('ePaymentBtn');
+const cashRowEl = document.getElementById('cashRow');
+const gcashInfoEl = document.getElementById('gcashInfo');
+const statusReceiptActionsEl = document.getElementById('statusReceiptActions');
+const statusPrintReceiptBtn = document.getElementById('statusPrintReceiptBtn');
+const salesSummaryEl = document.getElementById('salesSummary');
+const salesListEl = document.getElementById('salesList');
+const detailDailySalesEl = document.getElementById('detailDailySales');
+const detailDailyMetaEl = document.getElementById('detailDailyMeta');
+const detailMonthlySalesEl = document.getElementById('detailMonthlySales');
+const detailMonthlyMetaEl = document.getElementById('detailMonthlyMeta');
+const topProductsListEl = document.getElementById('topProductsList');
+const salesDailyBtn = document.getElementById('salesDailyBtn');
+const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
+const salesRefreshBtn = document.getElementById('salesRefreshBtn');
+const categoryTitleEl = document.getElementById('categoryTitle');
+const paymentSuccessModalEl = document.getElementById('paymentSuccessModal');
+const receiptRefEl = document.getElementById('receiptRef');
+const receiptDateEl = document.getElementById('receiptDate');
+const receiptOrderTypeEl = document.getElementById('receiptOrderType');
+const receiptPaymentMethodEl = document.getElementById('receiptPaymentMethod');
+const receiptItemsEl = document.getElementById('receiptItems');
+const receiptSubtotalEl = document.getElementById('receiptSubtotal');
+const receiptDiscountEl = document.getElementById('receiptDiscount');
+const receiptTotalDueEl = document.getElementById('receiptTotalDue');
+const receiptAmountPaidEl = document.getElementById('receiptAmountPaid');
+const receiptChangeEl = document.getElementById('receiptChange');
+const receiptPrintBtn = document.getElementById('receiptPrintBtn');
+const receiptPrintAreaEl = document.getElementById('receiptPrintArea');
+const paymentSuccessDoneBtn = document.getElementById('paymentSuccessDoneBtn');
+const receiptMinimizeBtn = document.getElementById('receiptMinimizeBtn');
+const adminReceiptModalEl = document.getElementById('adminReceiptModal');
+const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
+const adminReceiptRefEl = document.getElementById('adminReceiptRef');
+const adminReceiptDateEl = document.getElementById('adminReceiptDate');
+const adminReceiptOrderTypeEl = document.getElementById('adminReceiptOrderType');
+const adminReceiptPaymentMethodEl = document.getElementById('adminReceiptPaymentMethod');
+const adminReceiptItemsEl = document.getElementById('adminReceiptItems');
+const adminReceiptSubtotalEl = document.getElementById('adminReceiptSubtotal');
+const adminReceiptDiscountEl = document.getElementById('adminReceiptDiscount');
+const adminReceiptTotalDueEl = document.getElementById('adminReceiptTotalDue');
+const adminReceiptAmountPaidEl = document.getElementById('adminReceiptAmountPaid');
+const adminReceiptChangeEl = document.getElementById('adminReceiptChange');
+const adminReceiptPrintBtn = document.getElementById('adminReceiptPrintBtn');
+const adminReceiptCloseBtn = document.getElementById('adminReceiptCloseBtn');
+const eWalletModalEl = document.getElementById('eWalletModal');
+const chooseGcashBtn = document.getElementById('chooseGcashBtn');
+const choosePaymayaBtn = document.getElementById('choosePaymayaBtn');
+const chooseScanQrBtn = document.getElementById('chooseScanQrBtn');
+const cancelEwalletBtn = document.getElementById('cancelEwalletBtn');
+const scanQrModalEl = document.getElementById('scanQrModal');
+const scanQrContentEl = document.getElementById('scanQrContent');
+const scanQrFinishBtn = document.getElementById('scanQrFinishBtn');
+const scanQrCancelBtn = document.getElementById('scanQrCancelBtn');
+const authGateEl = document.getElementById('authGate');
+const showLoginBtn = document.getElementById('showLoginBtn');
+const showSignupBtn = document.getElementById('showSignupBtn');
+const loginFormEl = document.getElementById('loginForm');
+const signupFormEl = document.getElementById('signupForm');
+const loginEmailEl = document.getElementById('loginEmail');
+const loginPasswordEl = document.getElementById('loginPassword');
+const signupNameEl = document.getElementById('signupName');
+const signupEmailEl = document.getElementById('signupEmail');
+const signupRoleEl = document.getElementById('signupRole');
+const signupPasswordEl = document.getElementById('signupPassword');
+const authMessageEl = document.getElementById('authMessage');
+const authLogoVideoEl = document.getElementById('authLogoVideo');
+const authLogoCanvasEl = document.getElementById('authLogoCanvas');
+const welcomeBannerEl = document.getElementById('welcomeBanner');
+const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+const settingsMenuEl = document.getElementById('settingsMenu');
+const settingsAdminDashboardBtn = document.getElementById('settingsAdminDashboardBtn');
+const settingsEditMenuBtn = document.getElementById('settingsEditMenuBtn');
+const settingsOfflineSmokeTestBtn = document.getElementById('settingsOfflineSmokeTestBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const phDateTimeEl = document.getElementById('phDateTime');
+const welcomeRoleIconEl = document.getElementById('welcomeRoleIcon');
+const welcomeTextEl = document.getElementById('welcomeText');
+const globalToastEl = document.getElementById('globalToast');
+const globalToastTitleEl = document.getElementById('globalToastTitle');
+const globalToastMessageEl = document.getElementById('globalToastMessage');
+const offlineStatusBarEl = document.getElementById('offlineStatusBar');
+const offlineStatusTextEl = document.getElementById('offlineStatusText');
+const offlineQueueCountEl = document.getElementById('offlineQueueCount');
+const offlineStorageBackendEl = document.getElementById('offlineStorageBackend');
+const offlineSyncBtn = document.getElementById('offlineSyncBtn');
+const offlinePendingPanelEl = document.getElementById('offlinePendingPanel');
+const offlinePendingListEl = document.getElementById('offlinePendingList');
+
+// -- Customer Info Elements --
+const customerNameEl = document.getElementById('customerName');
+const customerEmailEl = document.getElementById('customerEmail');
+const customerPhoneEl = document.getElementById('customerPhone');
+
+// -- Admin Tab Elements --
+const adminFilterEl = document.getElementById('adminFilter');
+const adminRangeEl = document.getElementById('adminRange');
+const adminRefreshBtn = document.getElementById('adminRefreshBtn');
+const adminVerifyAllBtn = document.getElementById('adminVerifyAllBtn');
+const adminTransactionsEl = document.getElementById('adminTransactions');
+const statTotalEl = document.getElementById('statTotal');
+const statPaidEl = document.getElementById('statPaid');
+const statPendingEl = document.getElementById('statPending');
+const statRevenueEl = document.getElementById('statRevenue');
+const statCashEl = document.getElementById('statCash');
+const statGcashEl = document.getElementById('statGcash');
+const adminLoginModalEl = document.getElementById('adminLoginModal');
+const adminUsernameEl = document.getElementById('adminUsername');
+const adminPasswordEl = document.getElementById('adminPassword');
+const adminLoginBtn = document.getElementById('adminLoginBtn');
+const adminCancelBtn = document.getElementById('adminCancelBtn');
+const adminLoginErrorEl = document.getElementById('adminLoginError');
+const adminCloseBtn = document.getElementById('adminCloseBtn');
+const adminNavOverviewBtn = document.getElementById('adminNavOverviewBtn');
+const adminNavInventoryBtn = document.getElementById('adminNavInventoryBtn');
+const adminNavKitSpecBtn = document.getElementById('adminNavKitSpecBtn');
+const adminPanelOverviewEl = document.getElementById('adminPanelOverview');
+const adminPanelInventoryEl = document.getElementById('adminPanelInventory');
+const adminPanelKitSpecEl = document.getElementById('adminPanelKitSpec');
+const inventoryIngredientFormEl = document.getElementById('inventoryIngredientForm');
+const ingredientNameInputEl = document.getElementById('ingredientNameInput');
+const ingredientQtyInputEl = document.getElementById('ingredientQtyInput');
+const ingredientPriceInputEl = document.getElementById('ingredientPriceInput');
+const ingredientUnitInputEl = document.getElementById('ingredientUnitInput');
+const ingredientAddBtn = document.getElementById('ingredientAddBtn');
+const inventoryAdminNoteEl = document.getElementById('inventoryAdminNote');
+const inventorySummaryEl = document.getElementById('inventorySummary');
+const inventoryTableWrapEl = document.getElementById('inventoryTableWrap');
+const categoryButtonsEl = document.getElementById('categoryButtons');
+const menuEditorModalEl = document.getElementById('menuEditorModal');
+const menuEditorCloseBtn = document.getElementById('menuEditorCloseBtn');
+const menuCategoryFormEl = document.getElementById('menuCategoryForm');
+const menuCategoryNameInputEl = document.getElementById('menuCategoryNameInput');
+const menuCategoryImageFileInputEl = document.getElementById('menuCategoryImageFileInput');
+const menuCategoryAddBtn = document.getElementById('menuCategoryAddBtn');
+const menuProductFormEl = document.getElementById('menuProductForm');
+const menuProductNameInputEl = document.getElementById('menuProductNameInput');
+const menuProductPriceInputEl = document.getElementById('menuProductPriceInput');
+const menuProductCategoryInputEl = document.getElementById('menuProductCategoryInput');
+const menuProductImageFileInputEl = document.getElementById('menuProductImageFileInput');
+const menuProductAddBtn = document.getElementById('menuProductAddBtn');
+const menuCategoryEditorListEl = document.getElementById('menuCategoryEditorList');
+const menuProductEditorListEl = document.getElementById('menuProductEditorList');
+
+// -- Tab Elements --
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+let activeSalesRange = 'daily';
+const ADMIN_DEFAULT_USERNAME = 'admin';
+const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
+const AUTH_SESSION_KEY = 'pos_active_user_v1';
+const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
+const AUTH_OFFLINE_CACHE_KEY = 'pos_offline_auth_cache_v1';
+const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
+const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
+const CATALOG_CACHE_GLOBAL_KEY = 'pos_catalog_cache_v1_global';
+const OFFLINE_AUTH_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+const OFFLINE_SYNC_INTERVAL_MS = 15000;
+const OFFLINE_AUTO_SYNC_MIN_GAP_MS = 10000;
+const offlineOutbox = window.POSOfflineOutbox || null;
+let confettiAnimation = null;
+let yummyOrderAnimation = null;
+let appInitialized = false;
+let authLogoRenderStarted = false;
+let activeAuthSession = null;
+let phClockInterval = null;
+let toastTimer = null;
+let connectivityPoller = null;
+let syncTriggerBusy = false;
+let lastAutoSyncAttemptAt = 0;
+let menuEditorWarmReady = false;
+let menuEditorWarmInFlight = false;
+const BOOTSTRAP_CATALOG_FALLBACK = {
+  categories: [
+    { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
+    { key: 'rice', name: 'Rice', image: '/Menu/Rice.png', sortOrder: 20 },
+    { key: 'burger', name: 'Burger', image: '/Menu/Burger.png', sortOrder: 30 },
+    { key: 'drinks', name: 'Drinks', image: '/Menu/Drinks.png', sortOrder: 40 },
+    { key: 'fries', name: 'Fries', image: '/Menu/Fries.png', sortOrder: 50 },
+    { key: 'dessert', name: 'Dessert', image: '/Menu/Dessert.png', sortOrder: 60 },
+    { key: 'sauces', name: 'Sauces', image: '/Menu/Sauce.png', sortOrder: 70 }
+  ],
+  products: [
+    { id: 'p1', name: 'Succulent Roast Beef', price: 249, category: 'main-dish', image: '/Main Dish/Succulent Roast Beef Slides with rice and beef sauce.png' },
+    { id: 'p2', name: 'Roasted Beef w Java Rice', price: 229, category: 'main-dish', image: '/Main Dish/roasted beef w java rice.png' },
+    { id: 'p3', name: 'Party Tray', price: 799, category: 'main-dish', image: '/Main Dish/Party Tray.png' },
+    { id: 'p4', name: 'Letchon Baka', price: 269, category: 'main-dish', image: '/Main Dish/Letchon Baka.png' },
+    { id: 'p5', name: 'Crispy Letchon Kawali', price: 219, category: 'main-dish', image: '/Main Dish/Crispy Letchon Kawali.png' },
+    { id: 'p6', name: 'Beef Steak with Hot Sauce', price: 239, category: 'main-dish', image: '/Main Dish/beef steak with hot sauce.png' },
+    { id: 'p7', name: 'Beef Caldereta', price: 229, category: 'main-dish', image: '/Main Dish/Beef Caldereta.png' },
+    { id: 'p20', name: 'Delicious Fried Rice', price: 79, category: 'rice', image: '/Rice/Delicious fried rice.png' },
+    { id: 'p21', name: 'Unli Rice', price: 59, category: 'rice', image: '/Rice/Unli Rice.png' },
+    { id: 'p22', name: 'Brown Rice Bowl', price: 69, category: 'rice', image: '/Rice/Steaming bowl of brown rice.png' },
+    { id: 'p23', name: 'Fluffy Rice Bowl', price: 65, category: 'rice', image: '/Rice/Steaming bowl of fluffy rice.png' },
+    { id: 'p30', name: 'Spicy Jalapeno Cheeseburger', price: 189, category: 'burger', image: '/Burger/Spicy jalapeño cheeseburger with fries.png' },
+    { id: 'p31', name: 'Gourmet Cheese Burger', price: 179, category: 'burger', image: '/Burger/Gourmet cheese burger.png' },
+    { id: 'p32', name: 'Crispy Chicken Sandwich', price: 169, category: 'burger', image: '/Burger/Crispy chicken sandwich with slaw Burger.png' },
+    { id: 'p33', name: 'BBQ Bacon Cheeseburger', price: 199, category: 'burger', image: '/Burger/BBQ bacon cheeseburger.png' },
+    { id: 'p40', name: 'Lemon-Lime Soda', price: 59, category: 'drinks', image: '/Drinks/Refreshing lemon-lime soda on wood.png' },
+    { id: 'p41', name: 'Iced Tea Citrus Mint', price: 69, category: 'drinks', image: '/Drinks/Iced tea with citrus and mint.png' },
+    { id: 'p42', name: 'Refreshing Soda Lemon', price: 55, category: 'drinks', image: '/Drinks/Refreshing soda with lemon wedges.png' },
+    { id: 'p43', name: 'Coke Float', price: 79, category: 'drinks', image: '/Drinks/Coke Float.png' },
+    { id: 'p44', name: 'Mango Juice', price: 85, category: 'drinks', image: '/Drinks/Refreshing mango juice with mint garnish.png' },
+    { id: 'p45', name: 'Citrus Iced Drink', price: 75, category: 'drinks', image: '/Drinks/Citrus iced drinks with mint garnish.png' },
+    { id: 'p46', name: 'Strawberry Lemonade', price: 89, category: 'drinks', image: '/Drinks/Refreshing strawberry lemonade.png' },
+    { id: 'p50', name: 'Loaded Bacon Cheese Fries', price: 139, category: 'fries', image: '/Fries/Loaded bacon cheese fries close-up.png' },
+    { id: 'p51', name: 'Crispy Fries', price: 99, category: 'fries', image: '/Fries/Crispy Fries with dipping sauce.png' },
+    { id: 'p52', name: 'Cajun Seasoned Fries', price: 119, category: 'fries', image: '/Fries/Cajun seasoned fries.png' },
+    { id: 'p60', name: 'Strawberry Cheesecake Slice', price: 109, category: 'dessert', image: '/Dessert/Delicious strawberry cheesecake slice.png' },
+    { id: 'p61', name: 'Leche Flan Slice', price: 89, category: 'dessert', image: '/Dessert/Delicious slice of leche flan.png' },
+    { id: 'p62', name: 'Chocolate Fudge Cake Slice', price: 119, category: 'dessert', image: '/Dessert/Delicious chocolate fudge cake slice.png' },
+    { id: 'p70', name: 'Spicy Vinegar Sauce', price: 25, category: 'sauces', image: '/Sauces/Spicy Vinegar sauce.png' },
+    { id: 'p71', name: 'Spicy BBQ Sauce', price: 30, category: 'sauces', image: '/Sauces/Spicy BBQ sauce.png' },
+    { id: 'p72', name: 'Gravy Sauce', price: 25, category: 'sauces', image: '/Sauces/Gravy Sauce.png' },
+    { id: 'p73', name: 'Baka Sauce', price: 35, category: 'sauces', image: '/Sauces/Baka Sauce.png' }
+  ]
+};
+const GENERIC_CATEGORY_ICON = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="12" fill="#f4ece3" stroke="#d8c1ae" stroke-width="2"/><circle cx="32" cy="32" r="13" fill="#fffaf5" stroke="#a7724e" stroke-width="2"/><rect x="30.8" y="16" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="30.8" y="38" width="2.4" height="10" rx="1.2" fill="#7a4a2d"/><rect x="16" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/><rect x="38" y="30.8" width="10" height="2.4" rx="1.2" fill="#7a4a2d"/></svg>')}`;
+
+// ------------------------------------------
+// Utility Functions
+// ------------------------------------------
+
+function money(value) {
+  return `PHP ${Number(value).toFixed(2)}`;
+}
+
+function getPaymentMethodLabel(method) {
+  const map = {
+    cash: 'Cash',
+    gcash: 'GCash',
+    paymaya: 'PayMaya'
+  };
+  return map[String(method || '').toLowerCase()] || String(method || '').toUpperCase();
+}
+
+function getPaymentMethodIcon(method) {
+  const normalized = String(method || '').toLowerCase();
+  if (normalized === 'cash') return '/Other/Cash.png';
+  if (normalized === 'paymaya') return '/Other/Maya.png';
+  return '/Other/GCash.png';
+}
+
+function setStatus(text) {
+  statusEl.classList.remove('invoice-status');
+  statusEl.textContent = text;
+}
+
+function isEwalletAvailable() {
+  return state.connectivity.mode === 'online' || state.connectivity.mode === 'pending' || state.connectivity.mode === 'checking';
+}
+
+function updatePaymentActionAvailability() {
+  const hasOrderType = Boolean(state.orderType);
+  const ewalletAvailable = isEwalletAvailable();
+
+  if (cashPaymentBtn) cashPaymentBtn.disabled = !hasOrderType;
+  if (ePaymentBtn) ePaymentBtn.disabled = !hasOrderType || !ewalletAvailable;
+  if (chooseGcashBtn) chooseGcashBtn.disabled = !ewalletAvailable;
+  if (choosePaymayaBtn) choosePaymayaBtn.disabled = !ewalletAvailable;
+  if (chooseScanQrBtn) chooseScanQrBtn.disabled = !ewalletAvailable;
+
+  if (!ewalletAvailable && paymentMethodEl?.value !== 'cash') {
+    closeEwalletModal();
+    closeScanQrModal();
+    state.cashPromptActive = false;
+    setPaymentMethod('cash');
+  }
+}
+
+function renderConnectivityStatus() {
+  if (!offlineStatusBarEl || !offlineStatusTextEl || !offlineQueueCountEl) return;
+
+  const mode = String(state.connectivity.mode || 'checking');
+  const queuedOps = Math.max(0, Number(state.connectivity.queuedOperations || 0));
+  const queuedInvoices = Math.max(0, Number(state.connectivity.queuedInvoices || 0));
+  const modeClass = ['checking', 'offline', 'pending', 'online', 'server-offline'].includes(mode)
+    ? mode
+    : 'checking';
+
+  offlineStatusBarEl.classList.remove('checking', 'offline', 'pending', 'online', 'server-offline');
+  offlineStatusBarEl.classList.add(modeClass);
+
+  let statusText = 'Checking cloud sync status...';
+  if (mode === 'server-offline') {
+    statusText = navigator.onLine
+      ? 'Cannot reach POS cloud server right now. Keep this tab open and retry sync shortly.'
+      : 'No internet connection. Sales are saved on this device. Sync manually when internet returns.';
+  } else if (mode === 'offline') {
+    statusText = 'Offline mode: sales continue locally. Sync manually when internet returns.';
+  } else if (mode === 'pending') {
+    statusText = 'Online: pending operations are waiting to sync.';
+  } else if (mode === 'online') {
+    statusText = 'Online and synced with cloud.';
+  }
+
+  offlineStatusTextEl.textContent = statusText;
+  
+  // Enhanced pending sync display
+  if (queuedInvoices > 0 && queuedOps > 0) {
+    offlineQueueCountEl.textContent = `Pending sync: ${queuedInvoices} order(s) (${queuedOps} ops)`;
+  } else if (queuedOps > 0) {
+    offlineQueueCountEl.textContent = `Pending sync: ${queuedOps} operation(s)`;
+  } else {
+    offlineQueueCountEl.textContent = 'All synced';
+  }
+
+  if (offlineStorageBackendEl) {
+    const backend = String(state.connectivity.storageBackend || 'checking');
+    const fallbackCount = Number(state.connectivity.fallbackCount || 0);
+    // Enhanced storage backend display with more detail
+    let storageText = `Storage: ${backend}`;
+    if (backend === 'IndexedDB') {
+      storageText = '💾 IndexedDB active';
+    } else if (backend === 'Fallback(localStorage)') {
+      storageText = '⚠️ Using localStorage fallback';
+    } else if (backend === 'fallback-only') {
+      storageText = '⚠️ Fallback mode (no IndexedDB)';
+    } else if (backend === 'unavailable') {
+      storageText = '❌ Offline storage unavailable';
+    }
+    
+    const fallbackSuffix = fallbackCount > 0 ? ` +${fallbackCount} localStorage` : '';
+    offlineStorageBackendEl.textContent = `${storageText}${fallbackSuffix}`;
+  }
+
+  if (offlineSyncBtn) {
+    const canSync = queuedOps > 0 && !syncTriggerBusy && state.connectivity.serverReachable;
+    offlineSyncBtn.disabled = !canSync;
+    offlineSyncBtn.textContent = syncTriggerBusy ? 'Syncing...' : (queuedOps > 0 ? 'Sync now' : 'Synced');
+  }
+}
+
+function applyConnectivitySnapshot(snapshot, { showTransitionToast = true } = {}) {
+  const previousMode = String(state.connectivity.mode || 'checking');
+  const queuedOps = Math.max(0, Number(snapshot.queuedOperations || 0));
+  const queuedInvoices = Math.max(0, Number(snapshot.queuedInvoices || 0));
+  const browserOnline = navigator.onLine !== false;
+  let mode = 'checking';
+
+  if (!snapshot.serverReachable) {
+    mode = 'server-offline';
+  } else if (!snapshot.supabaseEnabled) {
+    mode = queuedOps > 0 ? 'pending' : 'online';
+  } else if (!browserOnline || !snapshot.supabaseReachable) {
+    mode = 'offline';
+  } else if (queuedOps > 0) {
+    mode = 'pending';
+  } else {
+    mode = 'online';
+  }
+
+  state.connectivity = {
+    mode,
+    queuedOperations: queuedOps,
+    queuedInvoices,
+    storageBackend: String(snapshot.storageBackend || state.connectivity.storageBackend || 'checking'),
+    fallbackCount: Number(snapshot.fallbackCount || 0),
+    supabaseEnabled: Boolean(snapshot.supabaseEnabled),
+    supabaseReachable: Boolean(snapshot.supabaseReachable),
+    serverReachable: Boolean(snapshot.serverReachable)
+  };
+
+  renderConnectivityStatus();
+  updatePaymentActionAvailability();
+
+  if (!showTransitionToast || previousMode === mode) return;
+
+  if (mode === 'offline' || mode === 'server-offline') {
+    showConfirmationToast({
+      title: 'Offline mode',
+      message: 'Sales are saved locally. Sync manually when ready.',
+      tone: 'warning',
+      duration: 3200
+    });
+    return;
+  }
+
+  if ((previousMode === 'offline' || previousMode === 'server-offline') && (mode === 'online' || mode === 'pending')) {
+    showConfirmationToast({
+      title: 'Internet restored',
+      message: queuedOps > 0
+        ? `${queuedOps} operation(s) waiting for sync.`
+        : 'All sales are synced.',
+      tone: 'success',
+      duration: 2800
+    });
+
+    const now = Date.now();
+    const shouldAutoSync = queuedOps > 0
+      && !syncTriggerBusy
+      && Boolean(state.connectivity.serverReachable)
+      && (now - lastAutoSyncAttemptAt) >= OFFLINE_AUTO_SYNC_MIN_GAP_MS;
+    if (shouldAutoSync) {
+      lastAutoSyncAttemptAt = now;
+      triggerOfflineSync().catch(() => {});
+    }
+  }
+}
+
+async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
+  const clientSummary = await getClientOfflineSummary();
+  try {
+    const response = await fetch('/api/connectivity', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Connectivity check failed');
+    }
+    const payload = await response.json();
+    applyConnectivitySnapshot({
+      serverReachable: true,
+      supabaseEnabled: Boolean(payload.supabaseEnabled),
+      supabaseReachable: Boolean(payload.supabaseReachable),
+      queuedOperations: clientSummary.operations,
+      queuedInvoices: clientSummary.invoices,
+      storageBackend: clientSummary.storageBackend,
+      fallbackCount: clientSummary.fallbackCount
+    }, { showTransitionToast });
+    await renderOfflinePendingTransactions();
+  } catch (_error) {
+    applyConnectivitySnapshot({
+      serverReachable: false,
+      supabaseEnabled: state.connectivity.supabaseEnabled,
+      supabaseReachable: false,
+      queuedOperations: clientSummary.operations,
+      queuedInvoices: clientSummary.invoices,
+      storageBackend: clientSummary.storageBackend,
+      fallbackCount: clientSummary.fallbackCount
+    }, { showTransitionToast });
+    await renderOfflinePendingTransactions();
+  }
+}
+
+function startConnectivityMonitor() {
+  if (connectivityPoller) return;
+  refreshConnectivityStatus({ showTransitionToast: false }).catch(() => {});
+  connectivityPoller = setInterval(() => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  }, OFFLINE_SYNC_INTERVAL_MS);
+}
+
+async function triggerOfflineSync() {
+  if (syncTriggerBusy) return;
+  syncTriggerBusy = true;
+  renderConnectivityStatus();
+  try {
+    const result = await syncClientOfflineOutbox();
+    await refreshConnectivityStatus({ showTransitionToast: false });
+    const synced = Number(result?.synced || 0);
+    const failed = Number(result?.failed || 0);
+    const remaining = Number(result?.remaining || 0);
+    showConfirmationToast({
+      title: failed > 0 ? 'Sync completed with warnings' : 'Sync completed',
+      message: `Synced: ${synced}, Failed: ${failed}, Remaining: ${remaining}`,
+      tone: failed > 0 ? 'warning' : 'success',
+      duration: 2600
+    });
+  } catch (error) {
+    showConfirmationToast({
+      title: 'Sync failed',
+      message: error?.message || 'Unable to sync pending operations.',
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    syncTriggerBusy = false;
+    renderConnectivityStatus();
+  }
+}
+
+function ensureConfettiAnimation() {
+  if (confettiAnimation || !addToCartConfettiEl || !window.lottie) {
+    return;
+  }
+
+  confettiAnimation = window.lottie.loadAnimation({
+    container: addToCartConfettiEl,
+    renderer: 'svg',
+    loop: false,
+    autoplay: false,
+    path: '/assets/confetti'
+  });
+}
+
+function loadYummyEmoji(container) {
+  if (!container || !window.lottie) return null;
+  return window.lottie.loadAnimation({
+    container,
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+    path: '/assets/yummy'
+  });
+}
+
+function ensureYummyAnimations() {
+  if (!yummyOrderAnimation) {
+    yummyOrderAnimation = loadYummyEmoji(yummyOrderEmojiEl);
+  }
+}
+
+function playAddToCartConfetti() {
+  ensureConfettiAnimation();
+  if (!confettiAnimation) return;
+  confettiAnimation.stop();
+  confettiAnimation.goToAndPlay(0, true);
+}
+
+function setOrderType(type) {
+  state.orderType = type;
+  state.cashPromptActive = false;
+  updatePaymentActionAvailability();
+  if (amountTenderedEl) amountTenderedEl.value = '';
+  setPaymentMethod('cash');
+  if (isEwalletAvailable()) {
+    setStatus(`${getOrderTypeLabel(type)} selected. Choose Cash or E-Payment.`);
+  } else {
+    setStatus(`${getOrderTypeLabel(type)} selected. Offline mode active: Cash only until internet is back.`);
+  }
+}
+
+function getOrderTypeLabel(type) {
+  return type === 'take-out' ? 'Take Out' : 'Dine In';
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '—';
+  const d = new Date(isoString);
+  return d.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function getCartItems() {
+  return Object.entries(state.cart)
+    .filter(([, qty]) => qty > 0)
+    .map(([productId, qty]) => ({ productId, qty }));
+}
+
+function getCartTotal() {
+  const byId = Object.fromEntries(state.products.map((p) => [p.id, p]));
+  return Object.entries(state.cart).reduce((sum, [productId, qty]) => {
+    const p = byId[productId];
+    return sum + (p ? p.price * qty : 0);
+  }, 0);
+}
+
+function getDiscountAmount() {
+  const subtotal = getCartTotal();
+  const discount = Number(state.discountAmount || 0);
+  if (!Number.isFinite(discount) || discount <= 0) return 0;
+  return Math.min(discount, subtotal);
+}
+
+function getTotalDue() {
+  const subtotal = getCartTotal();
+  return Math.max(0, subtotal - getDiscountAmount());
+}
+
+async function api(path, options = {}) {
+  const mergedHeaders = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  const res = await fetch(path, {
+    ...options,
+    headers: mergedHeaders
+  });
+  const rawText = await res.text();
+  let data = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch (_error) {
+    data = {};
+  }
+  if (!res.ok) {
+    throw new Error(data.error || 'Request failed');
+  }
+  return data;
+}
+
+function isNetworkLikeError(error) {
+  const txt = String(error?.message || '').toLowerCase();
+  return txt.includes('fetch') || txt.includes('network') || txt.includes('offline') || txt.includes('failed to fetch');
+}
+
+function createClientInvoiceReference(invoiceId) {
+  return `INV-${String(invoiceId).slice(0, 8).toUpperCase()}-${Date.now()}`;
+}
+
+function toOfflineInvoiceViewModel({ sale, invoiceId, reference, createdAt, paidAt }) {
+  const orderSnapshot = sale?.order || null;
+  const transactionSnapshot = sale?.transaction || null;
+  const productsById = new Map((state.products || []).map((p) => [String(p.id), p]));
+  const lineItems = (sale?.items || []).map((item) => {
+    const p = productsById.get(String(item.productId));
+    const qty = Number(item.qty || 0);
+    const price = Number(p?.price || 0);
+    return {
+      productId: item.productId,
+      name: p?.name || `Product ${item.productId}`,
+      qty,
+      price,
+      subtotal: price * qty
+    };
+  });
+
+  const subtotal = Number(orderSnapshot?.subtotal ?? lineItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0));
+  const discount = Number(orderSnapshot?.discount ?? sale?.discountAmount ?? 0);
+  const total = Math.max(0, subtotal - discount);
+  const amountPaid = Number(transactionSnapshot?.amountPaid ?? sale?.amountTendered ?? total);
+  return {
+    id: String(orderSnapshot?.id || invoiceId),
+    reference: String(orderSnapshot?.reference || reference),
+    createdAt: String(orderSnapshot?.createdAt || createdAt),
+    updatedAt: String(orderSnapshot?.updatedAt || paidAt),
+    status: String(orderSnapshot?.status || 'PAID'),
+    orderType: String(orderSnapshot?.orderType || sale?.orderType || state.orderType || 'dine-in'),
+    paymentMethod: 'cash',
+    subtotal,
+    discount,
+    total,
+    lineItems,
+    payment: {
+      method: 'cash',
+      paidAt: String(transactionSnapshot?.paidAt || paidAt),
+      amountPaid,
+      change: Number(transactionSnapshot?.change ?? Math.max(0, amountPaid - total)),
+      success: true,
+      successMessage: 'Queued offline. Use Sync now when internet returns.'
+    }
+  };
+}
+
+async function getClientOfflineSummary() {
+  console.log('[POS-App] Getting client offline summary...');
+  if (!offlineOutbox?.getSummary && !offlineOutbox?.listPendingSales) {
+    console.warn('[POS-App] No offline outbox available');
+    return { operations: 0, invoices: 0, storageBackend: 'unavailable', fallbackCount: 0 };
+  }
+  try {
+    const diagnostics = offlineOutbox?.getDiagnostics ? await offlineOutbox.getDiagnostics() : null;
+    console.log('[POS-App] Diagnostics:', diagnostics);
+    const summary = offlineOutbox?.getSummary ? await offlineOutbox.getSummary() : null;
+    console.log('[POS-App] Summary:', summary);
+    const fallbackPending = offlineOutbox?.listPendingSales ? await offlineOutbox.listPendingSales() : [];
+    const fallbackOps = Array.isArray(fallbackPending) ? fallbackPending.length : 0;
+    const fallbackInvoices = Array.isArray(fallbackPending)
+      ? new Set(fallbackPending.map((op) => String(op?.payload?.invoiceId || op?.invoiceId || '')).filter(Boolean)).size
+      : 0;
+    const result = {
+      operations: Math.max(Number(summary?.operations || 0), fallbackOps),
+      invoices: Math.max(Number(summary?.invoices || 0), fallbackInvoices),
+      storageBackend: String(diagnostics?.backend || 'IndexedDB'),
+      fallbackCount: Number(diagnostics?.fallbackCount || 0),
+      indexedDbReady: diagnostics?.indexedDbReady || false,
+      dbName: diagnostics?.dbName || null,
+      dbVersion: diagnostics?.dbVersion || null
+    };
+    console.log('[POS-App] Final summary:', result);
+    return result;
+  } catch (error) {
+    console.error('[POS-App] Error getting offline summary:', error);
+    try {
+      const pending = offlineOutbox?.listPendingSales ? await offlineOutbox.listPendingSales() : [];
+      const ops = Array.isArray(pending) ? pending : [];
+      const invoices = new Set(ops.map((op) => String(op?.payload?.invoiceId || op?.invoiceId || '')).filter(Boolean));
+      return { operations: ops.length, invoices: invoices.size, storageBackend: 'fallback-only', fallbackCount: ops.length, indexedDbReady: false };
+    } catch (nestedError) {
+      console.error('[POS-App] Fallback also failed:', nestedError);
+      return { operations: 0, invoices: 0, storageBackend: 'unavailable', fallbackCount: 0, indexedDbReady: false };
+    }
+  }
+}
+
+function computeOfflineSaleBreakdown(sale) {
+  const productsById = new Map((state.products || []).map((p) => [String(p.id), Number(p.price || 0)]));
+  const totalQty = (sale?.items || []).reduce((sum, item) => sum + Number(item?.qty || 0), 0);
+  const itemCount = Array.isArray(sale?.items) ? sale.items.length : 0;
+  const productNames = (sale?.items || []).map((item) => {
+    const productId = String(item?.productId || '');
+    const p = (state.products || []).find((x) => String(x.id) === productId);
+    return p?.name || `Product ${productId}`;
+  });
+  const subtotal = (sale?.items || []).reduce((sum, item) => {
+    const price = Number(productsById.get(String(item?.productId)) || 0);
+    const qty = Number(item?.qty || 0);
+    return sum + (price * qty);
+  }, 0);
+  const discount = Number(sale?.discountAmount || 0);
+  const total = Math.max(0, subtotal - discount);
+  return { totalQty, itemCount, productNames, subtotal, total };
+}
+
+function computeOfflineSaleTotal(sale) {
+  return computeOfflineSaleBreakdown(sale).total;
+}
+
+async function renderOfflinePendingTransactions() {
+  if (!offlinePendingPanelEl || !offlinePendingListEl) return;
+  if (!offlineOutbox?.listPendingSales) {
+    offlinePendingPanelEl.style.display = 'none';
+    return;
+  }
+
+  console.log('[POS-App] Rendering offline pending transactions...');
+  let ops = [];
+  try {
+    ops = await offlineOutbox.listPendingSales();
+    console.log('[POS-App] Found pending transactions:', ops.length);
+  } catch (error) {
+    console.error('[POS-App] Error fetching pending transactions:', error);
+    offlinePendingPanelEl.style.display = 'none';
+    return;
+  }
+
+  if (!Array.isArray(ops) || !ops.length) {
+    offlinePendingPanelEl.style.display = 'none';
+    offlinePendingListEl.innerHTML = '';
+    console.log('[POS-App] No pending transactions to display');
+    return;
+  }
+
+  const rows = ops.slice(0, 25).map((op) => {
+    const sale = op?.payload || {};
+    const ref = String(sale.reference || sale.invoiceId || op.id || '-');
+    const createdAt = formatDate(sale.createdAt || op.createdAt || new Date().toISOString());
+    const retries = Number(op.retries || 0);
+    const total = computeOfflineSaleTotal(sale);
+    const statusBadge = retries > 0 ? `<span class="offline-retry-badge">Retry ${retries}</span>` : '<span class="offline-pending-badge">Pending</span>';
+    return `
+      <div class="offline-pending-item">
+        <div class="offline-pending-main">
+          <div class="offline-pending-ref">${escapeHtml(ref)}</div>
+          <div class="offline-pending-meta">${escapeHtml(createdAt)} ${statusBadge}</div>
+        </div>
+        <div class="offline-pending-total">${money(total)}</div>
+      </div>
+    `;
+  });
+
+  if (ops.length > 25) {
+    rows.push(`<div class="offline-pending-empty">Showing latest 25 of ${ops.length} offline transactions.</div>`);
+  }
+
+  offlinePendingListEl.innerHTML = rows.join('');
+  offlinePendingPanelEl.style.display = 'block';
+  console.log('[POS-App] Pending transactions panel displayed');
+}
+
+async function queueOfflineCashSale({ items, amountTendered, discountAmount, orderType }) {
+  if (!offlineOutbox?.enqueueCashSale) {
+    throw new Error('Offline queue is not available in this browser.');
+  }
+
+  // This write targets IndexedDB (client device), not server/local SQLite.
+  const createdAt = new Date().toISOString();
+  const invoiceId = (window.crypto?.randomUUID?.() || `offline-${Date.now()}-${Math.floor(Math.random() * 1000000)}`);
+  const reference = createClientInvoiceReference(invoiceId);
+  const saleBreakdown = computeOfflineSaleBreakdown({ items, discountAmount });
+  const payload = {
+    operationId: `cash-sale-${invoiceId}`,
+    invoiceId,
+    reference,
+    createdAt,
+    items: items.map((x) => ({ productId: x.productId, qty: Number(x.qty || 0) })),
+    totalQty: Number(saleBreakdown.totalQty || 0),
+    itemCount: Number(saleBreakdown.itemCount || 0),
+    productNames: Array.isArray(saleBreakdown.productNames) ? saleBreakdown.productNames : [],
+    subtotalAmount: Number(saleBreakdown.subtotal || 0),
+    totalAmount: Number(saleBreakdown.total || 0),
+    amountTendered: Number(amountTendered || 0),
+    discountAmount: Number(discountAmount || 0),
+    orderType: String(orderType || 'dine-in')
+  };
+  payload.order = {
+    id: invoiceId,
+    reference,
+    status: 'PAID',
+    orderType: payload.orderType,
+    subtotal: payload.subtotalAmount,
+    discount: payload.discountAmount,
+    total: payload.totalAmount,
+    itemCount: payload.itemCount,
+    totalQty: payload.totalQty,
+    createdAt,
+    updatedAt: createdAt
+  };
+  payload.transaction = {
+    status: 'PAID',
+    paymentMethod: 'cash',
+    amountPaid: payload.amountTendered,
+    change: Math.max(0, payload.amountTendered - payload.totalAmount),
+    paidAt: createdAt
+  };
+  await offlineOutbox.enqueueCashSale(payload);
+  console.info('[POS-App] Offline cash sale queued.', {
+    operationId: payload.operationId,
+    invoiceId: payload.invoiceId,
+    reference: payload.reference,
+    totalAmount: payload.totalAmount,
+    amountTendered: payload.amountTendered,
+    itemCount: payload.itemCount,
+    orderType: payload.orderType
+  });
+  const paidAt = new Date().toISOString();
+  return toOfflineInvoiceViewModel({ sale: payload, invoiceId, reference, createdAt, paidAt });
+}
+
+async function runOfflineSmokeTest() {
+  if (!offlineOutbox?.enqueueCashSale || !offlineOutbox?.listPendingSales) {
+    showConfirmationToast({
+      title: 'Offline queue unavailable',
+      message: 'This browser cannot run offline smoke test right now.',
+      tone: 'warning',
+      duration: 2800
+    });
+    return;
+  }
+
+  const sourceProducts = Array.isArray(state.products) && state.products.length
+    ? state.products
+    : BOOTSTRAP_CATALOG_FALLBACK.products;
+  const sampleProducts = sourceProducts.slice(0, 2);
+  if (!sampleProducts.length) {
+    showConfirmationToast({
+      title: 'Smoke test blocked',
+      message: 'No catalog products available for test payload.',
+      tone: 'warning',
+      duration: 2800
+    });
+    return;
+  }
+
+  const testItems = sampleProducts.map((p) => ({
+    productId: p.id,
+    qty: 1
+  }));
+  const subtotal = sampleProducts.reduce((sum, p) => sum + Number(p.price || 0), 0);
+  const amountTendered = Math.max(1, subtotal + 100);
+  const queued = await queueOfflineCashSale({
+    items: testItems,
+    amountTendered,
+    discountAmount: 0,
+    orderType: 'dine-in'
+  });
+
+  await renderOfflinePendingTransactions();
+  await refreshConnectivityStatus({ showTransitionToast: false });
+
+  showConfirmationToast({
+    title: 'Offline smoke test queued',
+    message: `Saved ${queued.reference} on this device. Use Sync now when online.`,
+    tone: 'success',
+    duration: 3200
+  });
+}
+
+async function syncClientOfflineOutbox() {
+  if (!offlineOutbox?.listPendingSales) {
+    return { synced: 0, failed: 0, remaining: 0 };
+  }
+
+  // Replays device-stored offline cash sales to the live API once reachable.
+  const ops = await offlineOutbox.listPendingSales();
+  if (!Array.isArray(ops) || !ops.length) {
+    return { synced: 0, failed: 0, remaining: 0 };
+  }
+
+  let synced = 0;
+  let failed = 0;
+  console.info('[POS-App] Starting offline outbox sync.', { queued: ops.length });
+
+  for (const op of ops) {
+    try {
+      const sale = op?.payload || {};
+      const createdInvoice = await api('/api/invoices', {
+        method: 'POST',
+        body: JSON.stringify({
+          items: Array.isArray(sale.items) ? sale.items : [],
+          paymentMethod: 'cash',
+          discountAmount: Number(sale.discountAmount || 0),
+          orderType: String(sale.orderType || 'dine-in'),
+          clientInvoiceId: sale.invoiceId,
+          clientReference: sale.reference
+        })
+      });
+
+      await api('/api/payments/cash', {
+        method: 'POST',
+        body: JSON.stringify({
+          invoiceId: createdInvoice?.invoice?.id || sale.invoiceId,
+          amountTendered: Number(sale.amountTendered || 0)
+        })
+      });
+
+      await offlineOutbox.removeSale(op.id, {
+        serverInvoiceId: createdInvoice?.invoice?.id || sale.invoiceId || null,
+        serverReference: createdInvoice?.invoice?.reference || sale.reference || null
+      });
+      console.info('[POS-App] Offline sale synced to server/Supabase.', {
+        operationId: op?.id || null,
+        invoiceId: createdInvoice?.invoice?.id || sale.invoiceId || null,
+        reference: createdInvoice?.invoice?.reference || sale.reference || null
+      });
+      synced += 1;
+    } catch (error) {
+      failed += 1;
+      await offlineOutbox.incrementRetry(op.id, { errorMessage: error?.message || 'sync_failed' }).catch(() => {});
+      console.warn('[POS-App] Offline sale sync failed.', {
+        operationId: op?.id || null,
+        error: error?.message || String(error)
+      });
+      if (isNetworkLikeError(error)) break;
+    }
+  }
+
+  const summary = await getClientOfflineSummary();
+  const result = { synced, failed, remaining: summary.operations };
+  console.info('[POS-App] Offline outbox sync finished.', result);
+  return result;
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js')
+    .then((registration) => {
+      registration.update().catch(() => {});
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            worker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    })
+    .catch(() => {});
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function readActiveSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.email) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeActiveSession(user) {
+  const sessionUser = {
+    name: user.name,
+    email: user.email,
+    role: user.role || 'encharge',
+    userId: user.userId || null
+  };
+  activeAuthSession = sessionUser;
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionUser));
+}
+
+function clearActiveSession() {
+  activeAuthSession = null;
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function writeAccessToken(token) {
+  const normalized = String(token || '').trim();
+  if (!normalized) {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_TOKEN_KEY, normalized);
+}
+
+function readAccessToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function readOfflineAuthCache() {
+  try {
+    const raw = localStorage.getItem(AUTH_OFFLINE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.email || !parsed.passwordHash) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function sha256Hex(input) {
+  const text = String(input || '');
+  if (!window.crypto?.subtle) return '';
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function cacheOfflineAuthCredential({ name, email, role, userId, password }) {
+  if (!email || !password) return;
+  const passwordHash = await sha256Hex(password);
+  if (!passwordHash) return;
+  const payload = {
+    name: String(name || '').trim() || 'User',
+    email: normalizeEmail(email),
+    role: String(role || 'encharge').toLowerCase(),
+    userId: userId || null,
+    passwordHash,
+    updatedAt: new Date().toISOString()
+  };
+  localStorage.setItem(AUTH_OFFLINE_CACHE_KEY, JSON.stringify(payload));
+}
+
+async function tryOfflineLogin(email, password) {
+  const cached = readOfflineAuthCache();
+  if (!cached) return null;
+  if (normalizeEmail(cached.email) !== normalizeEmail(email)) return null;
+
+  const updatedAtTs = new Date(cached.updatedAt || '').getTime();
+  if (!Number.isFinite(updatedAtTs) || (Date.now() - updatedAtTs) > OFFLINE_AUTH_MAX_AGE_MS) {
+    return null;
+  }
+
+  const inputHash = await sha256Hex(password);
+  if (!inputHash || inputHash !== cached.passwordHash) return null;
+
+  return {
+    name: cached.name || 'User',
+    email: cached.email,
+    role: cached.role || 'encharge',
+    userId: cached.userId || null
+  };
+}
+
+function getUserUiStateKey() {
+  const userKey = activeAuthSession?.userId || activeAuthSession?.email || 'guest';
+  return `${UI_STATE_KEY_PREFIX}${userKey}`;
+}
+
+function getCatalogCacheKey() {
+  const userKey = activeAuthSession?.userId || activeAuthSession?.email || 'guest';
+  return `${CATALOG_CACHE_KEY_PREFIX}${userKey}`;
+}
+
+function readUserUiState() {
+  try {
+    const raw = localStorage.getItem(getUserUiStateKey());
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveUserUiState(patch) {
+  try {
+    const current = readUserUiState();
+    const next = { ...current, ...patch };
+    localStorage.setItem(getUserUiStateKey(), JSON.stringify(next));
+  } catch (_error) {
+    // Ignore local storage errors.
+  }
+}
+
+function readCatalogCache() {
+  try {
+    const raw = localStorage.getItem(getCatalogCacheKey());
+    const globalRaw = localStorage.getItem(CATALOG_CACHE_GLOBAL_KEY);
+    const parsed = raw ? JSON.parse(raw) : (globalRaw ? JSON.parse(globalRaw) : null);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+    const products = Array.isArray(parsed.products) ? parsed.products : [];
+    if (!categories.length && !products.length) return null;
+    return { categories, products };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeCatalogCache(payload) {
+  try {
+    const snapshot = JSON.stringify({
+      categories: Array.isArray(payload?.categories) ? payload.categories : [],
+      products: Array.isArray(payload?.products) ? payload.products : [],
+      updatedAt: new Date().toISOString()
+    });
+    localStorage.setItem(getCatalogCacheKey(), snapshot);
+    localStorage.setItem(CATALOG_CACHE_GLOBAL_KEY, snapshot);
+  } catch (_error) {
+    // Ignore cache write issues.
+  }
+}
+
+function getBootstrapCatalogFallback() {
+  return {
+    categories: BOOTSTRAP_CATALOG_FALLBACK.categories.map((x) => ({ ...x })),
+    products: BOOTSTRAP_CATALOG_FALLBACK.products.map((x) => ({ ...x }))
+  };
+}
+
+function normalizeSortOrderValue(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.round(n));
+}
+
+function normalizeCatalogProducts(products) {
+  const nextOrderByCategory = new Map();
+  return products.map((x) => {
+    const categoryKey = String(x.category || '').trim().toLowerCase();
+    const fallbackOrder = nextOrderByCategory.get(categoryKey) || 10;
+    nextOrderByCategory.set(categoryKey, fallbackOrder + 10);
+    return {
+      id: x.id,
+      name: x.name,
+      price: Number(x.price || 0),
+      category: categoryKey,
+      image: x.image || '/Business Logo/Ruels Logo for business.png',
+      sortOrder: normalizeSortOrderValue(x.sortOrder, fallbackOrder)
+    };
+  });
+}
+
+function sortCatalogState() {
+  state.categories = [...(state.categories || [])]
+    .sort((a, b) => {
+      const orderDiff = normalizeSortOrderValue(a.sortOrder, 0) - normalizeSortOrderValue(b.sortOrder, 0);
+      if (orderDiff !== 0) return orderDiff;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+  const categoryOrderByKey = new Map(
+    state.categories.map((x, idx) => [String(x.key || '').toLowerCase(), idx])
+  );
+
+  state.products = [...(state.products || [])]
+    .sort((a, b) => {
+      const aCategoryIdx = categoryOrderByKey.get(String(a.category || '').toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+      const bCategoryIdx = categoryOrderByKey.get(String(b.category || '').toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+      if (aCategoryIdx !== bCategoryIdx) return aCategoryIdx - bCategoryIdx;
+
+      const orderDiff = normalizeSortOrderValue(a.sortOrder, 0) - normalizeSortOrderValue(b.sortOrder, 0);
+      if (orderDiff !== 0) return orderDiff;
+
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+}
+
+function hydrateCatalogState(cached, { keepCategory = true } = {}) {
+  if (!cached || (!Array.isArray(cached.categories) && !Array.isArray(cached.products))) return false;
+
+  const nextCategories = Array.isArray(cached.categories) ? cached.categories : [];
+  const nextProducts = Array.isArray(cached.products) ? cached.products : [];
+
+  state.categories = nextCategories.map((x) => ({
+    key: String(x.key || '').trim().toLowerCase(),
+    name: String(x.name || '').trim() || String(x.key || ''),
+    image: String(x.image || '').trim() || getDefaultCategoryImage(x.key),
+    sortOrder: normalizeSortOrderValue(x.sortOrder, 0)
+  }));
+  state.products = normalizeCatalogProducts(nextProducts);
+
+  if (!state.categories.length) {
+    state.categories = [{
+      key: 'main-dish',
+      name: 'Main Dish',
+      image: '/Menu/Main Dish.png',
+      sortOrder: 10
+    }];
+  }
+
+  sortCatalogState();
+  const categoryKeys = new Set(state.categories.map((x) => x.key));
+  if (!keepCategory || !categoryKeys.has(String(state.activeCategory || '').toLowerCase())) {
+    state.activeCategory = state.categories[0].key;
+  }
+  return true;
+}
+
+function canAccessAdminFeatures() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations' || role === 'supervisor';
+}
+
+function canManageInventory() {
+  const role = String(activeAuthSession?.role || '').toLowerCase();
+  return role === 'administrations';
+}
+
+function updateSettingsRoleItems() {
+  const canAccess = canAccessAdminFeatures();
+  if (settingsAdminDashboardBtn) {
+    settingsAdminDashboardBtn.style.display = canAccess ? 'block' : 'none';
+  }
+  if (settingsEditMenuBtn) {
+    settingsEditMenuBtn.style.display = canAccess ? 'block' : 'none';
+  }
+  if (settingsOfflineSmokeTestBtn) {
+    settingsOfflineSmokeTestBtn.style.display = canAccess ? 'block' : 'none';
+  }
+}
+
+function fireAudit(eventType, metadata = {}) {
+  if (!activeAuthSession?.email) return;
+  api('/api/auth/audit', {
+    method: 'POST',
+    body: JSON.stringify({
+      eventType,
+      userId: activeAuthSession.userId || null,
+      email: activeAuthSession.email,
+      metadata
+    })
+  }).catch(() => {});
+}
+
+function showConfirmationToast({ title, message, tone = 'success', duration = 2600 }) {
+  if (!globalToastEl) return;
+  if (globalToastTitleEl) globalToastTitleEl.textContent = title || 'Success';
+  if (globalToastMessageEl) globalToastMessageEl.textContent = message || '';
+  globalToastEl.classList.remove('success');
+  globalToastEl.classList.add(tone);
+  globalToastEl.setAttribute('aria-hidden', 'false');
+  globalToastEl.classList.add('show');
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    globalToastEl.classList.remove('show');
+    globalToastEl.setAttribute('aria-hidden', 'true');
+  }, duration);
+}
+
+function updateWelcomeBanner() {
+  if (!welcomeBannerEl) return;
+  const rawName = String(activeAuthSession?.name || '').trim();
+  const firstName = rawName ? rawName.split(/\s+/)[0] : 'User';
+  const role = String(activeAuthSession?.role || 'encharge').toLowerCase();
+  const roleIconMap = {
+    administrations: '/User Role/administrator.png',
+    supervisor: '/User Role/Supervisor.png',
+    encharge: '/User Role/Encharge.png'
+  };
+  if (welcomeRoleIconEl) {
+    welcomeRoleIconEl.src = roleIconMap[role] || roleIconMap.encharge;
+    welcomeRoleIconEl.alt = `${role} role icon`;
+  }
+  if (welcomeTextEl) {
+    welcomeTextEl.textContent = `Welcome ${firstName}, have a nice day.`;
+    updateSettingsRoleItems();
+    return;
+  }
+  welcomeBannerEl.textContent = `Welcome ${firstName}, have a nice day.`;
+  updateSettingsRoleItems();
+}
+
+function updatePhilippineDateTime() {
+  if (!phDateTimeEl) return;
+  const now = new Date();
+  const dateText = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }).format(now);
+  const timeText = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  }).format(now);
+  phDateTimeEl.textContent = `${dateText} | ${timeText} (Philippines)`;
+}
+
+function startPhilippineClock() {
+  updatePhilippineDateTime();
+  if (phClockInterval) return;
+  phClockInterval = setInterval(updatePhilippineDateTime, 1000);
+}
+
+function closeSettingsMenu() {
+  if (!settingsMenuEl) return;
+  settingsMenuEl.classList.remove('open');
+  settingsMenuEl.setAttribute('aria-hidden', 'true');
+  if (settingsToggleBtn) settingsToggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSettingsMenu() {
+  if (!settingsMenuEl) return;
+  const willOpen = !settingsMenuEl.classList.contains('open');
+  settingsMenuEl.classList.toggle('open', willOpen);
+  settingsMenuEl.setAttribute('aria-hidden', String(!willOpen));
+  if (settingsToggleBtn) settingsToggleBtn.setAttribute('aria-expanded', String(willOpen));
+}
+
+async function handleLogout() {
+  if (state.logoutBusy) return;
+  state.logoutBusy = true;
+
+  const displayName = String(activeAuthSession?.name || 'User').trim() || 'User';
+  const logoutPayload = {
+    userId: activeAuthSession?.userId || null,
+    email: activeAuthSession?.email || null
+  };
+
+  // Do local logout immediately so the UI feels responsive.
+  if (state.poller) {
+    clearInterval(state.poller);
+    state.poller = null;
+  }
+
+  closeSettingsMenu();
+  closeAdminLogin();
+  closeAdminDashboard();
+  closeAdminReceiptModal();
+  closeEwalletModal();
+  clearActiveSession();
+  lockDashboard();
+  setAuthMode('login');
+  showConfirmationToast({
+    title: 'Logged out successfully',
+    message: `See you next time, ${displayName}.`,
+    tone: 'success'
+  });
+  if (loginEmailEl) loginEmailEl.focus();
+
+  // Notify server in background without blocking UI.
+  api('/api/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify(logoutPayload)
+  }).catch(() => {});
+
+  state.logoutBusy = false;
+}
+
+function setAuthMessage(message, isSuccess = false) {
+  if (!authMessageEl) return;
+  authMessageEl.textContent = message || '';
+  authMessageEl.classList.toggle('success', Boolean(isSuccess));
+}
+
+function setAuthMode(mode) {
+  const showLogin = mode !== 'signup';
+  if (loginFormEl) loginFormEl.classList.toggle('hidden', !showLogin);
+  if (signupFormEl) signupFormEl.classList.toggle('hidden', showLogin);
+  if (showLoginBtn) {
+    showLoginBtn.classList.toggle('active', showLogin);
+    showLoginBtn.setAttribute('aria-selected', String(showLogin));
+  }
+  if (showSignupBtn) {
+    showSignupBtn.classList.toggle('active', !showLogin);
+    showSignupBtn.setAttribute('aria-selected', String(!showLogin));
+  }
+  setAuthMessage('');
+  updateSettingsRoleItems();
+}
+
+function unlockDashboard() {
+  document.body.classList.remove('auth-locked');
+  if (authGateEl) authGateEl.setAttribute('aria-hidden', 'true');
+  updateWelcomeBanner();
+}
+
+function lockDashboard() {
+  document.body.classList.add('auth-locked');
+  if (authGateEl) authGateEl.setAttribute('aria-hidden', 'false');
+}
+
+function startAppOnce() {
+  if (appInitialized) return;
+  appInitialized = true;
+  init().catch((error) => {
+    setStatus(`Startup error: ${error.message}`);
+  });
+}
+
+function setFormSubmitBusy(formEl, busy, busyText = 'Please wait...') {
+  if (!formEl) return;
+  const submitBtn = formEl.querySelector('button[type="submit"]');
+  if (!submitBtn) return;
+
+  if (busy) {
+    if (!submitBtn.dataset.originalText) {
+      submitBtn.dataset.originalText = submitBtn.textContent || 'Submit';
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = busyText;
+    return;
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = submitBtn.dataset.originalText || submitBtn.textContent;
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  if (state.authBusy) return;
+  const email = normalizeEmail(loginEmailEl?.value);
+  const password = String(loginPasswordEl?.value || '');
+
+  if (!email || !password) {
+    setAuthMessage('Enter your email and password.');
+    return;
+  }
+
+  try {
+    state.authBusy = true;
+    setFormSubmitBusy(loginFormEl, true, 'Signing in...');
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    writeActiveSession({
+      name: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      userId: result.user.id
+    });
+    writeAccessToken(result.session?.accessToken || '');
+    await cacheOfflineAuthCredential({
+      name: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      userId: result.user.id,
+      password
+    });
+    setAuthMessage('');
+    showConfirmationToast({
+      title: 'Login successful',
+      message: `Welcome ${result.user.fullName}. Have a nice day.`,
+      tone: 'success'
+    });
+    unlockDashboard();
+    startAppOnce();
+  } catch (error) {
+    const errorText = String(error?.message || '');
+    const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
+    const isAuthReject = /invalid credentials|invalid login credentials|unauthorized|401/i.test(errorText);
+    if (isNetworkLike || isAuthReject) {
+      try {
+        const offlineUser = await tryOfflineLogin(email, password);
+        if (offlineUser) {
+          writeActiveSession(offlineUser);
+          writeAccessToken('');
+          const msg = isNetworkLike
+            ? 'Offline login successful (cached credentials).'
+            : 'Server login failed. Signed in using cached offline credentials.';
+          setAuthMessage(msg, true);
+          showConfirmationToast({
+            title: 'Offline login',
+            message: `Welcome back ${offlineUser.name}.`,
+            tone: 'warning',
+            duration: 2800
+          });
+          unlockDashboard();
+          startAppOnce();
+          return;
+        }
+      } catch (_offlineError) {
+        // Fall through to regular error message.
+      }
+    }
+
+    clearActiveSession();
+    setAuthMessage(`Login failed: ${error.message}`);
+  } finally {
+    state.authBusy = false;
+    setFormSubmitBusy(loginFormEl, false);
+  }
+}
+
+async function handleSignupSubmit(event) {
+  event.preventDefault();
+  if (state.authBusy) return;
+  const name = String(signupNameEl?.value || '').trim();
+  const email = normalizeEmail(signupEmailEl?.value);
+  const role = String(signupRoleEl?.value || '').trim().toLowerCase();
+  const password = String(signupPasswordEl?.value || '');
+
+  if (!name || !email || !password || !role) {
+    setAuthMessage('Complete all fields to create an account.');
+    return;
+  }
+  if (password.length < 6) {
+    setAuthMessage('Password must be at least 6 characters.');
+    return;
+  }
+  if (!['administrations', 'supervisor', 'encharge'].includes(role)) {
+    setAuthMessage('Select a valid role.');
+    return;
+  }
+
+  try {
+    state.authBusy = true;
+    setFormSubmitBusy(signupFormEl, true, 'Creating account...');
+    await api('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullName: name,
+        email,
+        role,
+        password
+      })
+    });
+
+    const loginResult = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    writeActiveSession({
+      name: loginResult.user.fullName,
+      email: loginResult.user.email,
+      role: loginResult.user.role,
+      userId: loginResult.user.id
+    });
+    writeAccessToken(loginResult.session?.accessToken || '');
+    await cacheOfflineAuthCredential({
+      name: loginResult.user.fullName,
+      email: loginResult.user.email,
+      role: loginResult.user.role,
+      userId: loginResult.user.id,
+      password
+    });
+    setAuthMessage('Sign up successful. Redirecting to dashboard...', true);
+    showConfirmationToast({
+      title: 'Signup successful',
+      message: `Welcome ${loginResult.user.fullName}. Your account is ready.`,
+      tone: 'success'
+    });
+    unlockDashboard();
+    startAppOnce();
+  } catch (error) {
+    const errorText = String(error.message || '');
+    const isExisting = /already|exists|registered/i.test(errorText);
+    if (isExisting) {
+      setAuthMessage('This email is already registered. Please login instead.');
+      showConfirmationToast({
+        title: 'Signup blocked',
+        message: 'Email already exists. Use Login.',
+        tone: 'warning',
+        duration: 2200
+      });
+      setAuthMode('login');
+      if (loginEmailEl) loginEmailEl.value = email;
+      if (loginEmailEl) loginEmailEl.focus();
+      return;
+    }
+    setAuthMessage(`Sign up failed: ${error.message}`);
+  } finally {
+    state.authBusy = false;
+    setFormSubmitBusy(signupFormEl, false);
+  }
+}
+
+function setupAuth() {
+  if (showLoginBtn) {
+    showLoginBtn.addEventListener('click', () => setAuthMode('login'));
+  }
+  if (showSignupBtn) {
+    showSignupBtn.addEventListener('click', () => setAuthMode('signup'));
+  }
+  if (loginFormEl) {
+    loginFormEl.addEventListener('submit', handleLoginSubmit);
+  }
+  if (signupFormEl) {
+    signupFormEl.addEventListener('submit', handleSignupSubmit);
+  }
+  if (settingsToggleBtn) {
+    settingsToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsMenu();
+    });
+  }
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleLogout);
+  }
+  if (settingsAdminDashboardBtn) {
+    settingsAdminDashboardBtn.addEventListener('click', async () => {
+      closeSettingsMenu();
+      await openAdminLogin();
+    });
+  }
+  if (settingsEditMenuBtn) {
+    settingsEditMenuBtn.addEventListener('click', () => {
+      closeSettingsMenu();
+      openMenuEditor();
+      if (!menuEditorWarmReady) {
+        warmMenuEditorInBackground({ force: true });
+      } else {
+        refreshMenuEditorData().catch((error) => {
+          setStatus(`Edit menu refresh failed: ${error.message}`);
+        });
+      }
+    });
+  }
+  if (settingsOfflineSmokeTestBtn) {
+    settingsOfflineSmokeTestBtn.addEventListener('click', async () => {
+      closeSettingsMenu();
+      await runOfflineSmokeTest();
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!settingsMenuEl?.classList.contains('open')) return;
+    if (e.target?.closest('.settings-menu-wrap')) return;
+    closeSettingsMenu();
+  });
+  startPhilippineClock();
+  setAuthMode('login');
+}
+
+function startAuthLogoRender() {
+  if (authLogoRenderStarted || !authLogoVideoEl || !authLogoCanvasEl) return;
+  authLogoRenderStarted = true;
+
+  const context = authLogoCanvasEl.getContext('2d', { willReadFrequently: true });
+  if (!context) return;
+  let hasStartedRender = false;
+
+  function fitCanvas() {
+    const width = Math.max(1, authLogoVideoEl.videoWidth || 720);
+    const height = Math.max(1, authLogoVideoEl.videoHeight || 720);
+    authLogoCanvasEl.width = width;
+    authLogoCanvasEl.height = height;
+  }
+
+  function shouldProcessFrame() {
+    return document.body.classList.contains('auth-locked') || document.body.classList.contains('auth-checking');
+  }
+
+  function renderFrame() {
+    if (!shouldProcessFrame()) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+
+    if (!authLogoVideoEl.videoWidth || !authLogoVideoEl.videoHeight) {
+      requestAnimationFrame(renderFrame);
+      return;
+    }
+
+    fitCanvas();
+    context.drawImage(authLogoVideoEl, 0, 0, authLogoCanvasEl.width, authLogoCanvasEl.height);
+
+    const frame = context.getImageData(0, 0, authLogoCanvasEl.width, authLogoCanvasEl.height);
+    const pixels = frame.data;
+
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const isWhite = r > 220 && g > 220 && b > 220;
+      if (isWhite) {
+        pixels[i + 3] = 0;
+      } else if (r > 190 && g > 185 && b > 180) {
+        pixels[i + 3] = Math.max(0, pixels[i + 3] - 120);
+      }
+    }
+
+    context.putImageData(frame, 0, 0);
+    requestAnimationFrame(renderFrame);
+  }
+
+  function ensurePlayback() {
+    authLogoVideoEl.muted = true;
+    authLogoVideoEl.loop = true;
+    authLogoVideoEl.playsInline = true;
+    const playPromise = authLogoVideoEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
+  }
+
+  function startRenderIfReady() {
+    if (hasStartedRender) return;
+    if (authLogoVideoEl.readyState < 2) return;
+    hasStartedRender = true;
+    fitCanvas();
+    renderFrame();
+  }
+
+  authLogoVideoEl.addEventListener('loadedmetadata', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('loadeddata', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('canplay', () => {
+    ensurePlayback();
+    startRenderIfReady();
+  });
+  authLogoVideoEl.addEventListener('pause', ensurePlayback);
+  authLogoVideoEl.addEventListener('ended', ensurePlayback);
+  authLogoVideoEl.addEventListener('stalled', ensurePlayback);
+
+  ensurePlayback();
+  if (authLogoVideoEl.readyState >= 2) {
+    startRenderIfReady();
+  }
+}
+
+async function bootstrap() {
+  setupAuth();
+  startAuthLogoRender();
+  document.body.classList.add('auth-checking');
+  const activeUser = readActiveSession();
+  const token = readAccessToken();
+
+  if (activeUser?.email && token) {
+    activeAuthSession = {
+      name: activeUser.name || 'User',
+      email: activeUser.email,
+      role: activeUser.role || 'encharge',
+      userId: activeUser.userId || null
+    };
+    unlockDashboard();
+    startAppOnce();
+    document.body.classList.remove('auth-checking');
+
+    try {
+      const sessionResult = await api('/api/auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ accessToken: token })
+      });
+      activeAuthSession = {
+        name: sessionResult.user.fullName,
+        email: sessionResult.user.email,
+        role: sessionResult.user.role || 'encharge',
+        userId: sessionResult.user.id
+      };
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(activeAuthSession));
+      unlockDashboard();
+    } catch (error) {
+      const errorText = String(error?.message || '');
+      const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
+      if (!isNetworkLike) {
+        clearActiveSession();
+        lockDashboard();
+        if (loginEmailEl) loginEmailEl.focus();
+      }
+    }
+    return;
+  }
+  clearActiveSession();
+  lockDashboard();
+  document.body.classList.remove('auth-checking');
+  if (loginEmailEl) loginEmailEl.focus();
+}
+
+// ------------------------------------------
+// Tab Navigation
+// ------------------------------------------
+
+function switchTab(tabName) {
+  tabBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+  });
+  tabContents.forEach((content) => {
+    content.classList.toggle('active', content.id === `tab-${tabName}`);
+  });
+
+  if (tabName === 'admin') {
+    refreshAdminTransactions();
+  }
+}
+
+function switchAdminPanel(panelName) {
+  const isOverview = panelName === 'overview';
+  const isInventory = panelName === 'inventory';
+  const isKit = panelName === 'kit-spec';
+
+  if (adminPanelOverviewEl) adminPanelOverviewEl.classList.toggle('active', isOverview);
+  if (adminPanelInventoryEl) adminPanelInventoryEl.classList.toggle('active', isInventory);
+  if (adminPanelKitSpecEl) adminPanelKitSpecEl.classList.toggle('active', isKit);
+
+  if (adminNavOverviewBtn) adminNavOverviewBtn.classList.toggle('active', isOverview);
+  if (adminNavInventoryBtn) adminNavInventoryBtn.classList.toggle('active', isInventory);
+  if (adminNavKitSpecBtn) adminNavKitSpecBtn.classList.toggle('active', isKit);
+
+  if (isInventory) {
+    refreshInventoryModule();
+  }
+}
+
+function openAdminLogin() {
+  if (!canAccessAdminFeatures()) {
+    fireAudit('admin_access_denied', { reason: 'role_blocked', role: activeAuthSession?.role || 'unknown' });
+    setStatus('Admin dashboard access is allowed only for Administrations and Supervisor roles.');
+    return;
+  }
+  fireAudit('admin_access_allowed', { role: activeAuthSession?.role || 'unknown' });
+  if (!adminLoginModalEl) return;
+  document.body.classList.add('admin-login-open');
+  if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
+  if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
+  if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
+  if (adminLoginBtn) {
+    adminLoginBtn.focus();
+  } else if (adminUsernameEl) {
+    adminUsernameEl.focus();
+  }
+}
+
+function closeAdminLogin() {
+  document.body.classList.remove('admin-login-open');
+}
+
+async function openAdminDashboard() {
+  document.body.classList.add('admin-open');
+  saveUserUiState({ adminOpen: true });
+  switchAdminPanel('overview');
+  await refreshAdminTransactions();
+  await refreshSalesReport(activeSalesRange);
+}
+
+function closeAdminDashboard() {
+  document.body.classList.remove('admin-open');
+  saveUserUiState({ adminOpen: false });
+}
+
+async function submitAdminLogin() {
+  const username = (adminUsernameEl?.value || '').trim();
+  const password = adminPasswordEl?.value || '';
+
+  if (username !== ADMIN_DEFAULT_USERNAME || password !== ADMIN_DEFAULT_PASSWORD) {
+    if (adminLoginErrorEl) adminLoginErrorEl.textContent = 'Invalid username or password.';
+    return;
+  }
+
+  closeAdminLogin();
+  await openAdminDashboard();
+}
+
+// ------------------------------------------
+// POS Terminal Functions
+// ------------------------------------------
+
+function getCategoryName(category) {
+  const key = String(category || '').trim().toLowerCase();
+  const matched = (state.categories || []).find((x) => String(x.key || '').toLowerCase() === key);
+  if (matched?.name) return matched.name;
+  return category ? String(category) : 'Menu';
+}
+
+function normalizeMenuCategoryKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+function getDefaultCategoryImage(categoryKey) {
+  const defaultByKey = {
+    'main-dish': '/Menu/Main Dish.png',
+    rice: '/Menu/Rice.png',
+    burger: '/Menu/Burger.png',
+    drinks: '/Menu/Drinks.png',
+    fries: '/Menu/Fries.png',
+    dessert: '/Menu/Dessert.png',
+    sauces: '/Menu/Sauce.png'
+  };
+  const key = normalizeMenuCategoryKey(categoryKey);
+  return defaultByKey[key] || GENERIC_CATEGORY_ICON;
+}
+
+function renderCategoryButtons() {
+  if (!categoryButtonsEl) return;
+  const rows = (state.categories || [])
+    .map((category) => {
+      const key = String(category.key || '').toLowerCase();
+      const isActive = key === String(state.activeCategory || '').toLowerCase();
+      return `
+        <button class="category-btn ${isActive ? 'active' : ''}" data-category="${escapeHtml(key)}">
+          <img class="category-icon" src="${escapeHtml(category.image || getDefaultCategoryImage(key))}" alt="${escapeHtml(category.name || key)}" />
+          <span class="category-label">${escapeHtml(category.name || key)}</span>
+        </button>
+      `;
+    })
+    .join('');
+
+  categoryButtonsEl.innerHTML = rows || '<p class="status">No categories available.</p>';
+}
+
+function preloadProductImages(products) {
+  const uniqueImages = Array.from(
+    new Set(
+      (products || [])
+        .map((p) => String(p?.image || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  uniqueImages.forEach((src) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+  });
+}
+
+function updateVisibleProducts() {
+  const activeCategory = String(state.activeCategory || '').toLowerCase();
+  let visibleCount = 0;
+
+  productsEl.querySelectorAll('.product-row').forEach((row) => {
+    const rowCategory = String(row.getAttribute('data-category') || '').toLowerCase();
+    const isVisible = rowCategory === activeCategory;
+    row.style.display = isVisible ? '' : 'none';
+    if (isVisible) visibleCount += 1;
+  });
+
+  const noProductsNotice = productsEl.querySelector('.no-products-message');
+  if (noProductsNotice) {
+    noProductsNotice.style.display = visibleCount ? 'none' : '';
+  }
+}
+
+function renderProducts() {
+  productsEl.innerHTML = '';
+
+  if (!state.products.length) {
+    productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products available.</p>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  state.products.forEach((p) => {
+    const sortOrder = normalizeSortOrderValue(p.sortOrder, 0);
+    const row = document.createElement('div');
+    row.className = 'product-row';
+    row.setAttribute('data-category', String(p.category || '').toLowerCase());
+    row.innerHTML = `
+      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
+      <div class="product-info">
+        <div class="product-name">
+          <span class="product-order">Order ${sortOrder}</span>
+          ${p.name}
+        </div>
+        <div class="product-price">${money(p.price)}</div>
+      </div>
+      <button data-add="${p.id}">Add to Order</button>
+    `;
+    fragment.appendChild(row);
+  });
+
+  const noProductsNotice = document.createElement('p');
+  noProductsNotice.className = 'no-products-message';
+  noProductsNotice.style.textAlign = 'center';
+  noProductsNotice.style.color = '#6b7280';
+  noProductsNotice.style.padding = '20px';
+  noProductsNotice.textContent = 'No products in this category.';
+  fragment.appendChild(noProductsNotice);
+
+  productsEl.appendChild(fragment);
+  updateVisibleProducts();
+}
+
+function setPaymentMethod(method) {
+  paymentMethodEl.value = method;
+  onPaymentMethodChange();
+  cashPaymentBtn?.classList.toggle('active', method === 'cash');
+  ePaymentBtn?.classList.toggle('active', method !== 'cash');
+}
+
+function switchCategory(category) {
+  const selected = String(category || '').toLowerCase();
+  if (!selected) return;
+  state.activeCategory = selected;
+  saveUserUiState({ activeCategory: selected });
+
+  document.querySelectorAll('.category-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-category') === selected);
+  });
+
+  categoryTitleEl.textContent = getCategoryName(selected);
+  renderProducts();
+}
+
+async function refreshCatalog({ keepCategory = true } = {}) {
+  const result = await api('/api/products');
+  const nextCategories = Array.isArray(result.categories) ? result.categories : [];
+  const nextProducts = Array.isArray(result.products) ? result.products : [];
+
+  state.categories = nextCategories.map((x) => ({
+    key: String(x.key || '').trim().toLowerCase(),
+    name: String(x.name || '').trim() || String(x.key || ''),
+    image: String(x.image || '').trim() || getDefaultCategoryImage(x.key),
+    sortOrder: normalizeSortOrderValue(x.sortOrder, 0)
+  }));
+  state.products = normalizeCatalogProducts(nextProducts);
+
+  if (!state.categories.length) {
+    state.categories = [{
+      key: 'main-dish',
+      name: 'Main Dish',
+      image: '/Menu/Main Dish.png',
+      sortOrder: 10
+    }];
+  }
+
+  sortCatalogState();
+  const categoryKeys = new Set(state.categories.map((x) => x.key));
+  if (!keepCategory || !categoryKeys.has(String(state.activeCategory || '').toLowerCase())) {
+    state.activeCategory = state.categories[0].key;
+  }
+
+  writeCatalogCache({ categories: state.categories, products: state.products });
+  renderCategoryButtons();
+  switchCategory(state.activeCategory);
+  renderCart();
+  preloadProductImages(state.products);
+}
+
+function openMenuEditor() {
+  if (!menuEditorModalEl) return;
+  if (!canAccessAdminFeatures()) {
+    setStatus('Edit Menu is allowed only for Administrations and Supervisor roles.');
+    return;
+  }
+  document.body.classList.add('menu-editor-open');
+}
+
+function closeMenuEditor() {
+  if (!menuEditorModalEl) return;
+  document.body.classList.remove('menu-editor-open');
+}
+
+function warmMenuEditorInBackground({ force = false } = {}) {
+  if (!canAccessAdminFeatures()) return;
+  if (!force && menuEditorWarmReady) return;
+  if (menuEditorWarmInFlight) return;
+
+  menuEditorWarmInFlight = true;
+  const runWarmup = async () => {
+    try {
+      fillMenuCategorySelectOptions();
+      renderMenuCategoryEditorRows();
+      renderMenuProductEditorRows();
+      await refreshMenuEditorData();
+      menuEditorWarmReady = true;
+    } catch (_error) {
+      // Keep silent in background warmup.
+    } finally {
+      menuEditorWarmInFlight = false;
+    }
+  };
+
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => {
+      runWarmup();
+    }, { timeout: 1200 });
+    return;
+  }
+
+  setTimeout(() => {
+    runWarmup();
+  }, 0);
+}
+
+function fillMenuCategorySelectOptions() {
+  if (!menuProductCategoryInputEl) return;
+  menuProductCategoryInputEl.innerHTML = (state.categories || [])
+    .map((x) => `<option value="${escapeHtml(x.key)}">${escapeHtml(x.name)}</option>`)
+    .join('');
+}
+
+function renderMenuCategoryEditorRows() {
+  if (!menuCategoryEditorListEl) return;
+  if (!state.categories.length) {
+    menuCategoryEditorListEl.innerHTML = '<p>No categories available.</p>';
+    return;
+  }
+
+  const rows = state.categories.map((c) => {
+    const imageSrc = String(c.image || getDefaultCategoryImage(c.key));
+    const sortOrder = normalizeSortOrderValue(c.sortOrder, 0);
+    return `
+      <div class="menu-category-editor-row" data-category-key="${escapeHtml(c.key)}">
+        <div class="menu-order-chip">Order ${sortOrder}</div>
+        <input type="text" class="menu-edit-category-name" value="${escapeHtml(c.name)}" />
+        <div class="menu-category-image-wrap">
+          <input type="hidden" class="menu-current-category-image" value="${escapeHtml(imageSrc)}" />
+          <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(c.name)}" />
+          <input type="file" class="menu-edit-category-image-file" accept="image/*" />
+        </div>
+        <button type="button" class="menu-save-category-btn">Save Category</button>
+        <button type="button" class="menu-delete-btn menu-delete-category-btn">Delete</button>
+      </div>
+    `;
+  }).join('');
+
+  menuCategoryEditorListEl.innerHTML = rows;
+}
+
+function renderMenuProductEditorRows() {
+  if (!menuProductEditorListEl) return;
+  if (!state.products.length) {
+    menuProductEditorListEl.innerHTML = '<p>No products available.</p>';
+    return;
+  }
+
+  const categoryOptions = (state.categories || [])
+    .map((x) => `<option value="${escapeHtml(x.key)}">${escapeHtml(x.name)}</option>`)
+    .join('');
+
+  const rows = state.products.map((p) => {
+    const imageSrc = String(p.image || '/Business Logo/Ruels Logo for business.png');
+    const sortOrder = normalizeSortOrderValue(p.sortOrder, 0);
+    return `
+      <div class="menu-product-editor-row" data-product-id="${escapeHtml(p.id)}">
+        <div class="menu-order-chip">Order ${sortOrder}</div>
+        <input type="text" class="menu-edit-name" value="${escapeHtml(p.name)}" />
+        <input type="number" class="menu-edit-price" min="0" step="0.01" value="${Number(p.price || 0).toFixed(2)}" />
+        <select class="menu-edit-category">${categoryOptions}</select>
+        <input type="hidden" class="menu-current-image" value="${escapeHtml(imageSrc)}" />
+        <div class="row">
+          <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(p.name)}" />
+          <input type="file" class="menu-edit-image-file" accept="image/*" />
+        </div>
+        <button type="button" class="menu-save-product-btn">Save</button>
+        <button type="button" class="menu-delete-btn menu-delete-product-btn">Delete</button>
+      </div>
+    `;
+  }).join('');
+
+  menuProductEditorListEl.innerHTML = rows;
+  menuProductEditorListEl.querySelectorAll('.menu-product-editor-row').forEach((row) => {
+    const productId = row.getAttribute('data-product-id');
+    const product = state.products.find((x) => x.id === productId);
+    const categorySelect = row.querySelector('.menu-edit-category');
+    if (categorySelect && product?.category) {
+      categorySelect.value = product.category;
+    }
+  });
+}
+
+async function readFileAsDataUrl(fileInputEl) {
+  const file = fileInputEl?.files?.[0];
+  if (!file) return '';
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Cannot read image file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function refreshMenuEditorData() {
+  await refreshCatalog({ keepCategory: true });
+  fillMenuCategorySelectOptions();
+  renderMenuCategoryEditorRows();
+  renderMenuProductEditorRows();
+  menuEditorWarmReady = true;
+}
+
+async function handleMenuCategorySubmit(event) {
+  event.preventDefault();
+  if (!canAccessAdminFeatures()) {
+    setStatus('Only Administrations and Supervisor can edit menu.');
+    return;
+  }
+
+  const name = String(menuCategoryNameInputEl?.value || '').trim();
+
+  if (!name) {
+    setStatus('Category name is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Category name is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Add new category "${name}"?`)) {
+      return;
+    }
+    const image = await readFileAsDataUrl(menuCategoryImageFileInputEl);
+    if (menuCategoryAddBtn) {
+      menuCategoryAddBtn.disabled = true;
+      menuCategoryAddBtn.textContent = 'Adding...';
+    }
+    await api('/api/menu/categories', {
+      method: 'POST',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({ name, image })
+    });
+    if (menuCategoryNameInputEl) menuCategoryNameInputEl.value = '';
+    if (menuCategoryImageFileInputEl) menuCategoryImageFileInputEl.value = '';
+    await refreshMenuEditorData();
+    setStatus(`Category "${name}" added.`);
+    showConfirmationToast({
+      title: 'Category added',
+      message: `"${name}" was added to menu categories.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Add category failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Add category failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    if (menuCategoryAddBtn) {
+      menuCategoryAddBtn.disabled = false;
+      menuCategoryAddBtn.textContent = 'Add Category';
+    }
+  }
+}
+
+async function handleMenuProductSubmit(event) {
+  event.preventDefault();
+  if (!canAccessAdminFeatures()) {
+    setStatus('Only Administrations and Supervisor can edit menu.');
+    return;
+  }
+
+  const name = String(menuProductNameInputEl?.value || '').trim();
+  const price = Number(menuProductPriceInputEl?.value || 0);
+  const category = String(menuProductCategoryInputEl?.value || '').trim().toLowerCase();
+
+  if (!name) {
+    setStatus('Product name is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product name is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    setStatus('Product price must be a number >= 0.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product price must be a number greater than or equal to 0.',
+      tone: 'warning',
+      duration: 2400
+    });
+    return;
+  }
+  if (!category) {
+    setStatus('Select a category for product.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Select a category for the product.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Add new product "${name}"?`)) {
+      return;
+    }
+    if (menuProductAddBtn) {
+      menuProductAddBtn.disabled = true;
+      menuProductAddBtn.textContent = 'Adding...';
+    }
+    const imageFromFile = await readFileAsDataUrl(menuProductImageFileInputEl);
+    await api('/api/menu/products', {
+      method: 'POST',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        price,
+        category,
+        image: imageFromFile
+      })
+    });
+    if (menuProductNameInputEl) menuProductNameInputEl.value = '';
+    if (menuProductPriceInputEl) menuProductPriceInputEl.value = '';
+    if (menuProductImageFileInputEl) menuProductImageFileInputEl.value = '';
+    await refreshMenuEditorData();
+    setStatus(`Product "${name}" added.`);
+    showConfirmationToast({
+      title: 'Product added',
+      message: `"${name}" was added successfully.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Add product failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Add product failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    if (menuProductAddBtn) {
+      menuProductAddBtn.disabled = false;
+      menuProductAddBtn.textContent = 'Add Product';
+    }
+  }
+}
+
+async function handleMenuCategoryEditorClick(event) {
+  const deleteBtn = event.target.closest('.menu-delete-category-btn');
+  if (deleteBtn) {
+    const row = event.target.closest('.menu-category-editor-row');
+    const categoryKey = String(row?.getAttribute('data-category-key') || '').trim().toLowerCase();
+    const categoryName = String(row?.querySelector('.menu-edit-category-name')?.value || categoryKey).trim();
+    if (!categoryKey) return;
+    if (!window.confirm(`Delete category "${categoryName}" and all products under it?`)) {
+      return;
+    }
+
+    try {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      await api(`/api/menu/categories/${encodeURIComponent(categoryKey)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': String(activeAuthSession?.role || '') }
+      });
+      await refreshMenuEditorData();
+      showConfirmationToast({
+        title: 'Category deleted',
+        message: `"${categoryName}" and its products were removed from menu.`,
+        tone: 'success'
+      });
+      setStatus(`Category "${categoryName}" deleted.`);
+    } catch (error) {
+      showConfirmationToast({
+        title: 'Delete category failed',
+        message: error.message,
+        tone: 'warning',
+        duration: 2600
+      });
+      setStatus(`Delete category failed: ${error.message}`);
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+    }
+    return;
+  }
+
+  const saveBtn = event.target.closest('.menu-save-category-btn');
+  if (!saveBtn) return;
+
+  const row = event.target.closest('.menu-category-editor-row');
+  const categoryKey = String(row?.getAttribute('data-category-key') || '').trim().toLowerCase();
+  if (!row || !categoryKey) return;
+
+  const name = String(row.querySelector('.menu-edit-category-name')?.value || '').trim();
+  const currentImage = String(row.querySelector('.menu-current-category-image')?.value || '').trim();
+  const imageFileInput = row.querySelector('.menu-edit-category-image-file');
+
+  if (!name) {
+    setStatus('Category name cannot be empty.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Category name cannot be empty.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Save changes for category "${name}"?`)) {
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    const imageFromFile = await readFileAsDataUrl(imageFileInput);
+    await api(`/api/menu/categories/${encodeURIComponent(categoryKey)}`, {
+      method: 'PUT',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        image: imageFromFile || currentImage
+      })
+    });
+    await refreshMenuEditorData();
+    setStatus(`Category "${name}" updated.`);
+    showConfirmationToast({
+      title: 'Category updated',
+      message: `"${name}" changes were saved.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Update category failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Update category failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Category';
+  }
+}
+
+async function handleMenuProductEditorClick(event) {
+  const deleteBtn = event.target.closest('.menu-delete-product-btn');
+  if (deleteBtn) {
+    const row = event.target.closest('.menu-product-editor-row');
+    const productId = row?.getAttribute('data-product-id');
+    const productName = String(row?.querySelector('.menu-edit-name')?.value || '').trim() || String(productId || '');
+    if (!productId) return;
+    if (!window.confirm(`Delete product "${productName}"?`)) {
+      return;
+    }
+
+    try {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      await api(`/api/menu/products/${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+        headers: { 'x-user-role': String(activeAuthSession?.role || '') }
+      });
+      await refreshMenuEditorData();
+      showConfirmationToast({
+        title: 'Product deleted',
+        message: `"${productName}" was removed from menu.`,
+        tone: 'success'
+      });
+      setStatus(`Product "${productName}" deleted.`);
+    } catch (error) {
+      showConfirmationToast({
+        title: 'Delete product failed',
+        message: error.message,
+        tone: 'warning',
+        duration: 2600
+      });
+      setStatus(`Delete product failed: ${error.message}`);
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+    }
+    return;
+  }
+
+  const saveBtn = event.target.closest('.menu-save-product-btn');
+  if (!saveBtn) return;
+
+  const row = event.target.closest('.menu-product-editor-row');
+  const productId = row?.getAttribute('data-product-id');
+  if (!row || !productId) return;
+
+  const name = String(row.querySelector('.menu-edit-name')?.value || '').trim();
+  const price = Number(row.querySelector('.menu-edit-price')?.value || 0);
+  const category = String(row.querySelector('.menu-edit-category')?.value || '').trim().toLowerCase();
+  const currentImage = String(row.querySelector('.menu-current-image')?.value || '').trim();
+  const imageFileInput = row.querySelector('.menu-edit-image-file');
+
+  if (!name) {
+    setStatus('Product name cannot be empty.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product name cannot be empty.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    setStatus('Product price must be a number >= 0.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product price must be a number greater than or equal to 0.',
+      tone: 'warning',
+      duration: 2400
+    });
+    return;
+  }
+  if (!category) {
+    setStatus('Product category is required.');
+    showConfirmationToast({
+      title: 'Validation error',
+      message: 'Product category is required.',
+      tone: 'warning',
+      duration: 2200
+    });
+    return;
+  }
+
+  try {
+    if (!window.confirm(`Save changes for product "${name}"?`)) {
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    const imageFromFile = await readFileAsDataUrl(imageFileInput);
+    await api(`/api/menu/products/${encodeURIComponent(productId)}`, {
+      method: 'PUT',
+      headers: { 'x-user-role': String(activeAuthSession?.role || '') },
+      body: JSON.stringify({
+        name,
+        price,
+        category,
+        image: imageFromFile || currentImage
+      })
+    });
+    await refreshMenuEditorData();
+    setStatus(`Product "${name}" updated.`);
+    showConfirmationToast({
+      title: 'Product updated',
+      message: `"${name}" changes were saved.`,
+      tone: 'success'
+    });
+  } catch (error) {
+    setStatus(`Update product failed: ${error.message}`);
+    showConfirmationToast({
+      title: 'Update product failed',
+      message: error.message,
+      tone: 'warning',
+      duration: 2600
+    });
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+
+function renderCart() {
+  cartEl.innerHTML = '';
+
+  const items = getCartItems();
+  const displayItems = [...items].reverse();
+  if (!items.length) {
+    cartEl.innerHTML = '<p>No Orders Yet</p>'; 
+  } else {
+    const byId = Object.fromEntries(state.products.map((p) => [p.id, p]));
+    displayItems.forEach(({ productId, qty }) => {
+      const p = byId[productId];
+      const row = document.createElement('div');
+      row.className = 'cart-row';
+      row.innerHTML = `
+        <div class="cart-item-name">${p.name} x ${qty}</div>
+        <div class="cart-item-price">
+          ${money(p.price * qty)}
+          <button class="secondary" data-remove="${p.id}">-1</button>
+        </div>
+      `;
+      cartEl.appendChild(row);
+    });
+  }
+
+  const subtotal = getCartTotal();
+  const discount = getDiscountAmount();
+  const totalDue = getTotalDue();
+  if (subtotalValueEl) subtotalValueEl.textContent = money(subtotal);
+  if (totalDueValueEl) totalDueValueEl.textContent = money(totalDue);
+  if (discountInputEl) {
+    discountInputEl.value = discount ? discount.toFixed(2) : '0';
+  }
+}
+
+function onProductClick(e) {
+  const addId = e.target.getAttribute('data-add');
+  const removeId = e.target.getAttribute('data-remove');
+
+  if (addId) {
+    state.cart[addId] = (state.cart[addId] || 0) + 1;
+    renderCart();
+    playAddToCartConfetti();
+  }
+
+  if (removeId) {
+    state.cart[removeId] = Math.max(0, (state.cart[removeId] || 0) - 1);
+    renderCart();
+  }
+}
+
+function resetAfterSale() {
+  state.cart = {};
+  state.activeInvoice = null;
+  state.discountAmount = 0;
+  gcashInfoEl.innerHTML = '';
+  if (state.poller) {
+    clearInterval(state.poller);
+    state.poller = null;
+  }
+  // Clear customer info fields
+  if (customerNameEl) customerNameEl.value = '';
+  if (customerEmailEl) customerEmailEl.value = '';
+  if (customerPhoneEl) customerPhoneEl.value = '';
+  if (discountInputEl) discountInputEl.value = '0';
+  renderCart();
+}
+
+function updateReceiptActionVisibility() {
+  const hasReceipt = Boolean(state.lastPaidInvoice);
+  if (statusReceiptActionsEl) {
+    statusReceiptActionsEl.style.display = hasReceipt ? 'flex' : 'none';
+  }
+  if (statusPrintReceiptBtn) {
+    statusPrintReceiptBtn.disabled = !hasReceipt;
+  }
+}
+
+function renderReceipt(invoice) {
+  const successText = invoice?.payment?.successMessage || (invoice.status === 'PAID' ? 'Payment Successful' : 'Payment Pending');
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="status-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+  const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : getOrderTypeLabel(state.orderType);
+  const paidAtText = formatDate(invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString());
+
+  statusEl.classList.add('invoice-status');
+  statusEl.innerHTML = `
+    <div class="status-head">
+      <div class="status-ref">Invoice: ${escapeHtml(invoice.reference || '-')}</div>
+      <div class="status-badge ${String(invoice.status || '').toLowerCase() === 'paid' ? 'paid' : ''}">${escapeHtml(invoice.status || '-')}</div>
+    </div>
+    <div class="status-grid">
+      <div class="status-grid-row"><span>Order</span><strong>${escapeHtml(orderLabel)}</strong></div>
+      <div class="status-grid-row"><span>Payment</span><strong>${escapeHtml(getPaymentMethodLabel(invoice.paymentMethod))}</strong></div>
+      <div class="status-grid-row"><span>Result</span><strong>${escapeHtml(successText)}</strong></div>
+    </div>
+    <div class="status-items">${itemRows || '<div class="status-item-row"><span>No items</span><strong>-</strong></div>'}</div>
+    <div class="status-totals">
+      <div class="status-total-row"><span>Subtotal</span><strong>${money(invoice.subtotal ?? invoice.total)}</strong></div>
+      <div class="status-total-row"><span>Discount</span><strong>${money(invoice.discount || 0)}</strong></div>
+      <div class="status-total-row grand"><span>Total Due</span><strong>${money(invoice.total)}</strong></div>
+      <div class="status-total-row"><span>Paid</span><strong>${money(invoice?.payment?.amountPaid || invoice.total || 0)}</strong></div>
+      <div class="status-total-row"><span>Change</span><strong>${money(invoice?.payment?.change || 0)}</strong></div>
+    </div>
+    <div class="status-paid-at">Paid At: ${escapeHtml(paidAtText)}</div>
+  `;
+}
+
+function renderPaymentReceiptModal(invoice) {
+  const orderLabel = invoice?.orderType
+    ? getOrderTypeLabel(invoice.orderType)
+    : getOrderTypeLabel(state.orderType);
+  const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
+  const paidAt = invoice?.payment?.paidAt || new Date().toISOString();
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="receipt-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+
+  if (receiptRefEl) receiptRefEl.textContent = invoice.reference;
+  if (receiptDateEl) receiptDateEl.textContent = formatDate(paidAt);
+  if (receiptOrderTypeEl) receiptOrderTypeEl.textContent = orderLabel;
+  if (receiptPaymentMethodEl) receiptPaymentMethodEl.textContent = paymentLabel;
+  if (receiptItemsEl) receiptItemsEl.innerHTML = itemRows;
+  if (receiptSubtotalEl) receiptSubtotalEl.textContent = money(invoice.subtotal ?? invoice.total);
+  if (receiptDiscountEl) receiptDiscountEl.textContent = money(invoice.discount || 0);
+  if (receiptTotalDueEl) receiptTotalDueEl.textContent = money(invoice.total || 0);
+  if (receiptAmountPaidEl) receiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
+  if (receiptChangeEl) receiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+}
+
+function renderAdminReceiptModal(invoice) {
+  const paidAt = invoice?.payment?.paidAt || invoice?.updatedAt || invoice?.createdAt || new Date().toISOString();
+  const orderLabel = invoice?.orderType ? getOrderTypeLabel(invoice.orderType) : 'N/A';
+  const paymentLabel = getPaymentMethodLabel(invoice.paymentMethod);
+  const itemRows = (invoice.lineItems || [])
+    .map((item) => `
+      <div class="receipt-item-row">
+        <span>${escapeHtml(item.name)} x ${item.qty}</span>
+        <strong>${money(item.subtotal)}</strong>
+      </div>
+    `)
+    .join('');
+
+  if (adminReceiptRefEl) adminReceiptRefEl.textContent = invoice.reference || '-';
+  if (adminReceiptDateEl) adminReceiptDateEl.textContent = formatDate(paidAt);
+  if (adminReceiptOrderTypeEl) adminReceiptOrderTypeEl.textContent = orderLabel;
+  if (adminReceiptPaymentMethodEl) adminReceiptPaymentMethodEl.textContent = paymentLabel;
+  if (adminReceiptItemsEl) adminReceiptItemsEl.innerHTML = itemRows || '<div class="receipt-item-row"><span>No items found</span><strong>-</strong></div>';
+  if (adminReceiptSubtotalEl) adminReceiptSubtotalEl.textContent = money(invoice.subtotal ?? invoice.total ?? 0);
+  if (adminReceiptDiscountEl) adminReceiptDiscountEl.textContent = money(invoice.discount || 0);
+  if (adminReceiptTotalDueEl) adminReceiptTotalDueEl.textContent = money(invoice.total || 0);
+  if (adminReceiptAmountPaidEl) adminReceiptAmountPaidEl.textContent = money(invoice?.payment?.amountPaid || invoice.total || 0);
+  if (adminReceiptChangeEl) adminReceiptChangeEl.textContent = money(invoice?.payment?.change || 0);
+}
+
+function finalizeSuccessfulPayment(invoice, modeLabel) {
+  state.lastPaidInvoice = invoice;
+  updateReceiptActionVisibility();
+  state.cashPromptActive = false;
+  if (amountTenderedEl) amountTenderedEl.value = '';
+  resetAfterSale();
+}
+
+function closePaymentSuccessModal() {
+  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
+  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  if (receiptCardEl) receiptCardEl.classList.remove('collapsed');
+  if (receiptCardEl) receiptCardEl.classList.remove('minimizing');
+  if (receiptCardEl) receiptCardEl.style.transform = '';
+  if (receiptCardEl) receiptCardEl.style.opacity = '';
+  if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
+}
+
+function printReceiptContent(printAreaEl) {
+  if (!printAreaEl) return;
+  const printWindow = window.open('', '_blank', 'width=420,height=780');
+  if (!printWindow) {
+    setStatus('Pop-up blocked. Please allow pop-ups to print receipt.');
+    return;
+  }
+
+  const receiptHtml = printAreaEl.innerHTML;
+  const printStyles = `
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 8px; color: #2d1b12; }
+      .receipt-print-area { width: 80mm; margin: 0 auto; }
+      .receipt-header { text-align: center; border-bottom: 1px dashed #c8a88f; padding-bottom: 10px; margin-bottom: 10px; }
+      .receipt-logo { width: 110px; height: auto; object-fit: contain; margin-bottom: 6px; }
+      .receipt-header h3 { margin: 0; font-size: 24px; font-weight: 800; }
+      .receipt-header p { margin: 2px 0; font-size: 12px; }
+      .receipt-meta { display: grid; gap: 4px; margin-bottom: 10px; font-size: 12px; }
+      .receipt-meta div { display: flex; justify-content: space-between; border-bottom: 1px dotted #e6d3c3; padding-bottom: 2px; }
+      .receipt-items { border-top: 1px dashed #c8a88f; border-bottom: 1px dashed #c8a88f; padding: 8px 0; margin: 10px 0; }
+      .receipt-item-row { display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0; gap: 8px; }
+      .receipt-item-row strong { white-space: nowrap; }
+      .receipt-totals { display: grid; gap: 4px; }
+      .receipt-totals div { display: flex; justify-content: space-between; font-size: 13px; }
+      .receipt-totals .total-due { margin-top: 4px; padding-top: 6px; border-top: 1px solid #cfb29b; font-size: 16px; font-weight: 800; }
+      .receipt-footer { margin-top: 12px; text-align: center; font-size: 12px; font-weight: 700; }
+    </style>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head><meta charset="utf-8" /><title>Receipt</title>${printStyles}</head>
+      <body><div class="receipt-print-area">${receiptHtml}</div></body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    setTimeout(() => printWindow.close(), 200);
+  }, 120);
+}
+
+function printReceiptFromModal() {
+  printReceiptContent(receiptPrintAreaEl);
+}
+
+function openLatestReceiptPreview() {
+  if (!state.lastPaidInvoice) {
+    setStatus('No paid transaction yet to preview receipt.');
+    return;
+  }
+  renderPaymentReceiptModal(state.lastPaidInvoice);
+  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.add('open');
+}
+
+function togglePaymentReceiptCollapse() {
+  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  const targetBtn = statusPrintReceiptBtn;
+  if (!receiptCardEl || !receiptMinimizeBtn) return;
+
+  if (receiptMinimizeBtn.textContent === 'Minimize' && paymentSuccessModalEl?.classList.contains('open')) {
+    if (!targetBtn) return;
+    const cardRect = receiptCardEl.getBoundingClientRect();
+    const targetRect = targetBtn.getBoundingClientRect();
+    const dx = (targetRect.left + (targetRect.width / 2)) - (cardRect.left + (cardRect.width / 2));
+    const dy = (targetRect.top + (targetRect.height / 2)) - (cardRect.top + (cardRect.height / 2));
+
+    receiptCardEl.classList.add('minimizing');
+    receiptCardEl.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
+    receiptCardEl.style.opacity = '0.15';
+    receiptMinimizeBtn.textContent = 'Expand';
+
+    setTimeout(() => {
+      if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
+      receiptCardEl.classList.remove('minimizing');
+      receiptCardEl.style.transform = '';
+      receiptCardEl.style.opacity = '';
+      if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
+    }, 360);
+    return;
+  }
+
+  const collapsed = !receiptCardEl.classList.contains('collapsed');
+  receiptCardEl.classList.toggle('collapsed', collapsed);
+  receiptMinimizeBtn.textContent = collapsed ? 'Expand' : 'Minimize';
+}
+
+function printAdminReceiptFromModal() {
+  printReceiptContent(adminReceiptPrintAreaEl);
+}
+
+function openAdminReceiptModal() {
+  if (adminReceiptModalEl) adminReceiptModalEl.classList.add('open');
+}
+
+function closeAdminReceiptModal() {
+  if (adminReceiptModalEl) adminReceiptModalEl.classList.remove('open');
+}
+
+function openEwalletModal() {
+  if (!eWalletModalEl) return;
+  eWalletModalEl.classList.add('open');
+}
+
+function closeEwalletModal() {
+  if (!eWalletModalEl) return;
+  eWalletModalEl.classList.remove('open');
+}
+
+function openScanQrModal() {
+  if (!scanQrModalEl) return;
+  scanQrModalEl.classList.add('open');
+}
+
+function closeScanQrModal() {
+  if (!scanQrModalEl) return;
+  scanQrModalEl.classList.remove('open');
+}
+
+function renderScanQrContent({ checkout, invoice, notice = 'Waiting for payment confirmation...' }) {
+  if (!scanQrContentEl) return;
+  const sampleQrDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
+      <rect width="220" height="220" fill="white"/>
+      <rect x="12" y="12" width="56" height="56" fill="black"/>
+      <rect x="20" y="20" width="40" height="40" fill="white"/>
+      <rect x="28" y="28" width="24" height="24" fill="black"/>
+      <rect x="152" y="12" width="56" height="56" fill="black"/>
+      <rect x="160" y="20" width="40" height="40" fill="white"/>
+      <rect x="168" y="28" width="24" height="24" fill="black"/>
+      <rect x="12" y="152" width="56" height="56" fill="black"/>
+      <rect x="20" y="160" width="40" height="40" fill="white"/>
+      <rect x="28" y="168" width="24" height="24" fill="black"/>
+      <rect x="84" y="84" width="8" height="8" fill="black"/>
+      <rect x="100" y="84" width="8" height="8" fill="black"/>
+      <rect x="116" y="84" width="8" height="8" fill="black"/>
+      <rect x="132" y="84" width="8" height="8" fill="black"/>
+      <rect x="84" y="100" width="8" height="8" fill="black"/>
+      <rect x="116" y="100" width="8" height="8" fill="black"/>
+      <rect x="132" y="100" width="8" height="8" fill="black"/>
+      <rect x="84" y="116" width="8" height="8" fill="black"/>
+      <rect x="100" y="116" width="8" height="8" fill="black"/>
+      <rect x="132" y="116" width="8" height="8" fill="black"/>
+      <rect x="84" y="132" width="8" height="8" fill="black"/>
+      <rect x="100" y="132" width="8" height="8" fill="black"/>
+      <rect x="116" y="132" width="8" height="8" fill="black"/>
+      <rect x="132" y="132" width="8" height="8" fill="black"/>
+      <text x="110" y="212" text-anchor="middle" font-size="11" font-family="Arial" fill="#5a3521">Sample QR for Scan-to-Pay</text>
+    </svg>
+  `)}`;
+  const qrMarkup = `<img class="qr" alt="Sample Payment QR Code" src="${sampleQrDataUrl}" />`;
+
+  scanQrContentEl.innerHTML = `
+    <div class="scan-qr-meta">
+      <div><strong>Reference:</strong> ${escapeHtml(checkout?.reference || invoice?.reference || '-')}</div>
+      <div><strong>Amount:</strong> ${money(invoice?.total || checkout?.amount || 0)}</div>
+      <div><strong>Method:</strong> ${escapeHtml(getPaymentMethodLabel(invoice?.paymentMethod || checkout?.method || 'gcash'))}</div>
+      <div><strong>Status:</strong> ${escapeHtml(notice)}</div>
+    </div>
+    ${qrMarkup}
+  `;
+}
+
+async function startScanQrPaymentFlow() {
+  try {
+    const items = getCartItems();
+    if (!items.length) {
+      setStatus('Add at least one item first.');
+      return;
+    }
+
+    const { invoice } = await api('/api/invoices', {
+      method: 'POST',
+      body: JSON.stringify({
+        items,
+        paymentMethod: 'gcash',
+        discountAmount: getDiscountAmount(),
+        orderType: state.orderType
+      })
+    });
+
+    state.activeInvoice = invoice;
+
+    const customerInfo = {};
+    const cName = (customerNameEl?.value || '').trim();
+    const cEmail = (customerEmailEl?.value || '').trim();
+    const cPhone = (customerPhoneEl?.value || '').trim();
+    if (cName) customerInfo.name = cName;
+    if (cEmail) customerInfo.email = cEmail;
+    if (cPhone) customerInfo.phone = cPhone;
+
+    const { checkout } = await api('/api/payments/ewallet/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
+    });
+
+    state.scanQrContext = {
+      invoiceId: invoice.id,
+      invoice,
+      checkout
+    };
+
+    renderScanQrContent({ checkout, invoice, notice: 'Waiting for customer proof of payment...' });
+    if (scanQrFinishBtn) scanQrFinishBtn.disabled = false;
+    openScanQrModal();
+    setStatus('Sample QR is ready. Ask customer to scan and pay, then confirm proof and click Finish.');
+  } catch (error) {
+    setStatus(`QR checkout error: ${error.message}`);
+  }
+}
+
+async function finishScanQrPayment() {
+  if (!state.scanQrContext?.invoiceId) {
+    setStatus('No active QR payment session.');
+    return;
+  }
+
+  let paidInvoice = null;
+  try {
+    const completeResult = await api(`/api/payments/ewallet/manual-complete/${state.scanQrContext.invoiceId}`, {
+      method: 'POST'
+    });
+    paidInvoice = completeResult?.invoice || null;
+  } catch (error) {
+    setStatus(`Cannot complete payment: ${error.message}`);
+    return;
+  }
+  if (!paidInvoice) return;
+
+  closeScanQrModal();
+  renderReceipt(paidInvoice);
+  await refreshSalesReport(activeSalesRange);
+  finalizeSuccessfulPayment(paidInvoice, 'E-Payment');
+  state.scanQrContext = null;
+}
+
+function renderSalesReport(report) {
+  salesSummaryEl.textContent = [
+    `Range: ${report.range.label.toUpperCase()}`,
+    `Total Sales: ${money(report.totalSales)}`,
+    `Transactions: ${report.totalTransactions}`,
+    `Average Ticket: ${money(report.averageTicket)}`,
+    `Cash: ${money(report.byMethod?.cash || 0)}`,
+    `E-Wallet: ${money((report.byMethod?.gcash || 0) + (report.byMethod?.paymaya || 0))}`
+  ].join('\n');
+
+  const rows = (report.transactions || []).slice(0, 10);
+  if (!rows.length) {
+    salesListEl.innerHTML = '<p>No sales found for this range.</p>';
+    return;
+  }
+
+  salesListEl.innerHTML = rows
+    .map(
+      (x) => `
+      <div class="sales-row sales-row-clickable" data-receipt="${x.invoiceId || ''}">
+        <span class="sales-ref">${x.reference}</span>
+        <span class="method-chip">
+          <img class="payment-method-icon" src="${getPaymentMethodIcon(x.method)}" alt="${getPaymentMethodLabel(x.method)}" />
+          ${getPaymentMethodLabel(x.method)}
+        </span>
+        <span class="sales-amount">${money(x.amountPaid)}</span>
+      </div>
+    `
+    )
+    .join('');
+}
+
+function renderDetailedSalesReport(report) {
+  if (detailDailySalesEl) detailDailySalesEl.textContent = money(report?.dailySales?.totalSales || 0);
+  if (detailDailyMetaEl) {
+    detailDailyMetaEl.textContent = `${Number(report?.dailySales?.totalTransactions || 0)} transactions | Avg ${money(report?.dailySales?.averageTicket || 0)}`;
+  }
+  if (detailMonthlySalesEl) detailMonthlySalesEl.textContent = money(report?.monthlySales?.totalSales || 0);
+  if (detailMonthlyMetaEl) {
+    detailMonthlyMetaEl.textContent = `${Number(report?.monthlySales?.totalTransactions || 0)} transactions | Avg ${money(report?.monthlySales?.averageTicket || 0)}`;
+  }
+
+  if (!topProductsListEl) return;
+  const rows = Array.isArray(report?.topSalesPerProduct) ? report.topSalesPerProduct : [];
+  if (!rows.length) {
+    topProductsListEl.innerHTML = '<p>No product sales yet.</p>';
+    return;
+  }
+
+  topProductsListEl.innerHTML = rows
+    .map((item) => `
+      <div class="top-product-row">
+        <span class="top-product-name">${escapeHtml(item.productName || 'Unknown Product')}</span>
+        <span class="top-product-qty">${Number(item.qtySold || 0)} sold</span>
+        <span class="top-product-sales">${money(item.totalSales || 0)}</span>
+      </div>
+    `)
+    .join('');
+}
+
+async function refreshDetailedSalesReport() {
+  try {
+    const report = await api('/api/reports/sales/detailed');
+    renderDetailedSalesReport(report);
+  } catch (error) {
+    if (topProductsListEl) {
+      topProductsListEl.innerHTML = `<p class="error">Detailed sales error: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+}
+
+function renderInventoryReport(report) {
+  function formatQty(value) {
+    return Number(value || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function formatInventoryMoney(value) {
+    return `PHP ${Number(value || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  }
+
+  const totals = report?.totals || {};
+  const ingredients = Array.isArray(report?.ingredients) ? report.ingredients : [];
+
+  if (inventorySummaryEl) {
+    inventorySummaryEl.textContent = [
+      `Total Ingredients: ${Number(totals.totalIngredients || 0)}`,
+      `Total Inventory Value: ${formatInventoryMoney(totals.totalInventoryValue || 0)}`,
+      `Low Stock Items: ${Number(totals.lowStockCount || 0)}`
+    ].join('\n');
+  }
+
+  if (!inventoryTableWrapEl) return;
+  if (!ingredients.length) {
+    inventoryTableWrapEl.innerHTML = '<p>No ingredients yet. Add your first ingredient above.</p>';
+    return;
+  }
+
+  const rows = ingredients.map((x) => {
+    const usageRows = (x.usageByProduct || [])
+      .slice(0, 3)
+      .map((u) => `<li>${escapeHtml(u.productName)}: used ${formatQty(u.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</li>`)
+      .join('');
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(x.name)}</strong></td>
+        <td>${formatQty(x.qtyOnHand || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${formatInventoryMoney(x.unitPrice || 0)}</td>
+        <td>${formatInventoryMoney(x.inventoryValue || 0)}</td>
+        <td>${formatQty(x.estimatedUsedQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${formatQty(x.estimatedRemainingQty || 0)} ${escapeHtml(x.unit || 'pcs')}</td>
+        <td>${x.lowStock ? '<span class="low-stock-badge">Low Stock</span>' : 'OK'}</td>
+        <td>${usageRows ? `<ul class="usage-list">${usageRows}</ul>` : 'No recipe mapping yet'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  inventoryTableWrapEl.innerHTML = `
+    <table class="inventory-table">
+      <thead>
+        <tr>
+          <th>Ingredient</th>
+          <th>Qty On Hand</th>
+          <th>Unit Price</th>
+          <th>Inventory Value</th>
+          <th>Estimated Used</th>
+          <th>Estimated Remaining</th>
+          <th>Status</th>
+          <th>Used in Products</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshInventoryModule() {
+  const isAdmin = canManageInventory();
+  if (inventoryIngredientFormEl) {
+    inventoryIngredientFormEl.style.display = isAdmin ? 'flex' : 'none';
+  }
+  if (inventoryAdminNoteEl) {
+    inventoryAdminNoteEl.style.display = isAdmin ? 'none' : 'block';
+  }
+
+  if (inventorySummaryEl) inventorySummaryEl.textContent = 'Loading inventory summary...';
+  if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '<p>Loading ingredients...</p>';
+
+  try {
+    const report = await api('/api/admin/inventory/report');
+    renderInventoryReport(report);
+  } catch (error) {
+    if (inventorySummaryEl) inventorySummaryEl.textContent = `Inventory error: ${error.message}`;
+    if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '';
+  }
+}
+
+async function handleIngredientSubmit(event) {
+  event.preventDefault();
+  if (!canManageInventory()) {
+    setStatus('Only Administrations role can add ingredients.');
+    return;
+  }
+
+  const name = String(ingredientNameInputEl?.value || '').trim();
+  const qtyOnHand = Number(ingredientQtyInputEl?.value || 0);
+  const unitPrice = Number(ingredientPriceInputEl?.value || 0);
+  const unit = String(ingredientUnitInputEl?.value || '').trim() || 'pcs';
+
+  if (!name) {
+    setStatus('Ingredient name is required.');
+    return;
+  }
+  if (!Number.isFinite(qtyOnHand) || qtyOnHand < 0) {
+    setStatus('Quantity must be a valid number >= 0.');
+    return;
+  }
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    setStatus('Unit price must be a valid number >= 0.');
+    return;
+  }
+
+  try {
+    if (ingredientAddBtn) {
+      ingredientAddBtn.disabled = true;
+      ingredientAddBtn.textContent = 'Adding...';
+    }
+
+    await api('/api/admin/inventory/ingredients', {
+      method: 'POST',
+      headers: {
+        'x-user-role': String(activeAuthSession?.role || '')
+      },
+      body: JSON.stringify({ name, qtyOnHand, unitPrice, unit })
+    });
+
+    if (ingredientNameInputEl) ingredientNameInputEl.value = '';
+    if (ingredientQtyInputEl) ingredientQtyInputEl.value = '';
+    if (ingredientPriceInputEl) ingredientPriceInputEl.value = '';
+    if (ingredientUnitInputEl) ingredientUnitInputEl.value = 'pcs';
+    await refreshInventoryModule();
+    setStatus(`Ingredient "${name}" added successfully.`);
+  } catch (error) {
+    setStatus(`Add ingredient failed: ${error.message}`);
+  } finally {
+    if (ingredientAddBtn) {
+      ingredientAddBtn.disabled = false;
+      ingredientAddBtn.textContent = 'Add Ingredient';
+    }
+  }
+}
+
+async function refreshSalesReport(range = activeSalesRange) {
+  try {
+    activeSalesRange = range;
+    saveUserUiState({ salesRange: activeSalesRange });
+    const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
+    renderSalesReport(report);
+    await refreshDetailedSalesReport();
+  } catch (error) {
+    salesSummaryEl.textContent = `Sales report error: ${error.message}`;
+    salesListEl.innerHTML = '';
+  }
+}
+
+async function pollInvoice(invoiceId) {
+  if (state.poller) {
+    clearInterval(state.poller);
+  }
+
+  let pollCount = 0;
+  const maxPolls = 90; // 3 minutes at 2s intervals
+
+  state.poller = setInterval(async () => {
+    try {
+      pollCount++;
+
+      // Every 5th poll, also try to verify directly with PayMongo
+      if (pollCount % 5 === 0) {
+        try {
+          const verifyResult = await api(`/api/payments/ewallet/verify/${invoiceId}`, {
+            method: 'POST'
+          });
+          if (verifyResult.verified || verifyResult.alreadyPaid) {
+            clearInterval(state.poller);
+            state.poller = null;
+            const inv = verifyResult.invoice;
+            renderReceipt(inv);
+            await refreshSalesReport(activeSalesRange);
+            finalizeSuccessfulPayment(inv, 'E-Payment');
+            return;
+          }
+        } catch (verifyErr) {
+          // Ignore verify errors, continue polling
+        }
+      }
+
+      const { invoice } = await api(`/api/invoices/${invoiceId}`);
+      if (invoice.status === 'PAID') {
+        clearInterval(state.poller);
+        state.poller = null;
+        renderReceipt(invoice);
+        await refreshSalesReport(activeSalesRange);
+        finalizeSuccessfulPayment(invoice, 'E-Payment');
+      } else if (pollCount >= maxPolls) {
+        clearInterval(state.poller);
+        state.poller = null;
+        setStatus('Payment verification timed out. Check Admin tab to verify manually.');
+      }
+    } catch (err) {
+      setStatus(`Polling error: ${err.message}`);
+    }
+  }, 2000);
+}
+
+async function handleCheckout() {
+  try {
+    const items = getCartItems();
+    if (!items.length) {
+      setStatus('Add at least one item first.');
+      return;
+    }
+
+    const paymentMethod = paymentMethodEl.value;
+    const discountAmount = getDiscountAmount();
+
+    if (paymentMethod === 'cash') {
+      const tendered = Number(amountTenderedEl?.value || 0);
+      if (tendered <= 0) {
+        setStatus('Enter customer cash tendered amount.');
+        if (amountTenderedEl) amountTenderedEl.focus();
+        return;
+      }
+      const likelyOffline = !navigator.onLine || !state.connectivity.serverReachable;
+      if (likelyOffline) {
+        console.info('[POS-App] Cash checkout routed to offline queue.', {
+          navigatorOnline: navigator.onLine,
+          serverReachable: state.connectivity.serverReachable
+        });
+        const queuedInvoice = await queueOfflineCashSale({
+          items,
+          amountTendered: tendered,
+          discountAmount,
+          orderType: state.orderType
+        });
+        renderReceipt(queuedInvoice);
+        finalizeSuccessfulPayment(queuedInvoice, 'Cash');
+        await refreshConnectivityStatus({ showTransitionToast: false });
+        showConfirmationToast({
+          title: 'Saved offline',
+          message: 'Cash sale stored on this device. Use Sync now to send to Supabase.',
+          tone: 'warning',
+          duration: 3400
+        });
+        return;
+      }
+
+      try {
+        console.info('[POS-App] Cash checkout routed to online API.', {
+          navigatorOnline: navigator.onLine,
+          serverReachable: state.connectivity.serverReachable
+        });
+        const { invoice } = await api('/api/invoices', {
+          method: 'POST',
+          body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+        });
+        state.activeInvoice = invoice;
+        const paid = await api('/api/payments/cash', {
+          method: 'POST',
+          body: JSON.stringify({ invoiceId: invoice.id, amountTendered: tendered })
+        });
+        renderReceipt(paid.invoice);
+        await refreshSalesReport(activeSalesRange);
+        finalizeSuccessfulPayment(paid.invoice, 'Cash');
+        return;
+      } catch (error) {
+        if (!isNetworkLikeError(error)) {
+          throw error;
+        }
+        console.warn('[POS-App] Cash checkout failed online; queuing offline instead.', {
+          error: error?.message || String(error)
+        });
+        const queuedInvoice = await queueOfflineCashSale({
+          items,
+          amountTendered: tendered,
+          discountAmount,
+          orderType: state.orderType
+        });
+        renderReceipt(queuedInvoice);
+        finalizeSuccessfulPayment(queuedInvoice, 'Cash');
+        await refreshConnectivityStatus({ showTransitionToast: false });
+        showConfirmationToast({
+          title: 'Saved offline',
+          message: 'Cash sale stored on this device. Use Sync now to send to Supabase.',
+          tone: 'warning',
+          duration: 3400
+        });
+        return;
+      }
+    }
+
+    const { invoice } = await api('/api/invoices', {
+      method: 'POST',
+      body: JSON.stringify({ items, paymentMethod, discountAmount, orderType: state.orderType })
+    });
+
+    state.activeInvoice = invoice;
+
+    // Collect customer info from the form
+    const customerInfo = {};
+    const cName = (customerNameEl?.value || '').trim();
+    const cEmail = (customerEmailEl?.value || '').trim();
+    const cPhone = (customerPhoneEl?.value || '').trim();
+    if (cName) customerInfo.name = cName;
+    if (cEmail) customerInfo.email = cEmail;
+    if (cPhone) customerInfo.phone = cPhone;
+
+    const eWalletMethod = String(paymentMethod).toLowerCase();
+    const eWalletLabel = getPaymentMethodLabel(eWalletMethod);
+    const { checkout } = await api('/api/payments/ewallet/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
+    });
+
+    const qrMarkup = checkout.qrDataUrl
+      ? `<img class="qr" alt="GCash QR" src="${checkout.qrDataUrl}" />`
+      : '<div>No direct QR in POS for this provider. Continue in hosted checkout.</div>';
+
+    gcashInfoEl.innerHTML = `
+      <h3>${eWalletLabel} Checkout</h3>
+      <div>Gateway: <strong>${String(checkout.provider || '').toUpperCase()}</strong></div>
+      <div>Method: <strong>${eWalletLabel}</strong></div>
+      <div>Reference: ${checkout.reference}</div>
+      ${qrMarkup}
+      <div class="row">
+        <button id="openCheckout" class="secondary">Open Hosted Checkout</button>
+      </div>
+    `;
+
+    const openBtn = document.getElementById('openCheckout');
+    openBtn.addEventListener('click', () => {
+      window.open(checkout.checkoutUrl, '_blank', 'noopener');
+    });
+
+    window.open(checkout.checkoutUrl, '_blank', 'noopener');
+    setStatus(`${eWalletLabel} checkout created via ${String(checkout.provider || '').toUpperCase()}. Waiting for payment...\nReference: ${checkout.reference}\n\nPayment will be auto-verified every 10 seconds.`);
+
+    await pollInvoice(invoice.id);
+  } catch (error) {
+    setStatus(`Checkout error: ${error.message}`);
+  }
+}
+
+function onPaymentMethodChange() {
+  const isCash = paymentMethodEl.value === 'cash';
+  if (cashRowEl) {
+    cashRowEl.style.display = (isCash && state.cashPromptActive) ? 'flex' : 'none';
+  }
+}
+
+// ------------------------------------------
+// Admin / Transactions Functions
+// ------------------------------------------
+
+async function refreshAdminTransactions() {
+  try {
+    const filterStatus = adminFilterEl.value;
+    const range = adminRangeEl.value;
+
+    let url = '/api/admin/transactions?';
+    if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
+    if (range) url += `range=${encodeURIComponent(range)}&`;
+
+    const { transactions } = await api(url);
+    renderAdminTransactions(transactions);
+    renderAdminStats(transactions);
+  } catch (error) {
+    adminTransactionsEl.innerHTML = `<p class="error">Error loading transactions: ${error.message}</p>`;
+  }
+}
+
+function renderAdminStats(transactions) {
+  const total = transactions.length;
+  const paid = transactions.filter((t) => t.status === 'PAID');
+  const pending = transactions.filter((t) => t.status === 'PENDING');
+
+  const totalRevenue = paid.reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+  const cashRevenue = paid
+    .filter((t) => t.paymentMethod === 'cash')
+    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+  const gcashRevenue = paid
+    .filter((t) => t.paymentMethod === 'gcash' || t.paymentMethod === 'paymaya')
+    .reduce((sum, t) => sum + (t.payment?.amountPaid || t.total), 0);
+
+  statTotalEl.textContent = total;
+  statPaidEl.textContent = paid.length;
+  statPendingEl.textContent = pending.length;
+  statRevenueEl.textContent = money(totalRevenue);
+  statCashEl.textContent = money(cashRevenue);
+  statGcashEl.textContent = money(gcashRevenue);
+}
+
+function renderAdminTransactions(transactions) {
+  if (!transactions.length) {
+    adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    return;
+  }
+
+  const rows = transactions.map((t) => {
+    const statusClass = t.status === 'PAID' ? 'badge-paid' : 'badge-pending';
+    const methodClass = t.paymentMethod === 'cash' ? 'badge-cash' : 'badge-gcash';
+
+    const verifyBtn = (t.status === 'PENDING' && t.paymentMethod !== 'cash')
+      ? `<button class="verify-btn small" data-verify="${t.id}">Verify</button>`
+      : '';
+    const receiptBtn = (t.status === 'PAID')
+      ? `<button class="secondary small" data-receipt="${t.id}">Receipt</button>`
+      : '';
+
+    const paidInfo = t.payment
+      ? `<div class="txn-paid-info">Paid: ${money(t.payment.amountPaid)} at ${formatDate(t.payment.paidAt)}</div>`
+      : '';
+
+    // Customer information from PayMongo billing
+    let customerInfoHtml = '';
+    if (t.payment) {
+      const name = t.payment.customerName;
+      const email = t.payment.customerEmail;
+      const phone = t.payment.customerPhone;
+
+      if (name || email || phone) {
+        customerInfoHtml = `
+          <div class="txn-customer">
+            <div class="txn-customer-label">Customer Info:</div>
+            ${name ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(name)}</div>` : ''}
+            ${email ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(email)}</div>` : ''}
+            ${phone ? `<div class="txn-customer-field"><span class="field-icon">??</span> ${escapeHtml(phone)}</div>` : ''}
+          </div>
+        `;
+      }
+    }
+
+    return `
+      <div class="txn-row">
+        <div class="txn-main">
+          <button class="txn-ref receipt-link" data-receipt="${t.id}">${t.reference}</button>
+          <div class="txn-badges">
+            <span class="badge ${statusClass}">${t.status}</span>
+            <span class="badge ${methodClass} method-badge">
+              <img class="payment-method-icon" src="${getPaymentMethodIcon(t.paymentMethod)}" alt="${getPaymentMethodLabel(t.paymentMethod)}" />
+              ${getPaymentMethodLabel(t.paymentMethod)}
+            </span>
+          </div>
+        </div>
+        <div class="txn-details">
+          <div class="txn-amount">${money(t.total)}</div>
+          <div class="txn-date">${formatDate(t.createdAt)}</div>
+          ${paidInfo}
+          ${customerInfoHtml}
+        </div>
+        <div class="txn-actions">
+          ${verifyBtn}
+          ${receiptBtn}
+        </div>
+      </div>
+    `;
+  });
+
+  adminTransactionsEl.innerHTML = rows.join('');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function verifyPayment(invoiceId) {
+  try {
+    const btn = document.querySelector(`[data-verify="${invoiceId}"]`);
+    if (btn) {
+      btn.textContent = 'Verifying...';
+      btn.disabled = true;
+    }
+
+    const result = await api(`/api/payments/ewallet/verify/${invoiceId}`, {
+      method: 'POST'
+    });
+
+    if (result.verified || result.alreadyPaid) {
+      alert(`? Payment verified! Invoice ${result.invoice.reference} is now PAID.`);
+    } else {
+      alert(`? Payment not yet completed.\nStatus: ${result.sessionStatus || 'unknown'}\n${result.message}`);
+    }
+
+    await refreshAdminTransactions();
+    await refreshSalesReport(activeSalesRange);
+  } catch (error) {
+    alert(`? Verification failed: ${error.message}`);
+    await refreshAdminTransactions();
+  }
+}
+
+async function verifyAllPending() {
+  try {
+    adminVerifyAllBtn.textContent = 'Verifying...';
+    adminVerifyAllBtn.disabled = true;
+
+    const filterStatus = adminFilterEl.value;
+    const range = adminRangeEl.value;
+
+    let url = '/api/admin/transactions?status=PENDING&';
+    if (range) url += `range=${encodeURIComponent(range)}&`;
+
+    const { transactions } = await api(url);
+    const gcashPending = transactions.filter((t) => t.paymentMethod !== 'cash');
+
+    if (!gcashPending.length) {
+      alert('No pending E-Payment transactions to verify.');
+      adminVerifyAllBtn.textContent = 'Verify All Pending';
+      adminVerifyAllBtn.disabled = false;
+      return;
+    }
+
+    let verified = 0;
+    let failed = 0;
+
+    for (const t of gcashPending) {
+      try {
+        const result = await api(`/api/payments/ewallet/verify/${t.id}`, { method: 'POST' });
+        if (result.verified || result.alreadyPaid) {
+          verified++;
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    alert(`Verification complete!\n? Verified: ${verified}\n? Still pending: ${gcashPending.length - verified - failed}\n? Errors: ${failed}`);
+
+    await refreshAdminTransactions();
+    await refreshSalesReport(activeSalesRange);
+  } catch (error) {
+    alert(`Verification error: ${error.message}`);
+  } finally {
+    adminVerifyAllBtn.textContent = 'Verify All Pending';
+    adminVerifyAllBtn.disabled = false;
+  }
+}
+
+async function viewReceipt(invoiceId) {
+  try {
+    const { invoice } = await api(`/api/invoices/${invoiceId}`);
+    if (!invoice) {
+      alert('Receipt not found.');
+      return;
+    }
+    renderAdminReceiptModal(invoice);
+    openAdminReceiptModal();
+  } catch (error) {
+    alert(`Unable to load receipt: ${error.message}`);
+  }
+}
+
+// ------------------------------------------
+// Event Listeners & Init
+// ------------------------------------------
+
+function setupEventListeners() {
+  // Tab navigation
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+  });
+
+  if (categoryButtonsEl) {
+    categoryButtonsEl.addEventListener('click', (e) => {
+      const category = e.target.closest('.category-btn')?.getAttribute('data-category');
+      if (category) switchCategory(category);
+    });
+  }
+
+  // POS events
+  productsEl.addEventListener('click', onProductClick);
+  cartEl.addEventListener('click', onProductClick);
+  paymentMethodEl.addEventListener('change', onPaymentMethodChange);
+  if (dineInCheckoutBtn) {
+    dineInCheckoutBtn.addEventListener('click', () => {
+      setOrderType('dine-in');
+    });
+  }
+  if (takeOutCheckoutBtn) {
+    takeOutCheckoutBtn.addEventListener('click', () => {
+      setOrderType('take-out');
+    });
+  }
+  if (cashPaymentBtn) {
+    cashPaymentBtn.addEventListener('click', () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      state.cashPromptActive = true;
+      setPaymentMethod('cash');
+      setStatus('Enter cash tendered amount, then click Pay.');
+      if (amountTenderedEl) amountTenderedEl.focus();
+    });
+  }
+  if (cashPayBtn) {
+    cashPayBtn.addEventListener('click', async () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!amountTenderedEl?.value) {
+        setStatus('Enter customer cash tendered amount.');
+        if (amountTenderedEl) amountTenderedEl.focus();
+        return;
+      }
+      setPaymentMethod('cash');
+      await handleCheckout();
+    });
+  }
+  if (ePaymentBtn) {
+    ePaymentBtn.addEventListener('click', async () => {
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. E-Payment is temporarily unavailable.');
+        return;
+      }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
+      openEwalletModal();
+    });
+  }
+  if (chooseGcashBtn) {
+    chooseGcashBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. GCash checkout is unavailable.');
+        return;
+      }
+      closeEwalletModal();
+      setPaymentMethod('gcash');
+      await handleCheckout();
+    });
+  }
+  if (choosePaymayaBtn) {
+    choosePaymayaBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. PayMaya checkout is unavailable.');
+        return;
+      }
+      closeEwalletModal();
+      setPaymentMethod('paymaya');
+      await handleCheckout();
+    });
+  }
+  if (chooseScanQrBtn) {
+    chooseScanQrBtn.addEventListener('click', async () => {
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. QR checkout is unavailable.');
+        return;
+      }
+      closeEwalletModal();
+      setPaymentMethod('gcash');
+      await startScanQrPaymentFlow();
+    });
+  }
+  if (cancelEwalletBtn) {
+    cancelEwalletBtn.addEventListener('click', closeEwalletModal);
+  }
+  if (scanQrFinishBtn) {
+    scanQrFinishBtn.addEventListener('click', finishScanQrPayment);
+  }
+  if (scanQrCancelBtn) {
+    scanQrCancelBtn.addEventListener('click', closeScanQrModal);
+  }
+  if (discountInputEl) {
+    discountInputEl.addEventListener('input', () => {
+      const raw = Number(discountInputEl.value || 0);
+      const subtotal = getCartTotal();
+      if (!Number.isFinite(raw) || raw <= 0) {
+        state.discountAmount = 0;
+      } else {
+        state.discountAmount = Math.min(raw, subtotal);
+      }
+      renderCart();
+    });
+  }
+  clearBtn.addEventListener('click', () => {
+    resetAfterSale();
+    setStatus('Cleared. Ready.');
+  });
+  salesDailyBtn.addEventListener('click', () => refreshSalesReport('daily'));
+  salesWeeklyBtn.addEventListener('click', () => refreshSalesReport('weekly'));
+  salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange));
+  if (offlineSyncBtn) {
+    offlineSyncBtn.addEventListener('click', triggerOfflineSync);
+  }
+
+  // Admin events
+  if (adminNavOverviewBtn) {
+    adminNavOverviewBtn.addEventListener('click', () => switchAdminPanel('overview'));
+  }
+  if (adminNavInventoryBtn) {
+    adminNavInventoryBtn.addEventListener('click', () => switchAdminPanel('inventory'));
+  }
+  if (adminNavKitSpecBtn) {
+    adminNavKitSpecBtn.addEventListener('click', () => switchAdminPanel('kit-spec'));
+  }
+  if (inventoryIngredientFormEl) {
+    inventoryIngredientFormEl.addEventListener('submit', handleIngredientSubmit);
+  }
+  adminRefreshBtn.addEventListener('click', refreshAdminTransactions);
+  adminVerifyAllBtn.addEventListener('click', verifyAllPending);
+  adminFilterEl.addEventListener('change', refreshAdminTransactions);
+  adminRangeEl.addEventListener('change', refreshAdminTransactions);
+  salesListEl.addEventListener('click', (e) => {
+    const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
+    if (receiptId) {
+      viewReceipt(receiptId);
+    }
+  });
+
+  // Delegate verify button clicks in admin transactions list
+  adminTransactionsEl.addEventListener('click', (e) => {
+    const verifyId = e.target.closest('[data-verify]')?.getAttribute('data-verify');
+    if (verifyId) {
+      verifyPayment(verifyId);
+      return;
+    }
+    const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
+    if (receiptId) {
+      viewReceipt(receiptId);
+    }
+  });
+
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener('click', () => {
+      submitAdminLogin();
+    });
+  }
+
+  if (adminCancelBtn) {
+    adminCancelBtn.addEventListener('click', closeAdminLogin);
+  }
+
+  if (adminCloseBtn) {
+    adminCloseBtn.addEventListener('click', closeAdminDashboard);
+  }
+
+  if (paymentSuccessDoneBtn) {
+    paymentSuccessDoneBtn.addEventListener('click', closePaymentSuccessModal);
+  }
+  if (receiptMinimizeBtn) {
+    receiptMinimizeBtn.addEventListener('click', togglePaymentReceiptCollapse);
+  }
+  if (receiptPrintBtn) {
+    receiptPrintBtn.addEventListener('click', printReceiptFromModal);
+  }
+  if (statusPrintReceiptBtn) {
+    statusPrintReceiptBtn.addEventListener('click', openLatestReceiptPreview);
+  }
+  if (adminReceiptPrintBtn) {
+    adminReceiptPrintBtn.addEventListener('click', printAdminReceiptFromModal);
+  }
+  if (adminReceiptCloseBtn) {
+    adminReceiptCloseBtn.addEventListener('click', closeAdminReceiptModal);
+  }
+  if (menuEditorCloseBtn) {
+    menuEditorCloseBtn.addEventListener('click', closeMenuEditor);
+  }
+  if (menuCategoryFormEl) {
+    menuCategoryFormEl.addEventListener('submit', handleMenuCategorySubmit);
+  }
+  if (menuProductFormEl) {
+    menuProductFormEl.addEventListener('submit', handleMenuProductSubmit);
+  }
+  if (menuCategoryEditorListEl) {
+    menuCategoryEditorListEl.addEventListener('click', handleMenuCategoryEditorClick);
+  }
+  if (menuProductEditorListEl) {
+    menuProductEditorListEl.addEventListener('click', handleMenuProductEditorClick);
+  }
+  window.addEventListener('online', () => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  });
+  window.addEventListener('offline', () => {
+    refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
+  });
+
+  if (adminPasswordEl) {
+    adminPasswordEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAdminLogin();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      openAdminLogin();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      closeSettingsMenu();
+      closeEwalletModal();
+      closeScanQrModal();
+      if (paymentSuccessModalEl?.classList.contains('open')) {
+        closePaymentSuccessModal();
+      }
+      closeMenuEditor();
+      closeAdminReceiptModal();
+      closeAdminLogin();
+      closeAdminDashboard();
+    }
+  });
+}
+
+async function init() {
+  const persistedUiState = readUserUiState();
+  const persistedCategory = String(persistedUiState.activeCategory || '').trim().toLowerCase();
+  if (persistedCategory) {
+    state.activeCategory = persistedCategory;
+  }
+  if (persistedUiState.salesRange === 'daily' || persistedUiState.salesRange === 'weekly') {
+    activeSalesRange = persistedUiState.salesRange;
+  }
+
+  const cachedOrFallbackCatalog = readCatalogCache() || getBootstrapCatalogFallback();
+  const hasCachedCatalog = hydrateCatalogState(cachedOrFallbackCatalog, { keepCategory: true });
+  if (hasCachedCatalog) {
+    renderCategoryButtons();
+    switchCategory(state.activeCategory);
+    renderCart();
+    preloadProductImages(state.products);
+  } else {
+    if (categoryButtonsEl) categoryButtonsEl.innerHTML = '<p class="status">Loading menu...</p>';
+    if (productsEl) productsEl.innerHTML = '<p style="text-align:center;color:#6b7280;padding:20px;">Loading products...</p>';
+  }
+
+  const configPromise = api('/api/config').catch(() => ({}));
+  const catalogPromise = refreshCatalog({ keepCategory: true }).catch((error) => {
+    if (!hasCachedCatalog) {
+      setStatus(`Menu load error: ${error.message}`);
+    }
+  });
+
+  ensureConfettiAnimation();
+  ensureYummyAnimations();
+  registerServiceWorker();
+
+  setupEventListeners();
+  updateReceiptActionVisibility();
+  startConnectivityMonitor();
+  updatePaymentActionAvailability();
+  setPaymentMethod('cash');
+  setStatus('Select order type first: Dine In or Take Out.');
+  await Promise.all([configPromise, catalogPromise]);
+  await refreshSalesReport(activeSalesRange);
+
+  if (canAccessAdminFeatures()) {
+    warmMenuEditorInBackground();
+  }
+
+  if (persistedUiState.adminOpen && canAccessAdminFeatures()) {
+    await openAdminDashboard();
+  }
+}
+
+bootstrap().catch((error) => {
+  setAuthMessage(`Authentication startup error: ${error.message}`);
+});

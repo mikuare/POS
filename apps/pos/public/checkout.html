@@ -1,0 +1,68 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hosted Checkout</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <section class="card">
+        <h1>Hosted Checkout (Mock GCash)</h1>
+        <p id="loading">Loading session...</p>
+        <div id="content"></div>
+      </section>
+    </div>
+
+    <script>
+      const loading = document.getElementById('loading');
+      const content = document.getElementById('content');
+      const parts = window.location.pathname.split('/');
+      const reference = parts[parts.length - 1];
+
+      function money(value) {
+        return `PHP ${Number(value).toFixed(2)}`;
+      }
+
+      async function api(path, options = {}) {
+        const res = await fetch(path, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      }
+
+      async function load() {
+        try {
+          const { session } = await api(`/api/payments/gcash/session/${reference}`);
+          loading.remove();
+          content.innerHTML = `
+            <p>Reference: <strong>${session.reference}</strong></p>
+            <p>Amount: <strong>${money(session.amount)}</strong></p>
+            <p>Pay To GCash Number: <strong>${session?.merchant?.gcashNumber || '09615745812'}</strong></p>
+            <img class="qr" src="${session.qrDataUrl}" alt="QR" />
+            <div class="row">
+              <button id="payBtn">Simulate Successful Payment</button>
+            </div>
+            <p><small>This simulates gateway webhook callback to POS backend.</small></p>
+          `;
+
+          document.getElementById('payBtn').addEventListener('click', async () => {
+            await api('/api/mock/gcash/pay', {
+              method: 'POST',
+              body: JSON.stringify({ reference })
+            });
+            alert('Payment Successful');
+          });
+        } catch (error) {
+          loading.textContent = `Error: ${error.message}`;
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>
