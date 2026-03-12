@@ -440,6 +440,7 @@ let inventoryDeleteContext = null;
 let inventoryHistoryContext = null;
 let latestSalesOpsDashboard = null;
 let latestAdminOverview = null;
+let lastAdminLoginTriggerEl = null;
 const BOOTSTRAP_CATALOG_FALLBACK = {
   categories: [
     { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
@@ -3109,6 +3110,16 @@ function startAppOnce() {
   });
 }
 
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      resolve();
+      return;
+    }
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 function setFormSubmitBusy(formEl, busy, busyText = 'Please wait...') {
   if (!formEl) return;
   const submitBtn = formEl.querySelector('button[type="submit"]');
@@ -3147,33 +3158,33 @@ async function handleLoginSubmit(event) {
     });
 
     const accountRole = normalizeRoleChoice(result?.user?.role);
-
-    writeActiveSession({
+    const sessionUser = {
       name: result.user.fullName,
       email: result.user.email,
       role: result.user.role,
       userId: result.user.id
-    });
+    };
+
+    writeActiveSession(sessionUser);
     writeAccessToken(result.session?.accessToken || '');
-
     clearCashierShiftState();
-
-    await cacheOfflineAuthCredential({
-      name: result.user.fullName,
-      email: result.user.email,
-      role: result.user.role,
-      userId: result.user.id,
-      password
-    });
     setAuthMessage('');
+    unlockDashboard();
+    startAppOnce();
     showConfirmationToast({
       title: 'Login successful',
       message: `Welcome ${result.user.fullName}. Have a nice day.`,
       tone: 'success'
     });
-    unlockDashboard();
-    startAppOnce();
+    cacheOfflineAuthCredential({
+      name: sessionUser.name,
+      email: sessionUser.email,
+      role: sessionUser.role,
+      userId: sessionUser.userId,
+      password
+    }).catch(() => {});
     if (canViewShiftMonitorOnPos(accountRole)) {
+      await waitForNextPaint();
       await presentStartShiftModal();
     }
   } catch (error) {
@@ -3554,7 +3565,9 @@ function openAdminLogin() {
   }
   fireAudit('admin_access_allowed', { role: activeAuthSession?.role || 'unknown' });
   if (!adminLoginModalEl) return;
+  lastAdminLoginTriggerEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.body.classList.add('admin-login-open');
+  adminLoginModalEl.setAttribute('aria-hidden', 'false');
   if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
   if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
   if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
@@ -3566,7 +3579,16 @@ function openAdminLogin() {
 }
 
 function closeAdminLogin() {
+  if (adminLoginModalEl?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   document.body.classList.remove('admin-login-open');
+  adminLoginModalEl?.setAttribute('aria-hidden', 'true');
+  const fallbackFocusEl = settingsAdminDashboardBtn || settingsToggleBtn || lastAdminLoginTriggerEl;
+  if (fallbackFocusEl instanceof HTMLElement) {
+    fallbackFocusEl.focus();
+  }
+  lastAdminLoginTriggerEl = null;
 }
 
 async function openAdminDashboard({ panelName, persist = true } = {}) {
@@ -3648,51 +3670,60 @@ function renderCategoryButtons() {
 }
 
 function preloadProductImages(products) {
-  const uniqueImages = Array.from(
-    new Set(
-      (products || [])
-        .map((p) => String(p?.image || '').trim())
-        .filter(Boolean)
-    )
-  );
+  const activeCategory = String(state.activeCategory || '').toLowerCase();
+  const activeImages = [];
+  const deferredImages = [];
+  const seen = new Set();
 
-  uniqueImages.forEach((src) => {
+  (products || []).forEach((product) => {
+    const src = String(product?.image || '').trim();
+    if (!src || seen.has(src)) return;
+    seen.add(src);
+    if (String(product?.category || '').toLowerCase() === activeCategory) {
+      activeImages.push(src);
+    } else {
+      deferredImages.push(src);
+    }
+  });
+
+  const primeImage = (src) => {
     const img = new Image();
     img.decoding = 'async';
     img.src = src;
-  });
-}
+  };
 
-function updateVisibleProducts() {
-  const activeCategory = String(state.activeCategory || '').toLowerCase();
-  let visibleCount = 0;
+  activeImages.slice(0, 8).forEach(primeImage);
 
-  productsEl.querySelectorAll('.product-row').forEach((row) => {
-    const rowCategory = String(row.getAttribute('data-category') || '').toLowerCase();
-    const isVisible = rowCategory === activeCategory;
-    row.style.display = isVisible ? '' : 'none';
-    if (isVisible) visibleCount += 1;
-  });
+  const warmDeferred = () => {
+    deferredImages.forEach(primeImage);
+    activeImages.slice(8).forEach(primeImage);
+  };
 
-  const noProductsNotice = productsEl.querySelector('.no-products-message');
-  if (noProductsNotice) {
-    noProductsNotice.style.display = visibleCount ? 'none' : '';
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(warmDeferred, { timeout: 1200 });
+    return;
   }
+
+  setTimeout(warmDeferred, 0);
 }
 
 function renderProducts() {
   productsEl.innerHTML = '';
 
-  if (!state.products.length) {
+  const activeCategory = String(state.activeCategory || '').toLowerCase();
+  const activeProducts = (state.products || []).filter((product) => String(product?.category || '').toLowerCase() === activeCategory);
+
+  if (!activeProducts.length) {
     productsEl.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No products available.</p>';
     return;
   }
 
   const fragment = document.createDocumentFragment();
-  state.products.forEach((p) => {
+  activeProducts.forEach((p, index) => {
     const availabilityClass = getProductAvailabilityClass(p);
     const isUnavailable = !Boolean(p.isAvailable);
     const buttonLabel = isUnavailable ? getProductDisabledButtonLabel(p) : 'Add to Order';
+    const prioritizeImage = index < 6;
     const indicatorMarkup = isUnavailable
       ? `
         <div class="product-availability ${availabilityClass}">
@@ -3705,7 +3736,7 @@ function renderProducts() {
     row.className = `product-row${isUnavailable ? ' unavailable' : ''}`;
     row.setAttribute('data-category', String(p.category || '').toLowerCase());
     row.innerHTML = `
-      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="lazy" decoding="async" />
+      <img class="product-image" src="${p.image || '/Business Logo/Ruels Logo for business.png'}" alt="${p.name}" loading="${prioritizeImage ? 'eager' : 'lazy'}" fetchpriority="${prioritizeImage ? 'high' : 'auto'}" decoding="async" />
       <div class="product-info">
         <div class="product-name">${p.name}</div>
         <div class="product-price">${money(p.price)}</div>
@@ -3716,16 +3747,7 @@ function renderProducts() {
     fragment.appendChild(row);
   });
 
-  const noProductsNotice = document.createElement('p');
-  noProductsNotice.className = 'no-products-message';
-  noProductsNotice.style.textAlign = 'center';
-  noProductsNotice.style.color = '#6b7280';
-  noProductsNotice.style.padding = '20px';
-  noProductsNotice.textContent = 'No products in this category.';
-  fragment.appendChild(noProductsNotice);
-
   productsEl.appendChild(fragment);
-  updateVisibleProducts();
 }
 
 function setPaymentMethod(method) {
