@@ -18,6 +18,8 @@
   appConfig: {
     enforceKitSpec: true
   },
+  discountManagerProfiles: [],
+  discountProfileEditorId: null,
   receiptTemplates: [],
   activeReceiptTemplate: null,
   receiptTemplateEditorId: null,
@@ -71,6 +73,7 @@ const salesRefreshBtn = document.getElementById('salesRefreshBtn');
 const categoryTitleEl = document.getElementById('categoryTitle');
 const paymentSuccessModalEl = document.getElementById('paymentSuccessModal');
 const receiptLogoEl = document.getElementById('receiptLogo');
+const receiptOrderSlipTitleEl = document.getElementById('receiptOrderSlipTitle');
 const receiptStoreNameEl = document.getElementById('receiptStoreName');
 const receiptStoreAddressEl = document.getElementById('receiptStoreAddress');
 const receiptStoreTaxEl = document.getElementById('receiptStoreTax');
@@ -97,6 +100,7 @@ const receiptMinimizeBtn = document.getElementById('receiptMinimizeBtn');
 const adminReceiptModalEl = document.getElementById('adminReceiptModal');
 const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
 const adminReceiptLogoEl = document.getElementById('adminReceiptLogo');
+const adminReceiptOrderSlipTitleEl = document.getElementById('adminReceiptOrderSlipTitle');
 const adminReceiptStoreNameEl = document.getElementById('adminReceiptStoreName');
 const adminReceiptStoreAddressEl = document.getElementById('adminReceiptStoreAddress');
 const adminReceiptStoreTaxEl = document.getElementById('adminReceiptStoreTax');
@@ -188,8 +192,14 @@ const customerPhoneEl = document.getElementById('customerPhone');
 // -- Admin Tab Elements --
 const adminFilterEl = document.getElementById('adminFilter');
 const adminRangeEl = document.getElementById('adminRange');
+const adminMonthPickerEl = document.getElementById('adminMonthPicker');
 const adminRefreshBtn = document.getElementById('adminRefreshBtn');
 const adminVerifyAllBtn = document.getElementById('adminVerifyAllBtn');
+const adminMixToggleBtn = document.getElementById('adminMixToggleBtn');
+const adminMixSectionEl = document.getElementById('adminMixSection');
+const adminMixPanelEl = document.getElementById('adminMixPanel');
+const adminTransactionsGroupHeadEl = document.getElementById('adminTransactionsGroupHead');
+const adminTransactionsRowEl = document.getElementById('adminTransactionsRow');
 const adminTransactionsEl = document.getElementById('adminTransactions');
 const adminStatsEl = document.getElementById('adminStats');
 const statTotalEl = document.getElementById('statTotal');
@@ -198,13 +208,8 @@ const statPendingEl = document.getElementById('statPending');
 const statRevenueEl = document.getElementById('statRevenue');
 const statCashEl = document.getElementById('statCash');
 const statGcashEl = document.getElementById('statGcash');
-const adminLoginModalEl = document.getElementById('adminLoginModal');
-const adminUsernameEl = document.getElementById('adminUsername');
-const adminPasswordEl = document.getElementById('adminPassword');
-const adminLoginBtn = document.getElementById('adminLoginBtn');
-const adminCancelBtn = document.getElementById('adminCancelBtn');
-const adminLoginErrorEl = document.getElementById('adminLoginError');
 const adminCloseBtn = document.getElementById('adminCloseBtn');
+const adminNavEl = document.getElementById('adminNav');
 const adminNavOverviewBtn = document.getElementById('adminNavOverviewBtn');
 const adminNavInventoryBtn = document.getElementById('adminNavInventoryBtn');
 const adminNavKitSpecBtn = document.getElementById('adminNavKitSpecBtn');
@@ -221,8 +226,35 @@ const adminPanelOperationsEl = document.getElementById('adminPanelOperations');
 const adminPanelReceiptTemplatesEl = document.getElementById('adminPanelReceiptTemplates');
 const adminPanelReportsEl = document.getElementById('adminPanelReports');
 const adminPanelOthersEl = document.getElementById('adminPanelOthers');
+const adminNavContextMenuEl = document.getElementById('adminNavContextMenu');
+const adminNavContextPrevBtn = document.getElementById('adminNavContextPrevBtn');
+const adminNavContextNextBtn = document.getElementById('adminNavContextNextBtn');
+const ADMIN_PANEL_ORDER = Object.freeze([
+  'overview',
+  'inventory',
+  'kit-spec',
+  'users',
+  'operations',
+  'receipt-templates',
+  'reports',
+  'others'
+]);
+const ADMIN_NAV_BUTTONS = {
+  overview: adminNavOverviewBtn,
+  inventory: adminNavInventoryBtn,
+  'kit-spec': adminNavKitSpecBtn,
+  users: adminNavUsersBtn,
+  operations: adminNavOperationsBtn,
+  'receipt-templates': adminNavReceiptTemplatesBtn,
+  reports: adminNavReportsBtn,
+  others: adminNavOthersBtn
+};
+const ADMIN_NAV_ENTRIES = ADMIN_PANEL_ORDER
+  .map((panelName) => ({ panelName, button: ADMIN_NAV_BUTTONS[panelName] }))
+  .filter((entry) => entry.button instanceof HTMLElement);
 const adminUsersSummaryEl = document.getElementById('adminUsersSummary');
 const adminUsersListEl = document.getElementById('adminUsersList');
+const roleAccessListEl = document.getElementById('roleAccessList');
 const adminCreateUserNoteEl = document.getElementById('adminCreateUserNote');
 const adminCreateUserFormEl = document.getElementById('adminCreateUserForm');
 const adminCreateUserNameEl = document.getElementById('adminCreateUserName');
@@ -252,6 +284,7 @@ const receiptTemplatesStatusEl = document.getElementById('receiptTemplatesStatus
 const receiptTemplateAdminNoteEl = document.getElementById('receiptTemplateAdminNote');
 const receiptTemplateFormEl = document.getElementById('receiptTemplateForm');
 const receiptTemplateNameInputEl = document.getElementById('receiptTemplateNameInput');
+const receiptTemplateOrderSlipTitleInputEl = document.getElementById('receiptTemplateOrderSlipTitleInput');
 const receiptTemplateStoreNameInputEl = document.getElementById('receiptTemplateStoreNameInput');
 const receiptTemplateStoreAddressInputEl = document.getElementById('receiptTemplateStoreAddressInput');
 const receiptTemplateTaxLineInputEl = document.getElementById('receiptTemplateTaxLineInput');
@@ -306,6 +339,9 @@ const receiptTemplateResetBtnEl = document.getElementById('receiptTemplateResetB
 const receiptTemplateActivateBtnEl = document.getElementById('receiptTemplateActivateBtn');
 const receiptTemplatePreviewAreaEl = document.getElementById('receiptTemplatePreviewArea');
 const receiptTemplateListEl = document.getElementById('receiptTemplateList');
+const salesOpsRangeEl = document.getElementById('salesOpsRange');
+const salesOpsMonthPickerEl = document.getElementById('salesOpsMonthPicker');
+const salesOpsRefreshBtn = document.getElementById('salesOpsRefreshBtn');
 const salesOpsSummaryEl = document.getElementById('salesOpsSummary');
 const hourlySalesGraphEl = document.getElementById('hourlySalesGraph');
 const monthlyClosingMonthInputEl = document.getElementById('monthlyClosingMonthInput');
@@ -323,6 +359,16 @@ const discountProfileNameInputEl = document.getElementById('discountProfileNameI
 const discountProfileTypeInputEl = document.getElementById('discountProfileTypeInput');
 const discountProfilePercentInputEl = document.getElementById('discountProfilePercentInput');
 const discountProfilesListEl = document.getElementById('discountProfilesList');
+const discountProfileModalEl = document.getElementById('discountProfileModal');
+const discountProfileModalCloseBtnEl = document.getElementById('discountProfileModalCloseBtn');
+const discountProfileModalTitleEl = document.getElementById('discountProfileModalTitle');
+const discountProfileModalNoteEl = document.getElementById('discountProfileModalNote');
+const discountProfileModalFormEl = document.getElementById('discountProfileModalForm');
+const discountProfileModalNameInputEl = document.getElementById('discountProfileModalNameInput');
+const discountProfileModalTypeInputEl = document.getElementById('discountProfileModalTypeInput');
+const discountProfileModalAmountLabelEl = document.getElementById('discountProfileModalAmountLabel');
+const discountProfileModalAmountInputEl = document.getElementById('discountProfileModalAmountInput');
+const discountProfileModalDeleteBtnEl = document.getElementById('discountProfileModalDeleteBtn');
 const monthlyClosingAdminNoteEl = document.getElementById('monthlyClosingAdminNote');
 const monthlyClosingSummaryEl = document.getElementById('monthlyClosingSummary');
 const monthlyExpenseListEl = document.getElementById('monthlyExpenseList');
@@ -402,8 +448,8 @@ const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 let activeSalesRange = 'daily';
-const ADMIN_DEFAULT_USERNAME = 'admin';
-const ADMIN_DEFAULT_PASSWORD = 'P@ssw0rd';
+let activeSalesOpsRange = 'daily';
+let isAdminMixPanelOpen = false;
 const AUTH_SESSION_KEY = 'pos_active_user_v1';
 const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
 const AUTH_OFFLINE_CACHE_KEY = 'pos_offline_auth_cache_v1';
@@ -440,7 +486,12 @@ let inventoryDeleteContext = null;
 let inventoryHistoryContext = null;
 let latestSalesOpsDashboard = null;
 let latestAdminOverview = null;
-let lastAdminLoginTriggerEl = null;
+let salesOpsHourlyChart = null;
+let salesOpsWeekdayChart = null;
+let activeSalesOpsHourlyView = 'bar';
+let activeSalesOpsWeekdayView = 'bar';
+let activeSalesOpsSelection = null;
+let activeAdminNavContextPanel = '';
 const BOOTSTRAP_CATALOG_FALLBACK = {
   categories: [
     { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
@@ -494,6 +545,385 @@ const GENERIC_CATEGORY_ICON = `data:image/svg+xml;utf8,${encodeURIComponent('<sv
 
 function money(value) {
   return `PHP ${Number(value).toFixed(2)}`;
+}
+
+function formatCompactNumber(value) {
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(Number(value || 0));
+}
+
+function setActiveSalesOpsSelection(selection = null) {
+  if (!selection || !Number.isInteger(selection.index) || selection.index < 0) {
+    activeSalesOpsSelection = null;
+    return;
+  }
+  activeSalesOpsSelection = {
+    source: selection.source === 'weekday' ? 'weekday' : 'hourly',
+    index: selection.index
+  };
+}
+
+function getActiveSalesOpsSelectionSnapshot(result) {
+  const selection = activeSalesOpsSelection;
+  if (!selection || !result) return null;
+  const rows = selection.source === 'weekday'
+    ? (Array.isArray(result?.weekdaySales) ? result.weekdaySales : [])
+    : (Array.isArray(result?.hourlySales) ? result.hourlySales : []);
+  const row = rows[selection.index];
+  if (!row) return null;
+  return {
+    source: selection.source,
+    index: selection.index,
+    row
+  };
+}
+
+function renderSalesOpsSummaryCards(result) {
+  if (!salesOpsSummaryEl) return;
+  const totals = result?.totals || {};
+  const rows = Array.isArray(result?.hourlySales) ? result.hourlySales : [];
+  const weekdayRows = Array.isArray(result?.weekdaySales) ? result.weekdaySales : [];
+  const peakHour = rows.reduce((best, row) => {
+    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
+  }, null);
+  const bestSalesDay = weekdayRows.reduce((best, row) => {
+    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
+  }, null);
+  const busiestDay = weekdayRows.reduce((best, row) => {
+    return Number(row?.transactions || 0) > Number(best?.transactions || 0) ? row : best;
+  }, null);
+  const averagePerHour = rows.length
+    ? rows.reduce((sum, row) => sum + Number(row.totalSales || 0), 0) / rows.length
+    : 0;
+  const selection = getActiveSalesOpsSelectionSnapshot(result);
+  const selectedRow = selection?.row || null;
+  const selectedDay = selection?.source === 'weekday' ? selectedRow : null;
+  const selectedHour = selection?.source === 'hourly' ? selectedRow : null;
+  const cards = [
+    {
+      highlight: true,
+      label: 'Total Sales',
+      value: money(selectedRow?.totalSales ?? totals.totalSales ?? 0),
+      meta: `${Number(selectedRow?.transactions ?? totals.totalTransactions ?? 0)} transaction(s) in selected range`
+    },
+    {
+      label: 'Best Sales Day',
+      value: escapeHtml(selectedDay?.fullLabel || selectedDay?.label || bestSalesDay?.fullLabel || '—'),
+      meta: `${money(selectedDay?.totalSales ?? bestSalesDay?.totalSales ?? 0)} in paid sales for the selected range`
+    },
+    {
+      label: 'Peak Day',
+      value: escapeHtml(selectedDay?.fullLabel || selectedDay?.label || busiestDay?.fullLabel || '—'),
+      meta: `${Number(selectedDay?.transactions ?? busiestDay?.transactions ?? 0)} paid order(s) as customer traffic proxy`
+    },
+    {
+      label: 'Peak Hour',
+      value: escapeHtml(selectedHour?.label || peakHour?.label || '—'),
+      meta: `${money(selectedHour?.totalSales ?? peakHour?.totalSales ?? 0)} | Avg per hour ${money(averagePerHour)}`
+    },
+    {
+      label: 'Cash In Flow',
+      value: money(selectedRow?.netCashRetained ?? totals.netCashRetained ?? 0),
+      meta: `Tendered ${money(selectedRow?.cashTendered ?? totals.cashTendered ?? 0)} | Change ${money(selectedRow?.changeGiven ?? totals.changeGiven ?? 0)}`
+    },
+    {
+      label: 'E Wallet',
+      value: money(selectedRow?.digitalSales ?? totals.digitalSales ?? 0),
+      meta: null
+    }
+  ];
+
+  salesOpsSummaryEl.innerHTML = `
+    <div class="sales-ops-summary-grid">
+      ${cards.map((card) => `
+        <article class="sales-ops-summary-card${card.highlight ? ' highlight' : ''}">
+          <span>${card.label}</span>
+          <strong>${card.value}</strong>
+          ${card.meta ? `<small>${card.meta}</small>` : ''}
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function destroySalesOpsWeekdayChart() {
+  if (salesOpsWeekdayChart && typeof salesOpsWeekdayChart.destroy === 'function') {
+    salesOpsWeekdayChart.destroy();
+  }
+  salesOpsWeekdayChart = null;
+}
+
+function destroySalesOpsHourlyChart() {
+  if (salesOpsHourlyChart && typeof salesOpsHourlyChart.destroy === 'function') {
+    salesOpsHourlyChart.destroy();
+  }
+  salesOpsHourlyChart = null;
+}
+
+const salesOpsWeekdayHoverLinePlugin = {
+  id: 'salesOpsWeekdayHoverLine',
+  afterDatasetsDraw(chart, _args, options) {
+    const activeElements = chart?.tooltip?.getActiveElements?.() || [];
+    if (!activeElements.length || !chart?.chartArea) return;
+    const indexAxis = chart?.options?.indexAxis === 'y' ? 'y' : 'x';
+    const x = activeElements[0]?.element?.x;
+    const y = activeElements[0]?.element?.y;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.beginPath();
+    if (indexAxis === 'y') {
+      if (!Number.isFinite(y)) {
+        ctx.restore();
+        return;
+      }
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+    } else {
+      if (!Number.isFinite(x)) {
+        ctx.restore();
+        return;
+      }
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+    }
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = options?.color || '#ff4d4d';
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+function renderSalesOpsWeekdayTrendChart(weekdayRows = []) {
+  const canvas = document.getElementById('salesOpsWeekdayChart');
+  destroySalesOpsWeekdayChart();
+  if (!canvas || !window.Chart || !weekdayRows.length) return;
+
+  const isLineView = activeSalesOpsWeekdayView === 'line';
+  const isBothView = activeSalesOpsWeekdayView === 'both';
+  const isUnitView = activeSalesOpsWeekdayView === 'unit';
+  const usesLineOnlyView = isLineView && !isBothView;
+  const selectedWeekdayIndex = activeSalesOpsSelection?.source === 'weekday'
+    ? activeSalesOpsSelection.index
+    : -1;
+  const datasets = [{
+    type: isLineView ? 'line' : 'bar',
+    label: isUnitView ? 'Orders' : 'Sales',
+    data: weekdayRows.map((row) => isUnitView ? Number(row?.transactions || 0) : Number(row?.totalSales || 0)),
+    backgroundColor(context) {
+      if (context?.dataIndex === selectedWeekdayIndex) {
+        if (usesLineOnlyView) return 'rgba(255, 113, 113, 0.24)';
+        return isUnitView ? '#f4c95d' : '#ff8c66';
+      }
+      if (usesLineOnlyView) return 'rgba(79, 131, 204, 0.18)';
+      if (isUnitView) {
+        const chart = context.chart;
+        const { chartArea } = chart || {};
+        if (!chartArea) return '#dfa425';
+        const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, '#f7d778');
+        gradient.addColorStop(1, '#d89918');
+        return gradient;
+      }
+      const chart = context.chart;
+      const { chartArea } = chart || {};
+      if (!chartArea) return '#4f83cc';
+      const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+      gradient.addColorStop(0, '#6fa8ff');
+      gradient.addColorStop(1, '#3b78c8');
+      return gradient;
+    },
+    borderColor(context) {
+      if (context?.dataIndex === selectedWeekdayIndex) {
+        return isUnitView ? '#b9810f' : '#d04b2f';
+      }
+      return isUnitView ? '#a87408' : '#2e66ae';
+    },
+    borderWidth: usesLineOnlyView ? 3 : 1,
+    borderSkipped: false,
+    borderRadius: usesLineOnlyView ? 0 : {
+      topLeft: 10,
+      topRight: 10,
+      bottomLeft: 0,
+      bottomRight: 0
+    },
+    hoverBackgroundColor: usesLineOnlyView
+      ? 'rgba(79, 131, 204, 0.24)'
+      : (isUnitView ? '#f4d98f' : '#7bb0ff'),
+    hoverBorderColor: isUnitView ? '#8d650a' : '#255a9e',
+    barPercentage: 0.62,
+    categoryPercentage: 0.76,
+    maxBarThickness: 54,
+    tension: usesLineOnlyView ? 0.28 : 0,
+    fill: usesLineOnlyView,
+    pointRadius(context) {
+      if (!usesLineOnlyView) return 0;
+      return context?.dataIndex === selectedWeekdayIndex ? 7 : 5;
+    },
+    pointHoverRadius: usesLineOnlyView ? 7 : 0,
+    pointBackgroundColor(context) {
+      return context?.dataIndex === selectedWeekdayIndex ? '#ff8c66' : '#3d7bc6';
+    },
+    pointBorderColor: '#ffffff',
+    pointBorderWidth: usesLineOnlyView ? 2 : 0,
+    pointHitRadius: 18
+  }];
+
+  if (isBothView) {
+    datasets.push({
+      type: 'line',
+      label: 'Sales Trend',
+      data: weekdayRows.map((row) => Number(row?.totalSales || 0)),
+      borderColor: '#2e66ae',
+      backgroundColor: 'rgba(79, 131, 204, 0.14)',
+      borderWidth: 3,
+      tension: 0.28,
+      fill: false,
+      pointRadius(context) {
+        return context?.dataIndex === selectedWeekdayIndex ? 7 : 5;
+      },
+      pointHoverRadius: 7,
+      pointBackgroundColor(context) {
+        return context?.dataIndex === selectedWeekdayIndex ? '#ff8c66' : '#3d7bc6';
+      },
+      pointBorderColor: '#ffffff',
+      pointBorderWidth: 2,
+      pointHitRadius: 18
+    });
+  }
+
+  salesOpsWeekdayChart = new window.Chart(canvas.getContext('2d'), {
+    type: isLineView ? 'line' : 'bar',
+    data: {
+      labels: weekdayRows.map((row) => [
+        String(row?.label || '--'),
+        `${Number(row?.transactions || 0)} order(s)`
+      ]),
+      datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      onClick(_event, elements) {
+        if (!latestSalesOpsDashboard) return;
+        if (!elements?.length) {
+          setActiveSalesOpsSelection(null);
+          renderSalesOpsDashboard(latestSalesOpsDashboard);
+          return;
+        }
+        const nextIndex = Number(elements[0]?.index);
+        if (!Number.isInteger(nextIndex) || nextIndex < 0) return;
+        const isSameSelection = activeSalesOpsSelection?.source === 'weekday' && activeSalesOpsSelection?.index === nextIndex;
+        setActiveSalesOpsSelection(isSameSelection ? null : { source: 'weekday', index: nextIndex });
+        renderSalesOpsDashboard(latestSalesOpsDashboard);
+      },
+      animation: {
+        duration: 280
+      },
+      layout: {
+        padding: {
+          top: 8,
+          right: 10,
+          bottom: 0,
+          left: 4
+        }
+      },
+      plugins: {
+        legend: {
+          display: isBothView,
+          labels: {
+            color: '#4a2d1d',
+            font: {
+              size: 11,
+              weight: '700'
+            },
+            usePointStyle: true,
+            boxWidth: 10,
+            boxHeight: 10
+          }
+        },
+        tooltip: {
+          displayColors: isBothView,
+          backgroundColor: 'rgba(42, 31, 24, 0.96)',
+          titleColor: '#fffaf5',
+          bodyColor: '#fffaf5',
+          padding: 12,
+          cornerRadius: 10,
+          titleFont: {
+            size: 12,
+            weight: '700'
+          },
+          bodyFont: {
+            size: 11,
+            weight: '600'
+          },
+          callbacks: {
+            title(items) {
+              const row = weekdayRows[items?.[0]?.dataIndex] || {};
+              return String(row?.fullLabel || row?.label || 'Weekday');
+            },
+            label(context) {
+              const value = Number(context.parsed?.y || 0);
+              if (isBothView) {
+                return `${context.dataset?.label || 'Sales'}: ${money(value)}`;
+              }
+              return isUnitView ? `Orders: ${value}` : `Sales: ${money(value)}`;
+            },
+            afterLabel(context) {
+              const row = weekdayRows[context?.dataIndex] || {};
+              if (isUnitView) {
+                return `Sales: ${money(row?.totalSales || 0)}`;
+              }
+              return `Orders: ${Number(row?.transactions || 0)}`;
+            }
+          }
+        },
+        salesOpsWeekdayHoverLine: {
+          color: '#ff4d4d'
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false,
+            drawBorder: false
+          },
+          ticks: {
+            autoSkip: false,
+            color: '#4a2d1d',
+            font: {
+              size: 11,
+              weight: '800'
+            },
+            padding: 12
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(88, 88, 88, 0.12)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#6d5a4d',
+            font: {
+              size: 11,
+              weight: '700'
+            },
+            callback(value) {
+              return formatCompactNumber(value);
+            }
+          }
+        }
+      }
+    },
+    plugins: [salesOpsWeekdayHoverLinePlugin]
+  });
 }
 
 function getPaymentMethodLabel(method) {
@@ -915,8 +1345,26 @@ function isNetworkLikeError(error) {
   return txt.includes('fetch') || txt.includes('network') || txt.includes('offline') || txt.includes('failed to fetch');
 }
 
-function createClientInvoiceReference(invoiceId) {
-  return `INV-${String(invoiceId).slice(0, 8).toUpperCase()}-${Date.now()}`;
+const CLIENT_ORDER_SLIP_SEQUENCE_KEY = 'pos_client_order_slip_sequence_v1';
+const CLIENT_ORDER_SLIP_DIGITS = 13;
+
+function formatClientOrderSlipReference(sequence) {
+  const safeSequence = Math.max(1, Math.floor(Number(sequence) || 1));
+  return `OR-${String(safeSequence).padStart(CLIENT_ORDER_SLIP_DIGITS, '0')}`;
+}
+
+function createClientInvoiceReference(_invoiceId) {
+  let nextSequence = 1;
+  try {
+    const previous = Number(localStorage.getItem(CLIENT_ORDER_SLIP_SEQUENCE_KEY) || 0);
+    nextSequence = Number.isFinite(previous) && previous > 0
+      ? Math.floor(previous) + 1
+      : 1;
+    localStorage.setItem(CLIENT_ORDER_SLIP_SEQUENCE_KEY, String(nextSequence));
+  } catch (_error) {
+    nextSequence = Math.max(1, Math.floor(Date.now()));
+  }
+  return formatClientOrderSlipReference(nextSequence);
 }
 
 function toOfflineInvoiceViewModel({ sale, invoiceId, reference, createdAt, paidAt }) {
@@ -1445,9 +1893,11 @@ async function refreshLatestShiftSummary() {
   defaultShiftStart.setHours(0, 0, 0, 0);
   const shiftStartedAt = cashierShiftState?.startedAt || defaultShiftStart.toISOString();
   const startedAtTs = Date.parse(shiftStartedAt);
-  const { transactions } = await api('/api/admin/transactions?status=PAID', {
-    headers: buildActorHeaders()
-  });
+  const { transactions } = canAccessAdminFeatures()
+    ? await api('/api/admin/transactions?status=PAID', {
+      headers: buildActorHeaders()
+    })
+    : { transactions: [] };
   const activeUserId = String(activeAuthSession?.userId || '').trim();
   const activeEmail = normalizeEmail(activeAuthSession?.email);
   const paidTransactions = (Array.isArray(transactions) ? transactions : [])
@@ -1955,6 +2405,7 @@ function writeActiveSession(user) {
   activeAuthSession = sessionUser;
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionUser));
   updateShiftMonitorVisibility();
+  restoreAdminNavOrder();
 }
 
 function clearActiveSession() {
@@ -1966,6 +2417,7 @@ function clearActiveSession() {
   localStorage.removeItem(AUTH_SESSION_KEY);
   localStorage.removeItem(AUTH_TOKEN_KEY);
   updateShiftMonitorVisibility();
+  restoreAdminNavOrder();
 }
 
 function writeAccessToken(token) {
@@ -2133,14 +2585,93 @@ function hydrateCatalogState(cached, { keepCategory = true } = {}) {
   return true;
 }
 
+function isAdminRole(role = activeAuthSession?.role) {
+  return normalizeRoleChoice(role) === 'administrations';
+}
+
+function isAdminOrSupervisorRole(role = activeAuthSession?.role) {
+  const normalizedRole = normalizeRoleChoice(role);
+  return normalizedRole === 'administrations' || normalizedRole === 'supervisor';
+}
+
 function canAccessAdminFeatures() {
-  const role = String(activeAuthSession?.role || '').toLowerCase();
-  return role === 'administrations' || role === 'supervisor';
+  return isAdminOrSupervisorRole();
 }
 
 function canManageInventory() {
-  const role = String(activeAuthSession?.role || '').toLowerCase();
-  return role === 'administrations';
+  return isAdminRole();
+}
+
+function getRoleAccessConfig() {
+  return normalizeRoleAccessConfig(state.appConfig?.roleAccess);
+}
+
+function hasRoleAccess(permissionKey, role = activeAuthSession?.role) {
+  const normalizedRole = normalizeRoleChoice(role);
+  if (normalizedRole === 'administrations') return true;
+  const safePermissionKey = String(permissionKey || '').trim().toLowerCase();
+  const roleAccess = getRoleAccessConfig();
+  return Array.isArray(roleAccess?.[normalizedRole]) && roleAccess[normalizedRole].includes(safePermissionKey);
+}
+
+function hasConfiguredRoleAccess(permissionKey, role = activeAuthSession?.role) {
+  const normalizedRole = normalizeRoleChoice(role);
+  if (normalizedRole === 'administrations') return false;
+  const safePermissionKey = String(permissionKey || '').trim().toLowerCase();
+  const roleAccess = getRoleAccessConfig();
+  return Array.isArray(roleAccess?.[normalizedRole]) && roleAccess[normalizedRole].includes(safePermissionKey);
+}
+
+function canAccessMenuEditor() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessCashDrawerControl() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessInventoryPanel() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessKitSpecPanel() {
+  return isAdminOrSupervisorRole();
+}
+
+function canViewUserDirectory() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessOperationsPanel() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessReceiptTemplatesPanel() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessReportsPanel() {
+  return isAdminOrSupervisorRole();
+}
+
+function canAccessDiscountManager() {
+  return isAdminOrSupervisorRole();
+}
+
+function canManageDiscounts() {
+  return isAdminRole();
+}
+
+function canAccessMonthlyClosing() {
+  return isAdminOrSupervisorRole();
+}
+
+function canManageMonthlyExpenses() {
+  return isAdminRole();
+}
+
+function canManageInvoiceActions() {
+  return isCashierRole(activeAuthSession?.role);
 }
 
 const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
@@ -2148,6 +2679,95 @@ const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
   { id: 'senior', name: 'Seniors', type: 'percent', amount: 20 },
   { id: 'pwd', name: 'PWD', type: 'percent', amount: 20 }
 ]);
+const ROLE_ACCESS_CATALOG = Object.freeze([
+  { key: 'control_center_access', label: 'Control Center Dashboard', description: 'Open the Control Center dashboard and overview workspace.' },
+  { key: 'menu_editor_access', label: 'Edit Menu', description: 'Open the menu editor from Settings and update menu items.' },
+  { key: 'cash_drawer_access', label: 'Cash Drawer Control', description: 'Open the cash drawer control workspace from Settings.' },
+  { key: 'inventory_access', label: 'Inventory Snapshot', description: 'View stock overview, ingredient value, and ingredient history.' },
+  { key: 'inventory_manage', label: 'Inventory Management', description: 'Add, edit, delete, and bulk update ingredient records.' },
+  { key: 'kit_spec_access', label: 'Kit Specification', description: 'View and save product ingredient mappings.' },
+  { key: 'user_directory_access', label: 'User Directory', description: 'View the user account directory and role summary.' },
+  { key: 'user_management_manage', label: 'User Management', description: 'Create users, change roles, activate, and reset passwords.' },
+  { key: 'operations_access', label: 'Operations Dashboard', description: 'View cashier monitoring, shifts, discrepancies, and drawer status.' },
+  { key: 'receipt_templates_access', label: 'Receipt Template Studio', description: 'View order slip templates and live previews.' },
+  { key: 'receipt_templates_manage', label: 'Receipt Template Management', description: 'Create, update, activate, and delete order slip templates.' },
+  { key: 'reports_access', label: 'Reports Dashboard', description: 'View reports, sales analytics, and dashboard charts.' },
+  { key: 'discounts_access', label: 'Customer Discounts', description: 'View saved customer discount types.' },
+  { key: 'discounts_manage', label: 'Discount Management', description: 'Create, update, and delete customer discount types.' },
+  { key: 'monthly_closing_access', label: 'Monthly Closing', description: 'View monthly closing and expense summaries.' },
+  { key: 'monthly_expenses_manage', label: 'Expense Management', description: 'Add monthly expense entries.' },
+  { key: 'shift_session_access', label: 'Shift Session', description: 'Start and end drawer shifts and keep cash-on-hand tracking active.' },
+  { key: 'shift_monitor_access', label: 'Shift Monitor', description: 'Open the POS shift monitor button.' },
+  { key: 'invoice_action_access', label: 'Invoice Hold / Void', description: 'Use hold-for-void and related receipt status actions.' }
+]);
+const ROLE_ACCESS_LABELS = Object.freeze(
+  ROLE_ACCESS_CATALOG.reduce((rows, item) => {
+    rows[item.key] = item.label;
+    return rows;
+  }, {})
+);
+const DEFAULT_ROLE_ACCESS = Object.freeze({
+  encharge: Object.freeze([
+    'shift_session_access',
+    'shift_monitor_access',
+    'invoice_action_access'
+  ]),
+  supervisor: Object.freeze([
+    'control_center_access',
+    'menu_editor_access',
+    'cash_drawer_access',
+    'inventory_access',
+    'kit_spec_access',
+    'user_directory_access',
+    'operations_access',
+    'receipt_templates_access',
+    'reports_access',
+    'discounts_access',
+    'monthly_closing_access',
+    'shift_session_access',
+    'invoice_action_access'
+  ])
+});
+const ROLE_ACCESS_SUMMARY = Object.freeze({
+  encharge: Object.freeze([
+    'shift_session_access',
+    'shift_monitor_access',
+    'invoice_action_access'
+  ]),
+  supervisor: Object.freeze([
+    'control_center_access',
+    'menu_editor_access',
+    'cash_drawer_access',
+    'inventory_access',
+    'kit_spec_access',
+    'user_directory_access',
+    'operations_access',
+    'receipt_templates_access',
+    'reports_access',
+    'discounts_access',
+    'monthly_closing_access'
+  ])
+});
+
+function normalizeRoleAccessEntries(entries = [], fallback = []) {
+  const source = Array.isArray(entries) ? entries : fallback;
+  const seenKeys = new Set();
+  return source.reduce((rows, entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (!ROLE_ACCESS_LABELS[key] || seenKeys.has(key)) return rows;
+    seenKeys.add(key);
+    rows.push(key);
+    return rows;
+  }, []);
+}
+
+function normalizeRoleAccessConfig(roleAccess = {}) {
+  const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  return {
+    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+  };
+}
 
 function normalizeDiscountProfileId(value, fallback = 'discount') {
   return String(value || fallback)
@@ -2199,7 +2819,8 @@ function normalizeDiscountProfiles(profiles = []) {
 function normalizeAppConfig(config = {}) {
   return {
     enforceKitSpec: config?.enforceKitSpec !== false,
-    discountProfiles: normalizeDiscountProfiles(config?.discountProfiles)
+    discountProfiles: normalizeDiscountProfiles(config?.discountProfiles),
+    roleAccess: normalizeRoleAccessConfig(config?.roleAccess)
   };
 }
 
@@ -2228,6 +2849,7 @@ const DEFAULT_RECEIPT_TEMPLATE = Object.freeze({
     borderColor: '#c8a88f',
     borderStyle: 'dashed',
     dividerStyle: 'dashed',
+    orderSlipTitle: 'Order Slip',
     storeName: "Ruel's Roast Beef",
     storeAddress: 'Location : Tres Martires, City of Baybay, 6521 Leyte',
     taxLine: 'Vat Registered TIN 342-231-312-00000',
@@ -2255,7 +2877,7 @@ const DEFAULT_RECEIPT_TEMPLATE = Object.freeze({
   }
 });
 const RECEIPT_TEMPLATE_SAMPLE = Object.freeze({
-  reference: 'INV-1773287822393-859',
+  reference: 'OR-0000000000001',
   paidAt: '2026-03-12T03:57:00.000Z',
   orderType: 'dine-in',
   paymentMethod: 'cash',
@@ -2332,6 +2954,7 @@ function normalizeReceiptTemplateSettings(settings = {}) {
     borderColor: normalizeTemplateColor(settings?.borderColor, defaults.borderColor),
     borderStyle: normalizeTemplateBorderStyle(settings?.borderStyle, defaults.borderStyle),
     dividerStyle: normalizeTemplateBorderStyle(settings?.dividerStyle, defaults.dividerStyle),
+    orderSlipTitle: normalizeTemplateText(settings?.orderSlipTitle, defaults.orderSlipTitle, 60),
     storeName: normalizeTemplateText(settings?.storeName, defaults.storeName, 80),
     storeAddress: normalizeTemplateText(settings?.storeAddress, defaults.storeAddress, 180),
     taxLine: normalizeTemplateText(settings?.taxLine, defaults.taxLine, 180),
@@ -2506,12 +3129,80 @@ function renderDiscountProfileSelect() {
   discountProfileSelectEl.value = state.selectedDiscountProfileId || '';
 }
 
+function normalizeDiscountManagerProfile(profile = {}, index = 0) {
+  const normalized = normalizeDiscountProfile(profile, index);
+  const usageCount = Math.max(0, Number(profile?.usageCount || 0));
+  return {
+    ...normalized,
+    usageCount,
+    lastUsedAt: profile?.lastUsedAt || null,
+    canDelete: profile?.canDelete !== undefined ? Boolean(profile.canDelete) : usageCount === 0
+  };
+}
+
+function syncDiscountManagerProfilesWithAppConfig() {
+  const usageById = new Map(
+    (state.discountManagerProfiles || []).map((profile, index) => {
+      const normalized = normalizeDiscountManagerProfile(profile, index);
+      return [normalized.id, normalized];
+    })
+  );
+
+  state.discountManagerProfiles = getDiscountProfiles().map((profile, index) => {
+    const usage = usageById.get(profile.id);
+    return normalizeDiscountManagerProfile({
+      ...profile,
+      usageCount: usage?.usageCount || 0,
+      lastUsedAt: usage?.lastUsedAt || null,
+      canDelete: usage ? usage.canDelete : true
+    }, index);
+  });
+}
+
+function getDiscountManagerProfiles() {
+  if (Array.isArray(state.discountManagerProfiles) && state.discountManagerProfiles.length) {
+    return state.discountManagerProfiles.map(normalizeDiscountManagerProfile);
+  }
+  return getDiscountProfiles().map(normalizeDiscountManagerProfile);
+}
+
+function formatDiscountManagerValue(profile = null) {
+  const amount = Number(profile?.amount || 0);
+  if (String(profile?.type || '').trim().toLowerCase() === 'fixed') {
+    return money(amount);
+  }
+  const formatted = Number.isInteger(amount)
+    ? amount.toFixed(0)
+    : amount.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return `${formatted}%`;
+}
+
+function applyDiscountManagerPayload(payload = {}) {
+  if (payload?.appConfig) {
+    applyAppConfig(payload.appConfig);
+  }
+  if (Array.isArray(payload?.profiles)) {
+    state.discountManagerProfiles = payload.profiles.map(normalizeDiscountManagerProfile);
+  } else {
+    syncDiscountManagerProfilesWithAppConfig();
+  }
+  renderDiscountManager();
+
+  if (!discountProfileModalEl?.classList.contains('open')) return;
+  const activeProfile = getDiscountManagerProfiles().find((profile) => profile.id === state.discountProfileEditorId) || null;
+  if (!activeProfile) {
+    closeDiscountProfileModal();
+    return;
+  }
+  populateDiscountProfileModal(activeProfile);
+}
+
 function renderDiscountManager() {
-  const canEdit = canManageUsers();
+  const canEdit = canManageDiscounts();
   if (discountConfigAdminNoteEl) {
     discountConfigAdminNoteEl.textContent = canEdit
-      ? 'Administrations can add, rename, remove, and set customer discount deductions as percent or minus amount.'
-      : 'View-only mode. Only Administrations can change discount types.';
+      ? 'Use the form to add discount types and click any row below to edit it. Delete stays locked once the discount is already used in transaction history.'
+      : 'View-only mode. Click a discount row to review it. Current role cannot change discount types.';
   }
 
   if (discountProfileFormEl) {
@@ -2519,61 +3210,163 @@ function renderDiscountManager() {
       if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
         element.disabled = !canEdit;
       }
+      if (element instanceof HTMLSelectElement) {
+        element.disabled = !canEdit;
+      }
     });
   }
 
   if (!discountProfilesListEl) return;
-  const profiles = getDiscountProfiles();
+  const profiles = getDiscountManagerProfiles();
   discountProfilesListEl.innerHTML = profiles.length
     ? `
-      <div class="discount-profile-grid">
-        ${profiles.map((profile) => `
-          <article class="discount-profile-card" data-discount-profile-id="${escapeHtml(profile.id)}">
-            <label>Name</label>
-            <input type="text" data-discount-profile-name value="${escapeHtml(profile.name)}" maxlength="60"${canEdit ? '' : ' disabled'} />
-            <label>Deduction Type</label>
-            <select data-discount-profile-type${canEdit ? '' : ' disabled'}>
-              <option value="percent"${profile.type === 'percent' ? ' selected' : ''}>Percent</option>
-              <option value="fixed"${profile.type === 'fixed' ? ' selected' : ''}>Minus Amount</option>
-            </select>
-            <label>${profile.type === 'fixed' ? 'Amount' : 'Percent'}</label>
-            <input type="number" data-discount-profile-amount min="0" step="0.01" value="${escapeHtml(String(profile.amount))}"${profile.type === 'percent' ? ' max="100"' : ''}${canEdit ? '' : ' disabled'} />
-            <p>${escapeHtml(getDiscountProfileSummaryText(profile))} will be applied to the current cart subtotal for this customer type.</p>
-            <div class="discount-profile-actions">
-              <button type="button" data-discount-profile-save="${escapeHtml(profile.id)}"${canEdit ? '' : ' disabled'}>Save</button>
-              <button class="secondary" type="button" data-discount-profile-delete="${escapeHtml(profile.id)}"${canEdit ? '' : ' disabled'}>Delete</button>
-            </div>
-          </article>
-        `).join('')}
+      <div class="discount-profile-table-wrap">
+        <table class="discount-profile-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Deduction Type</th>
+              <th>Value</th>
+              <th>Usage</th>
+              <th>Last Used</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${profiles.map((profile) => `
+              <tr class="discount-profile-table-row" tabindex="0" role="button" data-discount-profile-open="${escapeHtml(profile.id)}" aria-label="Open discount type ${escapeHtml(profile.name)}">
+                <td>
+                  <strong>${escapeHtml(profile.name)}</strong>
+                </td>
+                <td>${escapeHtml(profile.type === 'fixed' ? 'Minus Amount' : 'Percent')}</td>
+                <td>${escapeHtml(formatDiscountManagerValue(profile))}</td>
+                <td>
+                  <span class="discount-profile-usage-badge ${profile.canDelete ? 'unused' : 'used'}">
+                    ${profile.usageCount ? `${escapeHtml(String(profile.usageCount))} transaction(s)` : 'Unused'}
+                  </span>
+                </td>
+                <td>${escapeHtml(profile.lastUsedAt ? formatDate(profile.lastUsedAt) : '—')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `
     : '<p>No discount profiles available yet.</p>';
 }
 
-async function saveDiscountProfiles(profiles, successMessage) {
-  const result = await api('/api/admin/app-config', {
-    method: 'PUT',
-    headers: buildActorHeaders(),
-    body: JSON.stringify({
-      enforceKitSpec: state.appConfig?.enforceKitSpec !== false,
-      discountProfiles: profiles
-    })
+async function refreshDiscountManager() {
+  if (!discountProfilesListEl || !canAccessDiscountManager()) return;
+  discountProfilesListEl.innerHTML = '<p>Loading discount profiles...</p>';
+
+  try {
+    const result = await api('/api/admin/discount-profiles', {
+      headers: buildActorHeaders()
+    });
+    applyDiscountManagerPayload(result);
+  } catch (error) {
+    renderDiscountManager();
+    setStatus(`Discount manager load failed: ${error.message}`);
+  }
+}
+
+function scrollDiscountProfileIntoView(profileId) {
+  const safeProfileId = String(profileId || '').trim();
+  if (!safeProfileId || !discountProfilesListEl) return;
+  const rowEl = discountProfilesListEl.querySelector(`[data-discount-profile-open="${safeProfileId}"]`);
+  if (!rowEl) return;
+  rowEl.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest'
   });
-  applyAppConfig(result?.appConfig || state.appConfig);
-  renderDiscountManager();
-  if (successMessage) {
-    setStatus(successMessage);
-    showConfirmationToast({
-      title: 'Discount settings updated',
-      message: successMessage
+}
+
+function updateDiscountProfileModalAmountField() {
+  const isFixed = String(discountProfileModalTypeInputEl?.value || '').trim().toLowerCase() === 'fixed';
+  if (discountProfileModalAmountLabelEl) {
+    discountProfileModalAmountLabelEl.textContent = isFixed ? 'Amount' : 'Percent';
+  }
+  if (discountProfileModalAmountInputEl) {
+    if (isFixed) {
+      discountProfileModalAmountInputEl.removeAttribute('max');
+      discountProfileModalAmountInputEl.placeholder = 'Amount';
+    } else {
+      discountProfileModalAmountInputEl.setAttribute('max', '100');
+      discountProfileModalAmountInputEl.placeholder = 'Percent';
+    }
+  }
+}
+
+function populateDiscountProfileModal(profile = null) {
+  if (!profile) return;
+  state.discountProfileEditorId = profile.id;
+  if (discountProfileModalTitleEl) {
+    discountProfileModalTitleEl.textContent = `Discount Type: ${profile.name}`;
+  }
+  if (discountProfileModalNameInputEl) {
+    discountProfileModalNameInputEl.value = profile.name;
+  }
+  if (discountProfileModalTypeInputEl) {
+    discountProfileModalTypeInputEl.value = profile.type;
+  }
+  if (discountProfileModalAmountInputEl) {
+    discountProfileModalAmountInputEl.value = String(profile.amount);
+  }
+  updateDiscountProfileModalAmountField();
+
+  const canEdit = canManageDiscounts();
+  const historyText = profile.usageCount
+    ? `Used in ${profile.usageCount} saved transaction(s)${profile.lastUsedAt ? `, last used ${formatDate(profile.lastUsedAt)}` : ''}. Delete is locked for this discount type.`
+    : 'No saved transaction history uses this discount type yet. You can still delete it if needed.';
+  if (discountProfileModalNoteEl) {
+    discountProfileModalNoteEl.textContent = canEdit
+      ? historyText
+      : `View-only mode. ${historyText}`;
+  }
+
+  if (discountProfileModalFormEl) {
+    Array.from(discountProfileModalFormEl.elements || []).forEach((element) => {
+      if (
+        element instanceof HTMLInputElement
+        || element instanceof HTMLButtonElement
+        || element instanceof HTMLSelectElement
+      ) {
+        element.disabled = !canEdit;
+      }
     });
   }
+  if (discountProfileModalDeleteBtnEl) {
+    discountProfileModalDeleteBtnEl.disabled = !canEdit || !profile.canDelete;
+  }
+}
+
+function openDiscountProfileModal(profileId) {
+  const safeProfileId = String(profileId || '').trim();
+  if (!safeProfileId || !discountProfileModalEl) return;
+  const profile = getDiscountManagerProfiles().find((row) => row.id === safeProfileId);
+  if (!profile) return;
+
+  populateDiscountProfileModal(profile);
+  discountProfileModalEl.classList.add('open');
+  discountProfileModalEl.setAttribute('aria-hidden', 'false');
+  if (discountProfileModalNameInputEl && !discountProfileModalNameInputEl.disabled) {
+    discountProfileModalNameInputEl.focus();
+    discountProfileModalNameInputEl.select();
+  } else {
+    discountProfileModalCloseBtnEl?.focus();
+  }
+}
+
+function closeDiscountProfileModal() {
+  if (!discountProfileModalEl) return;
+  discountProfileModalEl.classList.remove('open');
+  discountProfileModalEl.setAttribute('aria-hidden', 'true');
+  state.discountProfileEditorId = null;
 }
 
 async function handleDiscountProfileSubmit(event) {
   event.preventDefault();
-  if (!canManageUsers()) {
-    setStatus('Only Administrations can manage discount types.');
+  if (!canManageDiscounts()) {
+    setStatus('Current role cannot manage discount types.');
     return;
   }
   const name = String(discountProfileNameInputEl?.value || '').trim();
@@ -2589,108 +3382,263 @@ async function handleDiscountProfileSubmit(event) {
       : 'Enter a discount percent from 0 to 100 only.');
     return;
   }
-  const profiles = getDiscountProfiles();
-  const nextProfile = normalizeDiscountProfile({
-    id: `${normalizeDiscountProfileId(name)}-${Date.now()}`,
-    name,
-    type,
-    amount
-  }, profiles.length);
-  await saveDiscountProfiles([...profiles, nextProfile], `Discount type "${nextProfile.name}" added.`);
+  const result = await api('/api/admin/discount-profiles', {
+    method: 'POST',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({ name, type, amount })
+  });
+  applyDiscountManagerPayload(result);
   if (discountProfileFormEl) discountProfileFormEl.reset();
   if (discountProfileTypeInputEl) discountProfileTypeInputEl.value = 'percent';
+  const savedName = result?.profile?.name || name;
+  if (getDiscountManagerProfiles().length > 5) {
+    scrollDiscountProfileIntoView(result?.profile?.id || '');
+  }
+  setStatus(`Discount type "${savedName}" added.`);
+  showConfirmationToast({
+    title: 'Discount settings updated',
+    message: `Discount type "${savedName}" added.`
+  });
 }
 
 async function handleDiscountProfileListClick(event) {
-  const saveBtn = event.target.closest('[data-discount-profile-save]');
-  const deleteBtn = event.target.closest('[data-discount-profile-delete]');
-  if (!saveBtn && !deleteBtn) return;
-  if (!canManageUsers()) {
-    setStatus('Only Administrations can manage discount types.');
+  const rowEl = event.target.closest('[data-discount-profile-open]');
+  if (!rowEl) return;
+  openDiscountProfileModal(rowEl.getAttribute('data-discount-profile-open'));
+}
+
+function handleDiscountProfileListKeydown(event) {
+  const rowEl = event.target.closest('[data-discount-profile-open]');
+  if (!rowEl) return;
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  openDiscountProfileModal(rowEl.getAttribute('data-discount-profile-open'));
+}
+
+async function handleDiscountProfileModalSubmit(event) {
+  event.preventDefault();
+  if (!canManageDiscounts()) {
+    setStatus('Current role cannot manage discount types.');
     return;
   }
 
-  const profileId = String(
-    saveBtn?.getAttribute('data-discount-profile-save')
-    || deleteBtn?.getAttribute('data-discount-profile-delete')
-    || ''
-  ).trim();
-  if (!profileId) return;
-
-  const profiles = getDiscountProfiles();
-  const currentProfile = profiles.find((profile) => profile.id === profileId);
-  if (!currentProfile) return;
-
-  if (deleteBtn) {
-    const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
-    await saveDiscountProfiles(nextProfiles, `Discount type "${currentProfile.name}" deleted.`);
+  const profileId = String(state.discountProfileEditorId || '').trim();
+  if (!profileId) {
+    setStatus('Select a discount type first.');
     return;
   }
 
-  const cardEl = saveBtn.closest('[data-discount-profile-id]');
-  const nameInputEl = cardEl?.querySelector('[data-discount-profile-name]');
-  const typeInputEl = cardEl?.querySelector('[data-discount-profile-type]');
-  const amountInputEl = cardEl?.querySelector('[data-discount-profile-amount]');
-  const nextName = String(nameInputEl?.value || '').trim();
-  const nextType = String(typeInputEl?.value || 'percent').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
-  const nextAmount = Number(amountInputEl?.value || 0);
-  if (!nextName) {
+  const name = String(discountProfileModalNameInputEl?.value || '').trim();
+  const type = String(discountProfileModalTypeInputEl?.value || 'percent').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const amount = Number(discountProfileModalAmountInputEl?.value || 0);
+  if (!name) {
     setStatus('Discount name cannot be empty.');
     return;
   }
-  if (!Number.isFinite(nextAmount) || nextAmount < 0 || (nextType === 'percent' && nextAmount > 100)) {
-    setStatus(nextType === 'fixed'
+  if (!Number.isFinite(amount) || amount < 0 || (type === 'percent' && amount > 100)) {
+    setStatus(type === 'fixed'
       ? 'Minus discount amount must be 0 or more.'
       : 'Discount percent must be between 0 and 100.');
     return;
   }
-  const nextProfiles = profiles.map((profile) => (
-    profile.id === profileId
-      ? normalizeDiscountProfile({ ...profile, name: nextName, type: nextType, amount: nextAmount })
-      : profile
-  ));
-  await saveDiscountProfiles(nextProfiles, `Discount type "${nextName}" updated.`);
+
+  const result = await api(`/api/admin/discount-profiles/${encodeURIComponent(profileId)}`, {
+    method: 'PUT',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({ name, type, amount })
+  });
+  applyDiscountManagerPayload(result);
+  closeDiscountProfileModal();
+  const savedName = result?.profile?.name || name;
+  setStatus(`Discount type "${savedName}" updated.`);
+  showConfirmationToast({
+    title: 'Discount settings updated',
+    message: `Discount type "${savedName}" updated.`
+  });
 }
 
-function handleDiscountProfileListChange(event) {
-  const typeInputEl = event.target.closest('[data-discount-profile-type]');
-  if (!typeInputEl) return;
-  const cardEl = typeInputEl.closest('[data-discount-profile-id]');
-  const amountInputEl = cardEl?.querySelector('[data-discount-profile-amount]');
-  const labelEl = amountInputEl?.previousElementSibling;
-  const isFixed = String(typeInputEl.value || '').trim().toLowerCase() === 'fixed';
-  if (labelEl) labelEl.textContent = isFixed ? 'Amount' : 'Percent';
-  if (amountInputEl) {
-    if (isFixed) {
-      amountInputEl.removeAttribute('max');
-    } else {
-      amountInputEl.setAttribute('max', '100');
-    }
+async function handleDiscountProfileModalDelete() {
+  if (!canManageDiscounts()) {
+    setStatus('Current role cannot manage discount types.');
+    return;
   }
+
+  const profileId = String(state.discountProfileEditorId || '').trim();
+  if (!profileId) {
+    setStatus('Select a discount type first.');
+    return;
+  }
+
+  const profile = getDiscountManagerProfiles().find((row) => row.id === profileId);
+  if (!profile) {
+    setStatus('Discount type not found.');
+    return;
+  }
+  if (!profile.canDelete) {
+    setStatus('This discount type cannot be deleted because it is already used in transaction history.');
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete discount type "${profile.name}"?`);
+  if (!confirmed) return;
+
+  const result = await api(`/api/admin/discount-profiles/${encodeURIComponent(profileId)}`, {
+    method: 'DELETE',
+    headers: buildActorHeaders()
+  });
+  applyDiscountManagerPayload(result);
+  closeDiscountProfileModal();
+  setStatus(`Discount type "${profile.name}" deleted.`);
+  showConfirmationToast({
+    title: 'Discount settings updated',
+    message: `Discount type "${profile.name}" deleted.`
+  });
+}
+
+function getEditableRoleAccessRoles() {
+  return ['encharge', 'supervisor'];
+}
+
+function getRoleAccessEntriesForRole(role) {
+  const safeRole = normalizeRoleChoice(role);
+  return Array.isArray(ROLE_ACCESS_SUMMARY?.[safeRole]) ? ROLE_ACCESS_SUMMARY[safeRole] : [];
+}
+
+function getRoleAccessCatalogEntry(permissionKey) {
+  const safePermissionKey = String(permissionKey || '').trim().toLowerCase();
+  return ROLE_ACCESS_CATALOG.find((entry) => entry.key === safePermissionKey) || null;
+}
+
+function renderRoleAccessManager() {
+  if (!roleAccessListEl) return;
+  const roleCards = getEditableRoleAccessRoles().map((roleKey) => {
+    const activeKeys = getRoleAccessEntriesForRole(roleKey);
+    const chipsMarkup = activeKeys.length
+      ? activeKeys.map((permissionKey) => {
+        const entry = getRoleAccessCatalogEntry(permissionKey);
+        if (!entry) return '';
+        return `
+          <li class="role-access-chip">
+            <div class="role-access-chip-copy">
+              <strong>${escapeHtml(entry.label)}</strong>
+              <small>${escapeHtml(entry.description)}</small>
+            </div>
+          </li>
+        `;
+      }).join('')
+      : '<li class="role-access-empty">No built-in functions listed for this role.</li>';
+
+    return `
+      <article class="role-access-card ${escapeHtml(roleKey)}">
+        <div class="role-access-card-head">
+          <div>
+            <span class="role-access-eyebrow">${escapeHtml(formatRoleLabel(roleKey))}</span>
+            <h4>${escapeHtml(formatRoleLabel(roleKey))} Functions</h4>
+            <p>${activeKeys.length} built-in function(s) available for this role.</p>
+          </div>
+          <span class="role-access-count">${activeKeys.length}</span>
+        </div>
+        <ul class="role-access-list">${chipsMarkup}</ul>
+        <p class="role-access-view-note">Reference only. This list shows the built-in functions currently available for this role.</p>
+      </article>
+    `;
+  }).join('');
+
+  roleAccessListEl.innerHTML = `
+    <div class="role-access-grid">
+      ${roleCards}
+    </div>
+  `;
+}
+
+async function updateRoleAccessConfig(roleKey, updater) {
+  if (!canManageUsers()) {
+    setStatus('Current role cannot update role access.');
+    return;
+  }
+  const safeRole = normalizeRoleChoice(roleKey);
+  if (!getEditableRoleAccessRoles().includes(safeRole)) return;
+
+  const currentAccess = getRoleAccessConfig();
+  const nextEntries = normalizeRoleAccessEntries(
+    typeof updater === 'function' ? updater(currentAccess[safeRole] || []) : updater,
+    []
+  );
+
+  const result = await api('/api/admin/role-access', {
+    method: 'PUT',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({
+      roleAccess: {
+        ...currentAccess,
+        [safeRole]: nextEntries
+      }
+    })
+  });
+  applyAppConfig(result?.appConfig || state.appConfig);
+  renderRoleAccessManager();
+  await refreshAdminUsers();
+  setStatus(`${formatRoleLabel(safeRole)} access updated.`);
+}
+
+function canAccessAdminPanel(panelName) {
+  const normalizedPanel = normalizeAdminPanelName(panelName);
+  if (normalizedPanel === 'overview') return canAccessAdminFeatures();
+  if (normalizedPanel === 'inventory') return canAccessInventoryPanel();
+  if (normalizedPanel === 'kit-spec') return canAccessKitSpecPanel();
+  if (normalizedPanel === 'users') return canViewUserDirectory();
+  if (normalizedPanel === 'operations') return canAccessOperationsPanel();
+  if (normalizedPanel === 'receipt-templates') return canAccessReceiptTemplatesPanel();
+  if (normalizedPanel === 'reports') return canAccessReportsPanel();
+  if (normalizedPanel === 'others') return canAccessDiscountManager() || canAccessMonthlyClosing();
+  return false;
+}
+
+function getFirstAccessibleAdminPanel(preferredPanel = readUserUiState()?.adminPanel) {
+  const preferred = normalizeAdminPanelName(preferredPanel);
+  if (canAccessAdminPanel(preferred)) return preferred;
+  const orderedPanels = getCurrentAdminNavOrder();
+  return orderedPanels.find((panelName) => canAccessAdminPanel(panelName)) || 'overview';
+}
+
+function updateAdminNavVisibility() {
+  ADMIN_NAV_ENTRIES.forEach(({ panelName, button }) => {
+    if (!(button instanceof HTMLElement)) return;
+    button.hidden = !canAccessAdminPanel(panelName);
+  });
 }
 
 function applyAppConfig(config = {}) {
   state.appConfig = normalizeAppConfig(config?.appConfig || config);
+  syncDiscountManagerProfilesWithAppConfig();
   ensureValidSelectedDiscountProfile();
   renderDiscountProfileSelect();
   renderDiscountManager();
+  renderRoleAccessManager();
   renderKitSpecModeControl();
+  updateSettingsRoleItems();
+  updateShiftMonitorVisibility();
+  updateAdminNavVisibility();
+  if (document.body.classList.contains('admin-open')) {
+    if (canAccessAdminFeatures()) {
+      switchAdminPanel(getFirstAccessibleAdminPanel(readUserUiState()?.adminPanel), { persist: false });
+    } else {
+      closeAdminDashboard();
+    }
+  }
   renderCart();
 }
 
 function canManageUsers() {
-  const role = String(activeAuthSession?.role || '').toLowerCase();
-  return role === 'administrations';
+  return isAdminRole();
 }
 
 function canManageReceiptTemplates() {
-  const role = String(activeAuthSession?.role || '').toLowerCase();
-  return role === 'administrations';
+  return isAdminRole();
 }
 
 function canManageCashDrawer() {
-  const role = String(activeAuthSession?.role || '').toLowerCase();
-  return role === 'administrations';
+  return isAdminRole();
 }
 
 function buildActorHeaders() {
@@ -2705,6 +3653,268 @@ function getAdminRangeQueryValue() {
   const range = String(adminRangeEl?.value || '').trim().toLowerCase();
   if (range === 'daily' || range === 'weekly') return range;
   return '';
+}
+
+function getMonthRangeBounds(monthValue) {
+  const normalized = String(monthValue || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(normalized)) return null;
+  const [yearValue, monthValueRaw] = normalized.split('-');
+  const year = Number(yearValue);
+  const month = Number(monthValueRaw) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 0 || month > 11) return null;
+  const from = new Date(year, month, 1, 0, 0, 0, 0);
+  const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return {
+    dateFrom: from.toISOString(),
+    dateTo: to.toISOString()
+  };
+}
+
+function normalizeSalesOpsRange(range) {
+  const normalized = String(range || '').trim().toLowerCase();
+  if (normalized === 'weekly' || normalized === 'monthly' || normalized === 'custom_month' || normalized === 'all') return normalized;
+  return 'daily';
+}
+
+function getSalesOpsRangeQueryValue() {
+  return normalizeSalesOpsRange(salesOpsRangeEl?.value || activeSalesOpsRange);
+}
+
+function getSalesOpsSelectedMonth() {
+  return String(salesOpsMonthPickerEl?.value || getCurrentMonthValue()).trim();
+}
+
+function syncSalesOpsMonthPickerVisibility(range = activeSalesOpsRange) {
+  if (!salesOpsMonthPickerEl) return;
+  const normalizedRange = normalizeSalesOpsRange(range);
+  if (normalizedRange === 'custom_month') {
+    salesOpsMonthPickerEl.style.display = 'inline-block';
+    if (!salesOpsMonthPickerEl.value) {
+      salesOpsMonthPickerEl.value = getCurrentMonthValue();
+    }
+    return;
+  }
+  salesOpsMonthPickerEl.style.display = 'none';
+}
+
+function normalizeSalesOpsWeekdayView(view) {
+  const normalized = String(view || '').trim().toLowerCase();
+  if (normalized === 'line' || normalized === 'both' || normalized === 'unit') return normalized;
+  return 'bar';
+}
+
+function normalizeSalesOpsHourlyView(view) {
+  const normalized = String(view || '').trim().toLowerCase();
+  if (normalized === 'line' || normalized === 'both') return normalized;
+  return 'bar';
+}
+
+function renderSalesOpsHourlyTrendChart(hourlyRows = []) {
+  const canvas = document.getElementById('salesOpsHourlyChart');
+  destroySalesOpsHourlyChart();
+  if (!canvas || !window.Chart || !hourlyRows.length) return;
+
+  const isLineView = activeSalesOpsHourlyView === 'line';
+  const isBothView = activeSalesOpsHourlyView === 'both';
+  const usesLineOnlyView = isLineView && !isBothView;
+  const selectedHourlyIndex = activeSalesOpsSelection?.source === 'hourly'
+    ? activeSalesOpsSelection.index
+    : -1;
+
+  const datasets = [{
+    type: isLineView ? 'line' : 'bar',
+    label: 'Sales',
+    data: hourlyRows.map((row) => Number(row?.totalSales || 0)),
+    backgroundColor(context) {
+      if (context?.dataIndex === selectedHourlyIndex) {
+        if (usesLineOnlyView) return 'rgba(255, 113, 113, 0.24)';
+        return '#ff8c66';
+      }
+      if (usesLineOnlyView) return 'rgba(67, 194, 126, 0.18)';
+      const chart = context.chart;
+      const { chartArea } = chart || {};
+      if (!chartArea) return '#43c27e';
+      const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+      gradient.addColorStop(0, '#7ce2a8');
+      gradient.addColorStop(1, '#43c27e');
+      return gradient;
+    },
+    borderColor(context) {
+      if (context?.dataIndex === selectedHourlyIndex) {
+        return '#d04b2f';
+      }
+      return '#2c9f62';
+    },
+    borderWidth: usesLineOnlyView ? 3 : 1,
+    borderSkipped: false,
+    borderRadius: usesLineOnlyView ? 0 : {
+      topLeft: 10,
+      topRight: 10,
+      bottomLeft: 0,
+      bottomRight: 0
+    },
+    hoverBackgroundColor: usesLineOnlyView ? 'rgba(67, 194, 126, 0.24)' : '#58cf8e',
+    hoverBorderColor: '#248553',
+    barPercentage: 0.8,
+    categoryPercentage: 0.9,
+    maxBarThickness: 26,
+    tension: usesLineOnlyView ? 0.24 : 0,
+    fill: usesLineOnlyView,
+    pointRadius(context) {
+      if (!usesLineOnlyView) return 0;
+      return context?.dataIndex === selectedHourlyIndex ? 6 : 4;
+    },
+    pointHoverRadius: usesLineOnlyView ? 6 : 0,
+    pointBackgroundColor(context) {
+      return context?.dataIndex === selectedHourlyIndex ? '#ff8c66' : '#43c27e';
+    },
+    pointBorderColor: '#ffffff',
+    pointBorderWidth: usesLineOnlyView ? 2 : 0,
+    pointHitRadius: 16
+  }];
+
+  if (isBothView) {
+    datasets.push({
+      type: 'line',
+      label: 'Sales Trend',
+      data: hourlyRows.map((row) => Number(row?.totalSales || 0)),
+      borderColor: '#2c9f62',
+      backgroundColor: 'rgba(67, 194, 126, 0.14)',
+      borderWidth: 3,
+      tension: 0.24,
+      fill: false,
+      pointRadius(context) {
+        return context?.dataIndex === selectedHourlyIndex ? 6 : 4;
+      },
+      pointHoverRadius: 6,
+      pointBackgroundColor(context) {
+        return context?.dataIndex === selectedHourlyIndex ? '#ff8c66' : '#43c27e';
+      },
+      pointBorderColor: '#ffffff',
+      pointBorderWidth: 2,
+      pointHitRadius: 16
+    });
+  }
+
+  salesOpsHourlyChart = new window.Chart(canvas.getContext('2d'), {
+    type: isLineView ? 'line' : 'bar',
+    data: {
+      labels: hourlyRows.map((row) => String(row?.label || '--')),
+      datasets
+    },
+    options: {
+      indexAxis: 'x',
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      onClick(_event, elements) {
+        if (!latestSalesOpsDashboard) return;
+        if (!elements?.length) {
+          setActiveSalesOpsSelection(null);
+          renderSalesOpsDashboard(latestSalesOpsDashboard);
+          return;
+        }
+        const nextIndex = Number(elements[0]?.index);
+        if (!Number.isInteger(nextIndex) || nextIndex < 0) return;
+        const isSameSelection = activeSalesOpsSelection?.source === 'hourly' && activeSalesOpsSelection?.index === nextIndex;
+        setActiveSalesOpsSelection(isSameSelection ? null : { source: 'hourly', index: nextIndex });
+        renderSalesOpsDashboard(latestSalesOpsDashboard);
+      },
+      animation: {
+        duration: 280
+      },
+      layout: {
+        padding: {
+          top: 8,
+          right: 10,
+          bottom: 0,
+          left: 4
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          displayColors: false,
+          backgroundColor: 'rgba(42, 31, 24, 0.96)',
+          titleColor: '#fffaf5',
+          bodyColor: '#fffaf5',
+          padding: 12,
+          cornerRadius: 10,
+          titleFont: {
+            size: 12,
+            weight: '700'
+          },
+          bodyFont: {
+            size: 11,
+            weight: '600'
+          },
+          callbacks: {
+            title(items) {
+              const row = hourlyRows[items?.[0]?.dataIndex] || {};
+              return `Hour: ${String(row?.label || '--')}`;
+            },
+            label(context) {
+              return `Sales: ${money(context.parsed?.y || 0)}`;
+            },
+            afterLabel(context) {
+              const row = hourlyRows[context?.dataIndex] || {};
+              return `Transactions: ${Number(row?.transactions || 0)}`;
+            }
+          }
+        },
+        salesOpsWeekdayHoverLine: {
+          color: '#ff4d4d'
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: false,
+          grid: {
+            display: false,
+            drawBorder: false
+          },
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 12,
+            color: '#4a2d1d',
+            font: {
+              size: 11,
+              weight: '800'
+            },
+            padding: 12,
+            maxRotation: 0,
+            minRotation: 0,
+            callback(value) {
+              return String(this.getLabelForValue(value));
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(88, 88, 88, 0.12)',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#6d5a4d',
+            font: {
+              size: 11,
+              weight: '700'
+            },
+            callback(value) {
+              return formatCompactNumber(value);
+            }
+          }
+        }
+      }
+    },
+    plugins: [salesOpsWeekdayHoverLinePlugin]
+  });
 }
 
 function getCashierInvoiceContext() {
@@ -2722,10 +3932,10 @@ function updateSettingsRoleItems() {
     settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
   }
   if (settingsEditMenuBtn) {
-    settingsEditMenuBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+    settingsEditMenuBtn.style.display = canAccessMenuEditor() ? 'block' : 'none';
   }
   if (settingsCashDrawerBtn) {
-    settingsCashDrawerBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+    settingsCashDrawerBtn.style.display = canAccessCashDrawerControl() ? 'block' : 'none';
   }
 }
 
@@ -2826,8 +4036,8 @@ function toggleSettingsMenu() {
 
 function openCashDrawerControlModal() {
   if (!cashDrawerControlModalEl) return;
-  if (!canAccessAdminFeatures()) {
-    setStatus('Cash drawer control is available only for Administrations and Supervisor roles.');
+  if (!canAccessCashDrawerControl()) {
+    setStatus('Current role does not have cash drawer control access.');
     return;
   }
   cashDrawerControlModalEl.classList.add('open');
@@ -3033,7 +4243,6 @@ async function finalizeLogout() {
     }
 
     closeSettingsMenu();
-    closeAdminLogin();
     closeAdminDashboard();
     closeAdminReceiptModal();
     closeEwalletModal();
@@ -3286,7 +4495,7 @@ function setupAuth() {
   if (settingsAdminDashboardBtn) {
     settingsAdminDashboardBtn.addEventListener('click', async () => {
       closeSettingsMenu();
-      await openAdminLogin();
+      await openAdminDashboard();
     });
   }
   if (settingsEditMenuBtn) {
@@ -3315,6 +4524,15 @@ function setupAuth() {
     if (!settingsMenuEl?.classList.contains('open')) return;
     if (e.target?.closest('.settings-menu-wrap')) return;
     closeSettingsMenu();
+  });
+  document.addEventListener('click', (e) => {
+    if (adminNavContextMenuEl?.hidden) return;
+    if (e.target?.closest('#adminNavContextMenu')) return;
+    closeAdminNavContextMenu();
+  });
+  document.addEventListener('contextmenu', (e) => {
+    if (e.target?.closest('.admin-nav-btn') || e.target?.closest('#adminNavContextMenu')) return;
+    closeAdminNavContextMenu();
   });
   startPhilippineClock();
   setAuthMode('login');
@@ -3443,6 +4661,7 @@ async function bootstrap() {
         userId: sessionResult.user.id
       };
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(activeAuthSession));
+      restoreAdminNavOrder();
       hydrateCashierShiftState();
       unlockDashboard();
       if (canViewShiftMonitorOnPos(activeAuthSession?.role) && needsCashierShiftStart()) {
@@ -3486,21 +4705,178 @@ function switchTab(tabName) {
 
 function normalizeAdminPanelName(panelName) {
   const normalized = String(panelName || '').trim().toLowerCase();
-  const allowedPanels = new Set([
-    'overview',
-    'inventory',
-    'kit-spec',
-    'users',
-    'operations',
-    'receipt-templates',
-    'reports',
-    'others'
-  ]);
-  return allowedPanels.has(normalized) ? normalized : 'overview';
+  return ADMIN_PANEL_ORDER.includes(normalized) ? normalized : 'overview';
+}
+
+function getAdminNavPanelName(button) {
+  if (!(button instanceof HTMLElement)) return '';
+  const panelName = String(button.dataset.adminPanel || '').trim().toLowerCase();
+  return ADMIN_PANEL_ORDER.includes(panelName) ? panelName : '';
+}
+
+function normalizeAdminNavOrder(order) {
+  const nextOrder = [];
+  const seenPanels = new Set();
+  const requestedOrder = Array.isArray(order) ? order : [];
+  requestedOrder.forEach((panelName) => {
+    const normalized = String(panelName || '').trim().toLowerCase();
+    if (!ADMIN_PANEL_ORDER.includes(normalized) || seenPanels.has(normalized) || !(ADMIN_NAV_BUTTONS[normalized] instanceof HTMLElement)) {
+      return;
+    }
+    seenPanels.add(normalized);
+    nextOrder.push(normalized);
+  });
+  ADMIN_NAV_ENTRIES.forEach(({ panelName }) => {
+    if (!seenPanels.has(panelName)) {
+      seenPanels.add(panelName);
+      nextOrder.push(panelName);
+    }
+  });
+  return nextOrder;
+}
+
+function getCurrentAdminNavOrder() {
+  if (!adminNavEl) return normalizeAdminNavOrder();
+  return normalizeAdminNavOrder(
+    Array.from(adminNavEl.querySelectorAll('.admin-nav-btn')).map((button) => getAdminNavPanelName(button))
+  );
+}
+
+function applyAdminNavOrder(order) {
+  if (!adminNavEl) return;
+  const fragment = document.createDocumentFragment();
+  normalizeAdminNavOrder(order).forEach((panelName) => {
+    const button = ADMIN_NAV_BUTTONS[panelName];
+    if (button instanceof HTMLElement) {
+      fragment.appendChild(button);
+    }
+  });
+  adminNavEl.appendChild(fragment);
+  refreshAdminNavContextMenu();
+}
+
+function restoreAdminNavOrder(order = readUserUiState()?.adminNavOrder) {
+  applyAdminNavOrder(order);
+}
+
+function persistAdminNavOrder() {
+  saveUserUiState({ adminNavOrder: getCurrentAdminNavOrder() });
+}
+
+function getAdminNavMoveAvailability(panelName) {
+  const button = ADMIN_NAV_BUTTONS[panelName];
+  if (!(button instanceof HTMLElement)) {
+    return { canMovePrev: false, canMoveNext: false };
+  }
+  const previousButton = button.previousElementSibling;
+  const nextButton = button.nextElementSibling;
+  return {
+    canMovePrev: previousButton instanceof HTMLElement && previousButton.classList.contains('admin-nav-btn'),
+    canMoveNext: nextButton instanceof HTMLElement && nextButton.classList.contains('admin-nav-btn')
+  };
+}
+
+function closeAdminNavContextMenu() {
+  activeAdminNavContextPanel = '';
+  if (!adminNavContextMenuEl) return;
+  adminNavContextMenuEl.hidden = true;
+  adminNavContextMenuEl.classList.remove('open');
+}
+
+function refreshAdminNavContextMenu(panelName = activeAdminNavContextPanel) {
+  if (!adminNavContextMenuEl || adminNavContextMenuEl.hidden || !panelName) return;
+  const { canMovePrev, canMoveNext } = getAdminNavMoveAvailability(panelName);
+  if (adminNavContextPrevBtn instanceof HTMLButtonElement) {
+    adminNavContextPrevBtn.disabled = !canMovePrev;
+  }
+  if (adminNavContextNextBtn instanceof HTMLButtonElement) {
+    adminNavContextNextBtn.disabled = !canMoveNext;
+  }
+}
+
+function openAdminNavContextMenu(panelName, clientX, clientY) {
+  if (!adminNavContextMenuEl || !panelName) return;
+  activeAdminNavContextPanel = panelName;
+  adminNavContextMenuEl.hidden = false;
+  adminNavContextMenuEl.classList.add('open');
+  adminNavContextMenuEl.style.left = '0px';
+  adminNavContextMenuEl.style.top = '0px';
+  refreshAdminNavContextMenu(panelName);
+  const menuWidth = adminNavContextMenuEl.offsetWidth || 180;
+  const menuHeight = adminNavContextMenuEl.offsetHeight || 96;
+  const left = Math.max(12, Math.min(clientX, window.innerWidth - menuWidth - 12));
+  const top = Math.max(12, Math.min(clientY, window.innerHeight - menuHeight - 12));
+  adminNavContextMenuEl.style.left = `${left}px`;
+  adminNavContextMenuEl.style.top = `${top}px`;
+}
+
+function moveAdminNavButton(panelName, direction) {
+  if (!adminNavEl) return;
+  const button = ADMIN_NAV_BUTTONS[panelName];
+  if (!(button instanceof HTMLElement)) return;
+  if (direction === 'prev') {
+    const previousButton = button.previousElementSibling;
+    if (previousButton instanceof HTMLElement && previousButton.classList.contains('admin-nav-btn')) {
+      adminNavEl.insertBefore(button, previousButton);
+    }
+  } else if (direction === 'next') {
+    const nextButton = button.nextElementSibling;
+    if (nextButton instanceof HTMLElement && nextButton.classList.contains('admin-nav-btn')) {
+      adminNavEl.insertBefore(button, nextButton.nextElementSibling);
+    }
+  }
+  persistAdminNavOrder();
+  refreshAdminNavContextMenu(panelName);
+}
+
+function handleAdminNavButtonClick(event) {
+  closeAdminNavContextMenu();
+  const panelName = getAdminNavPanelName(event.currentTarget?.closest('.admin-nav-btn'));
+  if (panelName) {
+    switchAdminPanel(panelName);
+  }
+}
+
+function handleAdminNavButtonContextMenu(event) {
+  event.preventDefault();
+  const panelName = getAdminNavPanelName(event.currentTarget);
+  if (!panelName) return;
+  openAdminNavContextMenu(panelName, event.clientX, event.clientY);
+}
+
+function handleAdminNavMoveButtonClick(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const direction = String(event.currentTarget?.dataset.adminMove || '').trim().toLowerCase();
+  if (!activeAdminNavContextPanel || (direction !== 'prev' && direction !== 'next')) return;
+  const panelName = activeAdminNavContextPanel;
+  moveAdminNavButton(panelName, direction);
+  closeAdminNavContextMenu();
+}
+
+function setupAdminNavButtons() {
+  ADMIN_NAV_ENTRIES.forEach(({ panelName, button }) => {
+    if (!(button instanceof HTMLElement) || button.dataset.adminNavBound === 'true') return;
+    button.dataset.adminPanel = panelName;
+    button.dataset.adminNavBound = 'true';
+    const openBtn = button.querySelector('.admin-nav-main-btn');
+    if (openBtn instanceof HTMLButtonElement) {
+      openBtn.addEventListener('click', handleAdminNavButtonClick);
+    }
+    button.addEventListener('contextmenu', handleAdminNavButtonContextMenu);
+  });
+  if (adminNavContextPrevBtn instanceof HTMLButtonElement) {
+    adminNavContextPrevBtn.dataset.adminMove = 'prev';
+    adminNavContextPrevBtn.addEventListener('click', handleAdminNavMoveButtonClick);
+  }
+  if (adminNavContextNextBtn instanceof HTMLButtonElement) {
+    adminNavContextNextBtn.dataset.adminMove = 'next';
+    adminNavContextNextBtn.addEventListener('click', handleAdminNavMoveButtonClick);
+  }
 }
 
 function switchAdminPanel(panelName, { persist = true } = {}) {
-  const activePanel = normalizeAdminPanelName(panelName);
+  const activePanel = getFirstAccessibleAdminPanel(panelName);
   const isOverview = activePanel === 'overview';
   const isInventory = activePanel === 'inventory';
   const isKit = activePanel === 'kit-spec';
@@ -3549,7 +4925,7 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
     refreshSalesReport(activeSalesRange);
   }
   if (isOthers) {
-    renderDiscountManager();
+    refreshDiscountManager();
     refreshMonthlyClosingModule();
   }
   if (persist) {
@@ -3557,64 +4933,25 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   }
 }
 
-function openAdminLogin() {
+async function openAdminDashboard({ panelName, persist = true } = {}) {
   if (!canAccessAdminFeatures()) {
     fireAudit('admin_access_denied', { reason: 'role_blocked', role: activeAuthSession?.role || 'unknown' });
-    setStatus('Admin dashboard access is allowed only for Administrations and Supervisor roles.');
+    setStatus('Current role does not have Control Center access.');
     return;
   }
   fireAudit('admin_access_allowed', { role: activeAuthSession?.role || 'unknown' });
-  if (!adminLoginModalEl) return;
-  lastAdminLoginTriggerEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  document.body.classList.add('admin-login-open');
-  adminLoginModalEl.setAttribute('aria-hidden', 'false');
-  if (adminUsernameEl) adminUsernameEl.value = ADMIN_DEFAULT_USERNAME;
-  if (adminPasswordEl) adminPasswordEl.value = ADMIN_DEFAULT_PASSWORD;
-  if (adminLoginErrorEl) adminLoginErrorEl.textContent = '';
-  if (adminLoginBtn) {
-    adminLoginBtn.focus();
-  } else if (adminUsernameEl) {
-    adminUsernameEl.focus();
-  }
-}
-
-function closeAdminLogin() {
-  if (adminLoginModalEl?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-  document.body.classList.remove('admin-login-open');
-  adminLoginModalEl?.setAttribute('aria-hidden', 'true');
-  const fallbackFocusEl = settingsAdminDashboardBtn || settingsToggleBtn || lastAdminLoginTriggerEl;
-  if (fallbackFocusEl instanceof HTMLElement) {
-    fallbackFocusEl.focus();
-  }
-  lastAdminLoginTriggerEl = null;
-}
-
-async function openAdminDashboard({ panelName, persist = true } = {}) {
+  updateAdminNavVisibility();
   const restoredPanel = panelName || readUserUiState()?.adminPanel;
-  const activePanel = normalizeAdminPanelName(restoredPanel);
+  const activePanel = getFirstAccessibleAdminPanel(restoredPanel);
   document.body.classList.add('admin-open');
   saveUserUiState({ adminOpen: true });
   switchAdminPanel(activePanel, { persist });
 }
 
 function closeAdminDashboard() {
+  closeAdminNavContextMenu();
   document.body.classList.remove('admin-open');
   saveUserUiState({ adminOpen: false });
-}
-
-async function submitAdminLogin() {
-  const username = (adminUsernameEl?.value || '').trim();
-  const password = adminPasswordEl?.value || '';
-
-  if (username !== ADMIN_DEFAULT_USERNAME || password !== ADMIN_DEFAULT_PASSWORD) {
-    if (adminLoginErrorEl) adminLoginErrorEl.textContent = 'Invalid username or password.';
-    return;
-  }
-
-  closeAdminLogin();
-  await openAdminDashboard();
 }
 
 // ------------------------------------------
@@ -3810,8 +5147,8 @@ async function refreshCatalog({ keepCategory = true } = {}) {
 
 function openMenuEditor() {
   if (!menuEditorModalEl) return;
-  if (!canAccessAdminFeatures()) {
-    setStatus('Edit Menu is allowed only for Administrations and Supervisor roles.');
+  if (!canAccessMenuEditor()) {
+    setStatus('Current role does not have menu editor access.');
     return;
   }
   document.body.classList.add('menu-editor-open');
@@ -3823,7 +5160,7 @@ function closeMenuEditor() {
 }
 
 function warmMenuEditorInBackground({ force = false } = {}) {
-  if (!canAccessAdminFeatures()) return;
+  if (!canAccessMenuEditor()) return;
   if (!force && menuEditorWarmReady) return;
   if (menuEditorWarmInFlight) return;
 
@@ -3948,8 +5285,8 @@ async function refreshMenuEditorData() {
 
 async function handleMenuCategorySubmit(event) {
   event.preventDefault();
-  if (!canAccessAdminFeatures()) {
-    setStatus('Only Administrations and Supervisor can edit menu.');
+  if (!canAccessMenuEditor()) {
+    setStatus('Current role does not have menu editor access.');
     return;
   }
 
@@ -4007,8 +5344,8 @@ async function handleMenuCategorySubmit(event) {
 
 async function handleMenuProductSubmit(event) {
   event.preventDefault();
-  if (!canAccessAdminFeatures()) {
-    setStatus('Only Administrations and Supervisor can edit menu.');
+  if (!canAccessMenuEditor()) {
+    setStatus('Current role does not have menu editor access.');
     return;
   }
 
@@ -4404,7 +5741,7 @@ function updateReceiptActionVisibility() {
   const hasReceipt = Boolean(state.lastPaidInvoice);
   const canHoldForVoid = Boolean(
     hasReceipt
-    && isCashierRole(activeAuthSession?.role)
+    && canManageInvoiceActions()
     && String(state.lastPaidInvoice?.status || '').trim().toUpperCase() === 'PAID'
   );
   if (statusReceiptActionsEl) {
@@ -4479,6 +5816,7 @@ function applyReceiptTemplateToArea(areaEl, template, refs = {}) {
   }
 
   setReceiptTemplateContent(refs.storeNameEl || areaEl.querySelector('.receipt-store-name'), settings.storeName);
+  setReceiptTemplateContent(refs.orderSlipTitleEl || areaEl.querySelector('.receipt-order-slip-title'), settings.orderSlipTitle);
   setReceiptTemplateContent(refs.storeAddressEl || areaEl.querySelector('.receipt-store-address'), settings.storeAddress);
   setReceiptTemplateContent(refs.storeTaxEl || areaEl.querySelector('.receipt-store-tax'), settings.taxLine);
   setReceiptTemplateContent(refs.footerEl || areaEl.querySelector('.receipt-footer'), settings.footerMessage);
@@ -4490,6 +5828,7 @@ function applyActiveReceiptTemplate() {
   state.activeReceiptTemplate = template;
   applyReceiptTemplateToArea(receiptPrintAreaEl, template, {
     logoEl: receiptLogoEl,
+    orderSlipTitleEl: receiptOrderSlipTitleEl,
     storeNameEl: receiptStoreNameEl,
     storeAddressEl: receiptStoreAddressEl,
     storeTaxEl: receiptStoreTaxEl,
@@ -4498,6 +5837,7 @@ function applyActiveReceiptTemplate() {
   });
   applyReceiptTemplateToArea(adminReceiptPrintAreaEl, template, {
     logoEl: adminReceiptLogoEl,
+    orderSlipTitleEl: adminReceiptOrderSlipTitleEl,
     storeNameEl: adminReceiptStoreNameEl,
     storeAddressEl: adminReceiptStoreAddressEl,
     storeTaxEl: adminReceiptStoreTaxEl,
@@ -4524,12 +5864,13 @@ function buildReceiptTemplatePreviewMarkup(template) {
     <div class="receipt-print-area receipt-template-preview-surface">
       <div class="receipt-header receipt-preview-draggable" data-preview-drag="header" title="Drag to move header in preview">
         <img class="receipt-logo" src="${escapeHtml(settings.logoUrl)}" alt="${escapeHtml(settings.storeName)} Logo" />
+        <p class="receipt-order-slip-title">${escapeHtml(settings.orderSlipTitle)}</p>
         <h3 class="receipt-store-name">${escapeHtml(settings.storeName)}</h3>
         <p class="receipt-store-address">${escapeHtml(settings.storeAddress)}</p>
         <p class="receipt-store-tax">${escapeHtml(settings.taxLine)}</p>
       </div>
       <div class="receipt-meta receipt-preview-draggable" data-preview-drag="meta" title="Drag to move meta details in preview">
-        <div><span>Receipt No:</span> <strong>${escapeHtml(invoice.reference)}</strong></div>
+        <div><span>Order Slip No.:</span> <strong>${escapeHtml(invoice.reference)}</strong></div>
         <div><span>Date:</span> <strong>${escapeHtml(formatDate(invoice.paidAt))}</strong></div>
         <div><span>Order Type:</span> <strong>${escapeHtml(getOrderTypeLabel(invoice.orderType))}</strong></div>
         <div><span>Payment:</span> <strong>${escapeHtml(getPaymentMethodLabel(invoice.paymentMethod))}</strong></div>
@@ -4555,6 +5896,7 @@ function collectReceiptTemplateDraft() {
     id: state.receiptTemplateEditorId || DEFAULT_RECEIPT_TEMPLATE.id,
     name: receiptTemplateNameInputEl?.value,
     settings: {
+      orderSlipTitle: receiptTemplateOrderSlipTitleInputEl?.value,
       storeName: receiptTemplateStoreNameInputEl?.value,
       storeAddress: receiptTemplateStoreAddressInputEl?.value,
       taxLine: receiptTemplateTaxLineInputEl?.value,
@@ -4627,6 +5969,7 @@ function populateReceiptTemplateEditor(template) {
   const normalized = withLocalReceiptTemplateLogo(normalizeReceiptTemplate(template || getActiveReceiptTemplate()));
   state.receiptTemplateEditorId = normalized.id || null;
   if (receiptTemplateNameInputEl) receiptTemplateNameInputEl.value = normalized.name;
+  if (receiptTemplateOrderSlipTitleInputEl) receiptTemplateOrderSlipTitleInputEl.value = normalized.settings.orderSlipTitle;
   if (receiptTemplateStoreNameInputEl) receiptTemplateStoreNameInputEl.value = normalized.settings.storeName;
   if (receiptTemplateStoreAddressInputEl) receiptTemplateStoreAddressInputEl.value = normalized.settings.storeAddress;
   if (receiptTemplateTaxLineInputEl) receiptTemplateTaxLineInputEl.value = normalized.settings.taxLine;
@@ -4685,7 +6028,7 @@ function updateReceiptTemplateEditorState() {
   if (receiptTemplateAdminNoteEl) {
     receiptTemplateAdminNoteEl.textContent = canEdit
       ? 'Save new templates or activate one for all printed transaction receipts.'
-      : 'You can preview receipt templates here, but only Administrations can save or activate them.';
+      : 'You can preview order slip templates here, but only Administrations can save or activate them.';
   }
   if (receiptTemplateUpdateBtnEl) receiptTemplateUpdateBtnEl.disabled = !canEdit || !selectedTemplate;
   if (receiptTemplateActivateBtnEl) {
@@ -4792,7 +6135,7 @@ function stopReceiptTemplatePreviewDrag() {
 function renderReceiptTemplateList() {
   if (!receiptTemplateListEl) return;
   if (!state.receiptTemplates.length) {
-    receiptTemplateListEl.innerHTML = '<p>No saved receipt templates yet.</p>';
+    receiptTemplateListEl.innerHTML = '<p>No saved order slip templates yet.</p>';
     return;
   }
 
@@ -4818,7 +6161,7 @@ function renderReceiptTemplateList() {
         </div>
         <div class="receipt-template-list-actions">
           <button class="secondary small" type="button" data-receipt-template-load="${escapeHtml(normalized.id)}">Load</button>
-          <button class="secondary small" type="button" data-receipt-template-activate="${escapeHtml(normalized.id)}"${canActivate ? '' : ' disabled'}>${normalized.isActive ? 'Active Template' : 'Use for Receipts'}</button>
+          <button class="secondary small" type="button" data-receipt-template-activate="${escapeHtml(normalized.id)}"${canActivate ? '' : ' disabled'}>${normalized.isActive ? 'Active Template' : 'Use for Order Slips'}</button>
           <button class="secondary small" type="button" data-receipt-template-delete="${escapeHtml(normalized.id)}"${canManageReceiptTemplates() && !normalized.isActive ? '' : ' disabled'}>Delete</button>
         </div>
       </article>
@@ -4862,8 +6205,8 @@ function applyReceiptTemplatesState(payload = {}) {
 }
 
 async function refreshReceiptTemplatesModule() {
-  if (!receiptTemplatesStatusEl) return;
-  setReceiptTemplatesStatus('Loading receipt templates...');
+  if (!receiptTemplatesStatusEl || !canAccessReceiptTemplatesPanel()) return;
+  setReceiptTemplatesStatus('Loading order slip templates...');
   if (receiptTemplateListEl) receiptTemplateListEl.innerHTML = '<p>Loading templates...</p>';
   try {
     const result = await api('/api/admin/receipt-templates', {
@@ -5031,6 +6374,14 @@ function printReceiptContent(printAreaEl) {
       .receipt-logo { width: var(--receipt-logo-width, 78px); height: auto; object-fit: contain; margin-bottom: 6px; }
       .receipt-print-area.logo-hidden .receipt-logo { display: none !important; }
       .receipt-header h3 { margin: 0; font-size: var(--receipt-title-size, 24px); font-weight: 800; color: var(--receipt-accent-color, #5a3521); }
+      .receipt-order-slip-title {
+        margin: 0 0 2px;
+        font-size: var(--receipt-meta-size, 12px);
+        color: var(--receipt-accent-color, #5a3521);
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
       .receipt-header p { margin: 2px 0; font-size: var(--receipt-meta-size, 12px); color: var(--receipt-muted-color, #7b5a47); white-space: pre-line; }
       .receipt-meta { display: grid; gap: 4px; margin-bottom: var(--receipt-section-gap, 10px); font-size: var(--receipt-meta-size, 12px); transform: translate(var(--receipt-meta-offset-x, 0px), var(--receipt-meta-offset-y, 0px)); }
       .receipt-meta div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted var(--receipt-border-color, #c8a88f); padding-bottom: 2px; }
@@ -5327,6 +6678,23 @@ function getOverviewMixLabel(value, fallback = 'Unknown') {
   return normalized.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function renderOverviewMixRows(rows, type) {
+  return rows.length
+    ? rows.map((row) => `
+        <div class="overview-mix-row">
+          <div>
+            <strong>${escapeHtml(getOverviewMixLabel(type === 'payment' ? row.method : type === 'order' ? row.orderType : row.status))}</strong>
+            <small>${Number(row.count || 0)} transaction(s)</small>
+          </div>
+          <div class="overview-mix-meta">
+            <span>${type === 'status' ? money(row.amount || 0) : `${Number(row.share || 0).toFixed(1)}%`}</span>
+            ${type === 'status' ? '' : `<small>${money(row.amount || 0)}</small>`}
+          </div>
+        </div>
+      `).join('')
+    : '<p>No data for this range.</p>';
+}
+
 function renderOverviewMetricCards(report) {
   const metrics = report?.metrics || {};
   const comparisons = report?.comparisons || {};
@@ -5358,19 +6726,9 @@ function renderOverviewMetricCards(report) {
         <small>Tendered ${money(metrics.cashTendered || 0)} | Change ${money(metrics.changeGiven || 0)}</small>
       </article>
       <article class="overview-kpi-card">
-        <span>Active Cashiers</span>
-        <strong>${Number(metrics.activeCashiers || 0)}</strong>
-        <small>${Number(metrics.pendingTransactions || 0)} pending payment(s) in range</small>
-      </article>
-      <article class="overview-kpi-card">
         <span>Monthly Net After Expenses</span>
         <strong>${money(metrics.monthlyNetAfterExpenses || 0)}</strong>
         <small>Monthly expenses ${money(metrics.monthlyExpenses || 0)}</small>
-      </article>
-      <article class="overview-kpi-card">
-        <span>Risk Signals</span>
-        <strong>${Number((metrics.lowStockIngredients || 0) + (metrics.discrepancyAlerts || 0) + (metrics.unsyncedOperations || 0))}</strong>
-        <small>Low stock ${Number(metrics.lowStockIngredients || 0)} | Discrepancies ${Number(metrics.discrepancyAlerts || 0)}</small>
       </article>
     </div>
   `;
@@ -5379,77 +6737,48 @@ function renderOverviewMetricCards(report) {
 function renderOverviewMixSection(report) {
   const paymentMix = Array.isArray(report?.paymentMix) ? report.paymentMix : [];
   const orderTypeMix = Array.isArray(report?.orderTypeMix) ? report.orderTypeMix : [];
-  const attention = report?.attention || {};
-  const statusBreakdown = Array.isArray(report?.statusBreakdown) ? report.statusBreakdown : [];
-
-  const renderMixRows = (rows, type) => rows.length
-    ? rows.map((row) => `
-        <div class="overview-mix-row">
-          <div>
-            <strong>${escapeHtml(getOverviewMixLabel(type === 'payment' ? row.method : type === 'order' ? row.orderType : row.status))}</strong>
-            <small>${Number(row.count || 0)} transaction(s)</small>
-          </div>
-          <div class="overview-mix-meta">
-            <span>${type === 'status' ? money(row.amount || 0) : `${Number(row.share || 0).toFixed(1)}%`}</span>
-            ${type === 'status' ? '' : `<small>${money(row.amount || 0)}</small>`}
-          </div>
-        </div>
-      `).join('')
-    : '<p>No data for this range.</p>';
 
   return `
-    <div class="overview-analysis-grid">
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Payment Mix</h3>
-          <span>Cash and e-wallet share</span>
-        </div>
-        <div class="overview-mix-list">${renderMixRows(paymentMix, 'payment')}</div>
-      </section>
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Order Type Mix</h3>
-          <span>Dine in vs take out</span>
-        </div>
-        <div class="overview-mix-list">${renderMixRows(orderTypeMix, 'order')}</div>
-      </section>
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Status Breakdown</h3>
-          <span>Lifecycle visibility</span>
-        </div>
-        <div class="overview-mix-list">${renderMixRows(statusBreakdown, 'status')}</div>
-      </section>
-      <section class="overview-panel-card attention">
-        <div class="overview-panel-head">
-          <h3>Attention Needed</h3>
-          <span>Issues to review now</span>
-        </div>
-        <div class="overview-alert-list">
-          <article class="overview-alert-item">
-            <strong>${Number(attention.pendingPayments || 0)}</strong>
-            <span>Pending Payments</span>
-          </article>
-          <article class="overview-alert-item">
-            <strong>${Number(attention.discrepancyAlerts || 0)}</strong>
-            <span>Shift Discrepancies</span>
-          </article>
-          <article class="overview-alert-item">
-            <strong>${Number(attention.lowStockIngredients || 0)}</strong>
-            <span>Low Stock Ingredients</span>
-          </article>
-          <article class="overview-alert-item">
-            <strong>${Number(attention.unsyncedOperations || 0)}</strong>
-            <span>Unsynced Operations</span>
-          </article>
-          <article class="overview-alert-item">
-            <strong>${Number(attention.voidedTransactions || 0)}</strong>
-            <span>Voided Sales</span>
-          </article>
-        </div>
-      </section>
-    </div>
+    <section class="overview-panel-card admin-mix-panel-card">
+      <div class="overview-panel-head">
+        <h3>Payment and Order Mix</h3>
+        <span>Selected dashboard range</span>
+      </div>
+      <div class="admin-mix-grid">
+        <section class="admin-mix-column">
+          <div class="admin-mix-column-head">
+            <h4>Payment Mix</h4>
+            <span>Cash and e-wallet share</span>
+          </div>
+          <div class="overview-mix-list">${renderOverviewMixRows(paymentMix, 'payment')}</div>
+        </section>
+        <section class="admin-mix-column">
+          <div class="admin-mix-column-head">
+            <h4>Order Type Mix</h4>
+            <span>Dine in vs take out</span>
+          </div>
+          <div class="overview-mix-list">${renderOverviewMixRows(orderTypeMix, 'order')}</div>
+        </section>
+      </div>
+    </section>
   `;
+}
+
+function setAdminMixPanelVisibility(nextOpen) {
+  isAdminMixPanelOpen = Boolean(nextOpen);
+  if (adminMixSectionEl) {
+    adminMixSectionEl.classList.toggle('hidden-control', !isAdminMixPanelOpen);
+  }
+  if (adminTransactionsGroupHeadEl) {
+    adminTransactionsGroupHeadEl.classList.toggle('hidden-control', isAdminMixPanelOpen);
+  }
+  if (adminTransactionsRowEl) {
+    adminTransactionsRowEl.classList.toggle('hidden-control', isAdminMixPanelOpen);
+  }
+  if (adminMixToggleBtn) {
+    adminMixToggleBtn.textContent = 'Comparison';
+    adminMixToggleBtn.setAttribute('aria-expanded', String(isAdminMixPanelOpen));
+  }
 }
 
 function renderOverviewDetailSection(report) {
@@ -5561,9 +6890,6 @@ function renderOverviewDetailSection(report) {
 
 function renderOverviewTopLists(report) {
   const topProducts = Array.isArray(report?.topProducts) ? report.topProducts : [];
-  const activeCashiers = Array.isArray(report?.activeCashiers) ? report.activeCashiers : [];
-  const inventoryAlerts = Array.isArray(report?.inventory?.alerts) ? report.inventory.alerts.slice(0, 5) : [];
-  const discountTypeSummary = Array.isArray(report?.discountTypeSummary) ? report.discountTypeSummary : [];
 
   const topProductsMarkup = topProducts.length
     ? topProducts.map((item) => `
@@ -5577,73 +6903,8 @@ function renderOverviewTopLists(report) {
       `).join('')
     : '<p>No product sales yet for this range.</p>';
 
-  const activeCashiersMarkup = activeCashiers.length
-    ? activeCashiers.map((cashier) => `
-        <div class="overview-list-row">
-          <div>
-            <strong>${escapeHtml(cashier.cashierName || cashier.cashierEmail || 'Cashier')}</strong>
-            <small>${escapeHtml(cashier.drawerName || 'Drawer')} | Hold for void ${money(cashier.holdForVoidAmount || 0)}</small>
-          </div>
-          <span>${money(cashier.currentSales || 0)}</span>
-        </div>
-      `).join('')
-    : '<p>No active cashiers right now.</p>';
-
-  const inventoryAlertsMarkup = inventoryAlerts.length
-    ? inventoryAlerts.map((alert) => `
-        <div class="overview-list-row">
-          <div>
-            <strong>${escapeHtml(alert.ingredientName || alert.title || 'Inventory Alert')}</strong>
-            <small>${escapeHtml(alert.reason || alert.message || 'Needs review')}</small>
-          </div>
-          <span>${escapeHtml(alert.severity || 'warning')}</span>
-        </div>
-      `).join('')
-    : '<p>No inventory alerts right now.</p>';
-
-  const discountTypeMarkup = discountTypeSummary.length
-    ? discountTypeSummary.map((item) => `
-        <div class="overview-list-row">
-          <div>
-            <strong>${escapeHtml(item.label || item.profileName || 'Discount')}</strong>
-            <small>${Number(item.count || 0)} transaction(s) used this customer type</small>
-          </div>
-          <span>${money(item.discountAmount || 0)}</span>
-        </div>
-      `).join('')
-    : '<p>No customer discount transactions yet in this range.</p>';
-
   return `
-    <div class="overview-analysis-grid">
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Top Products</h3>
-          <span>Best sellers in selected range</span>
-        </div>
-        <div class="overview-list">${topProductsMarkup}</div>
-      </section>
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Active Cashiers</h3>
-          <span>Live cashier activity</span>
-        </div>
-        <div class="overview-list">${activeCashiersMarkup}</div>
-      </section>
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Discount Monitor</h3>
-          <span>Customer discount usage</span>
-        </div>
-        <div class="overview-list">${discountTypeMarkup}</div>
-      </section>
-      <section class="overview-panel-card">
-        <div class="overview-panel-head">
-          <h3>Inventory Alerts</h3>
-          <span>Operational stock warnings</span>
-        </div>
-        <div class="overview-list">${inventoryAlertsMarkup}</div>
-      </section>
-    </div>
+    <div class="overview-list">${topProductsMarkup}</div>
   `;
 }
 
@@ -5653,7 +6914,7 @@ function renderSalesReport(report) {
     salesSummaryEl.innerHTML = renderOverviewMetricCards(report);
   }
   if (salesListEl) {
-    salesListEl.innerHTML = renderOverviewMixSection(report);
+    salesListEl.innerHTML = '';
   }
   if (detailDailySalesEl) detailDailySalesEl.textContent = '';
   if (detailDailyMetaEl) detailDailyMetaEl.textContent = '';
@@ -5664,6 +6925,9 @@ function renderSalesReport(report) {
   }
   if (topProductsListEl) {
     topProductsListEl.innerHTML = renderOverviewTopLists(report);
+  }
+  if (adminMixPanelEl) {
+    adminMixPanelEl.innerHTML = renderOverviewMixSection(report);
   }
   renderAdminStats(report);
 }
@@ -6164,6 +7428,7 @@ function renderInventoryReport(report) {
 }
 
 async function refreshInventoryModule() {
+  if (!canAccessInventoryPanel()) return;
   const isAdmin = canManageInventory();
   const showIngredientManagement = activeInventoryView === 'ingredients';
   if (inventoryIngredientFormEl) {
@@ -6191,7 +7456,9 @@ async function refreshInventoryModule() {
   if (inventoryTableWrapEl) inventoryTableWrapEl.innerHTML = '<p>Loading ingredients...</p>';
 
   try {
-    const report = await api('/api/admin/inventory/report');
+    const report = await api('/api/admin/inventory/report', {
+      headers: buildActorHeaders()
+    });
     renderInventoryReport(report);
   } catch (error) {
     if (inventorySummaryEl) inventorySummaryEl.innerHTML = `<p class="error">Inventory error: ${escapeHtml(error.message)}</p>`;
@@ -6577,7 +7844,7 @@ function renderKitSpecModeControl() {
   if (!kitSpecModeControlEl || !kitSpecModeLabelEl || !kitSpecModeHintEl || !kitSpecModeToggleBtnEl) return;
 
   const enforceKitSpec = state.appConfig?.enforceKitSpec !== false;
-  const canToggle = canManageInventory();
+  const canToggle = normalizeRoleChoice(activeAuthSession?.role) === 'administrations';
 
   kitSpecModeLabelEl.textContent = enforceKitSpec ? 'Kit Spec Required' : 'Open Ordering Mode';
   kitSpecModeHintEl.textContent = enforceKitSpec
@@ -6602,7 +7869,7 @@ function syncKitSpecBuilderVisibility() {
 }
 
 async function refreshKitSpecModule() {
-  if (!kitSpecModuleEl) return;
+  if (!kitSpecModuleEl || !canAccessKitSpecPanel()) return;
   renderKitSpecModeControl();
   syncKitSpecBuilderVisibility();
   if (kitSpecNoteEl) {
@@ -6611,9 +7878,9 @@ async function refreshKitSpecModule() {
         ? 'Kit spec requirement is currently turned off. The Kit Builder inputs are hidden because ordering and payment no longer depend on recipes or ingredient stock.'
         : 'Kit spec requirement is currently turned off. The Kit Builder inputs are hidden because products can be sold without ingredient checks.';
     } else {
-      kitSpecNoteEl.textContent = canAccessAdminFeatures()
+      kitSpecNoteEl.textContent = canAccessKitSpecPanel()
         ? 'Assign the exact ingredients and quantity used by each product. Paid orders will deduct stock from these kit specs.'
-        : 'View-only mode. Only Administrations and Supervisor can manage kit specification.';
+        : 'View-only mode. Current role cannot manage kit specification.';
     }
   }
   if (kitSpecModuleEl) kitSpecModuleEl.innerHTML = '<p class="kit-spec-empty-state">Loading kit specification records...</p>';
@@ -6652,7 +7919,7 @@ async function refreshKitSpecModule() {
 }
 
 async function handleKitSpecModeToggle() {
-  if (!canManageInventory()) {
+  if (normalizeRoleChoice(activeAuthSession?.role) !== 'administrations') {
     setStatus('Only Administrations can change the Kit Spec requirement.');
     return;
   }
@@ -6883,6 +8150,13 @@ function buildUserManagementHeaders() {
 async function refreshAdminUsers() {
   if (adminUsersSummaryEl) adminUsersSummaryEl.innerHTML = '<div class="user-management-summary-loading">Loading users...</div>';
   if (adminUsersListEl) adminUsersListEl.innerHTML = '<p>Loading users...</p>';
+  renderRoleAccessManager();
+
+  if (!canViewUserDirectory()) {
+    if (adminUsersSummaryEl) adminUsersSummaryEl.innerHTML = '<p class="error">Current role does not have user directory access.</p>';
+    if (adminUsersListEl) adminUsersListEl.innerHTML = '';
+    return;
+  }
 
   try {
     const result = await api('/api/admin/users', {
@@ -6895,7 +8169,7 @@ async function refreshAdminUsers() {
     if (adminCreateUserNoteEl) {
       adminCreateUserNoteEl.textContent = canManage
         ? 'Create a user account and set the initial login password.'
-        : 'View-only mode. Only Administrations can create users.';
+        : 'View-only mode. Current role can review accounts and access lists, but cannot change users.';
     }
     if (adminCreateUserFormEl) {
       adminCreateUserFormEl.style.display = canManage ? 'grid' : 'none';
@@ -6934,7 +8208,7 @@ async function refreshAdminUsers() {
           value: Number(roleCounts.administrations || 0).toLocaleString('en-US'),
           icon: '🛡',
           accent: 'admins',
-          meta: canManage ? 'You can manage roles, account status, and password reset.' : 'View-only mode. Only Administrations can manage users.'
+          meta: canManage ? 'You can manage roles, account status, and password resets. Built-in role functions are listed below.' : 'View-only mode. Built-in role functions are listed below for review.'
         }
       ];
 
@@ -6993,7 +8267,7 @@ async function refreshAdminUsers() {
                   ${user.isActive ? 'Deactivate' : 'Activate'}
                 </button>
               </div>
-              <div class="user-management-action-row">
+              <div class="user-management-action-row password-reset-row">
                 <input type="password" class="user-reset-password-input" placeholder="Temp password (min 6)" />
                 <button type="button" class="secondary" data-user-reset-password="${escapeHtml(user.id)}">Reset Password</button>
               </div>
@@ -7039,7 +8313,7 @@ async function refreshAdminUsers() {
 async function handleAdminCreateUserSubmit(event) {
   event.preventDefault();
   if (!canManageUsers()) {
-    setStatus('Only Administrations can create users.');
+    setStatus('Current role does not have permission to create users.');
     return;
   }
 
@@ -7110,7 +8384,7 @@ async function handleAdminUsersAction(event) {
   const roleBtn = event.target.closest('[data-user-save-role]');
   if (roleBtn) {
     if (!canManageUsers()) {
-      setStatus('Only Administrations can update user roles.');
+      setStatus('Current role does not have permission to update user roles.');
       return;
     }
     const userId = String(roleBtn.getAttribute('data-user-save-role') || '').trim();
@@ -7142,7 +8416,7 @@ async function handleAdminUsersAction(event) {
   const toggleBtn = event.target.closest('[data-user-toggle-active]');
   if (toggleBtn) {
     if (!canManageUsers()) {
-      setStatus('Only Administrations can activate/deactivate users.');
+      setStatus('Current role does not have permission to activate or deactivate users.');
       return;
     }
     const userId = String(toggleBtn.getAttribute('data-user-toggle-active') || '').trim();
@@ -7170,7 +8444,7 @@ async function handleAdminUsersAction(event) {
   const resetBtn = event.target.closest('[data-user-reset-password]');
   if (resetBtn) {
     if (!canManageUsers()) {
-      setStatus('Only Administrations can reset user passwords.');
+      setStatus('Current role does not have permission to reset user passwords.');
       return;
     }
     const userId = String(resetBtn.getAttribute('data-user-reset-password') || '').trim();
@@ -7207,10 +8481,59 @@ async function handleAdminUsersAction(event) {
   }
 }
 
+async function handleRoleAccessManagerClick(event) {
+  const removeBtn = event.target.closest('[data-role-access-remove]');
+  if (!removeBtn) return;
+  const roleKey = String(removeBtn.getAttribute('data-role-access-remove') || '').trim().toLowerCase();
+  const permissionKey = String(removeBtn.getAttribute('data-role-access-key') || '').trim().toLowerCase();
+  if (!roleKey || !permissionKey) return;
+
+  const entry = getRoleAccessCatalogEntry(permissionKey);
+  if (!entry) return;
+
+  try {
+    removeBtn.disabled = true;
+    removeBtn.textContent = 'Removing...';
+    await updateRoleAccessConfig(roleKey, (entries) => entries.filter((key) => key !== permissionKey));
+  } catch (error) {
+    setStatus(`Role access update failed: ${error.message}`);
+  } finally {
+    removeBtn.disabled = false;
+    removeBtn.textContent = 'Remove';
+  }
+}
+
+async function handleRoleAccessManagerSubmit(event) {
+  const formEl = event.target.closest('[data-role-access-form]');
+  if (!formEl) return;
+  event.preventDefault();
+
+  const roleKey = String(formEl.getAttribute('data-role-access-form') || '').trim().toLowerCase();
+  const selectEl = formEl.querySelector('[data-role-access-select]');
+  const permissionKey = String(selectEl?.value || '').trim().toLowerCase();
+  if (!roleKey || !permissionKey) return;
+
+  const submitBtn = formEl.querySelector('button[type="submit"]');
+  try {
+    if (submitBtn instanceof HTMLButtonElement) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Adding...';
+    }
+    await updateRoleAccessConfig(roleKey, (entries) => entries.concat(permissionKey));
+  } catch (error) {
+    setStatus(`Role access update failed: ${error.message}`);
+  } finally {
+    if (submitBtn instanceof HTMLButtonElement) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Add';
+    }
+  }
+}
+
 async function handleIngredientSubmit(event) {
   event.preventDefault();
   if (!canManageInventory()) {
-    setStatus('Only Administrations role can add ingredients.');
+    setStatus('Current role does not have permission to add ingredients.');
     return;
   }
 
@@ -7303,7 +8626,7 @@ function toggleInventoryBulkEditor() {
 async function handleInventoryBulkEditSubmit(event) {
   event.preventDefault();
   if (!canManageInventory()) {
-    setStatus('Only Administrations can bulk edit ingredients.');
+    setStatus('Current role does not have permission to bulk edit ingredients.');
     return;
   }
   if (!inventoryBulkEditorEl) return;
@@ -7448,7 +8771,7 @@ function closeInventoryHistoryModal() {
 
 async function handleInventoryEditClick(buttonEl) {
   if (!canManageInventory()) {
-    setStatus('Only Administrations can edit ingredients.');
+    setStatus('Current role does not have permission to edit ingredients.');
     return;
   }
   const ingredientId = String(buttonEl?.getAttribute('data-inventory-edit') || '').trim();
@@ -7480,7 +8803,7 @@ async function handleInventoryEditClick(buttonEl) {
 async function handleInventoryEditSubmit(event) {
   event.preventDefault();
   if (!canManageInventory()) {
-    setStatus('Only Administrations can edit ingredients.');
+    setStatus('Current role does not have permission to edit ingredients.');
     return;
   }
   const ingredientId = String(inventoryEditContext?.ingredientId || '').trim();
@@ -7540,7 +8863,7 @@ async function handleInventoryEditSubmit(event) {
 
 async function handleInventoryDeleteClick(buttonEl) {
   if (!canManageInventory()) {
-    setStatus('Only Administrations can delete ingredients.');
+    setStatus('Current role does not have permission to delete ingredients.');
     return;
   }
   const ingredientId = String(buttonEl?.getAttribute('data-inventory-delete') || '').trim();
@@ -7631,7 +8954,7 @@ async function handleInventoryHistoryClick(buttonEl) {
 
 async function submitInventoryDelete() {
   if (!canManageInventory()) {
-    setStatus('Only Administrations can delete ingredients.');
+    setStatus('Current role does not have permission to delete ingredients.');
     return;
   }
   const ingredientId = String(inventoryDeleteContext?.ingredientId || '').trim();
@@ -7662,28 +8985,42 @@ async function submitInventoryDelete() {
   }
 }
 
-async function refreshSalesReport(range = activeSalesRange) {
+async function refreshSalesReport(range = activeSalesRange, options = {}) {
   try {
+    const { refreshSalesOps = true } = options;
     activeSalesRange = range;
     saveUserUiState({ salesRange: activeSalesRange });
     if (!canAccessAdminFeatures()) return;
-    if (adminRangeEl && (range === 'daily' || range === 'weekly')) {
+    if (adminRangeEl) {
       adminRangeEl.value = range;
     }
-    const report = await api(`/api/admin/overview?range=${encodeURIComponent(range)}`, {
+    
+    let url = `/api/admin/overview?range=${encodeURIComponent(range)}`;
+    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
+      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
+      const year = parseInt(monthVal.split('-')[0], 10);
+      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
+      const from = new Date(year, month, 1, 0, 0, 0);
+      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      url += `&dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}`;
+    }
+
+    const report = await api(url, {
       headers: buildActorHeaders()
     });
     renderSalesReport(report);
-    await Promise.all([
-      refreshAdminTransactions(),
-      refreshSalesOpsDashboard()
-    ]);
+    const followUpTasks = [refreshAdminTransactions()];
+    if (refreshSalesOps) {
+      followUpTasks.push(refreshSalesOpsDashboard(activeSalesOpsRange));
+    }
+    await Promise.all(followUpTasks);
   } catch (error) {
     latestAdminOverview = null;
     if (salesSummaryEl) salesSummaryEl.textContent = `Sales report error: ${error.message}`;
     if (salesListEl) salesListEl.innerHTML = '';
     if (salesDetailedGridEl) salesDetailedGridEl.innerHTML = '';
     if (topProductsListEl) topProductsListEl.innerHTML = '';
+    if (adminMixPanelEl) adminMixPanelEl.innerHTML = '';
     if (adminStatsEl) adminStatsEl.innerHTML = '';
   }
 }
@@ -7889,6 +9226,15 @@ async function refreshAdminTransactions() {
     let url = '/api/admin/transactions?';
     if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
     if (range) url += `range=${encodeURIComponent(range)}&`;
+    
+    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
+      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
+      const year = parseInt(monthVal.split('-')[0], 10);
+      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
+      const from = new Date(year, month, 1, 0, 0, 0);
+      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      url += `dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}&`;
+    }
 
     const { transactions } = await api(url, {
       headers: buildActorHeaders()
@@ -7954,50 +9300,72 @@ async function requestHoldForVoid(invoiceId = null) {
 function renderAdminStats(report) {
   if (!adminStatsEl) return;
   const metrics = report?.metrics || {};
-  const monthly = report?.monthlyClosing?.summary || {};
+  const comparisons = report?.comparisons || {};
 
   adminStatsEl.innerHTML = `
-    <article class="overview-health-card">
-      <span>Pending Payments</span>
-      <strong>${Number(metrics.pendingTransactions || 0)}</strong>
-      <small>Invoices waiting for payment confirmation</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Voided Sales</span>
-      <strong>${Number(metrics.voidedTransactions || 0)}</strong>
-      <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Low Stock</span>
-      <strong>${Number(metrics.lowStockIngredients || 0)}</strong>
-      <small>Ingredients at or below reorder level</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Discrepancy Alerts</span>
-      <strong>${Number(metrics.discrepancyAlerts || 0)}</strong>
-      <small>Shift reviews needing reconciliation</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Unsynced Operations</span>
-      <strong>${Number(metrics.unsyncedOperations || 0)}</strong>
-      <small>Offline queue items waiting to sync</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Monthly Expenses</span>
-      <strong>${money(metrics.monthlyExpenses || 0)}</strong>
-      <small>${Number(monthly.expenseCount || 0)} expense entry(s) this month</small>
-    </article>
-    <article class="overview-health-card">
-      <span>Inventory Snapshot</span>
-      <strong>${money(monthly.inventoryValueSnapshot || 0)}</strong>
-      <small>Current stock value tied to this month closing view</small>
-    </article>
+    <div class="sales-ops-summary-grid admin-health-grid">
+      <article class="sales-ops-summary-card highlight">
+        <span>Gross Sales</span>
+        <strong>${money(metrics.totalSales || 0)}</strong>
+        <small>${formatOverviewDelta(comparisons.sales, money)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Paid Transactions</span>
+        <strong>${Number(metrics.paidTransactions || 0)}</strong>
+        <small>${formatOverviewCountDelta(comparisons.transactions)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Average Ticket</span>
+        <strong>${money(metrics.averageTicket || 0)}</strong>
+        <small>${formatOverviewDelta(comparisons.averageTicket, money)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Items Sold</span>
+        <strong>${Number(metrics.itemsSold || 0)}</strong>
+        <small>${formatOverviewCountDelta(comparisons.itemsSold)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Net Cash</span>
+        <strong>${money(metrics.netCash || 0)}</strong>
+        <small>Tendered ${money(metrics.cashTendered || 0)} | Change ${money(metrics.changeGiven || 0)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Monthly Net After Expenses</span>
+        <strong>${money(metrics.monthlyNetAfterExpenses || 0)}</strong>
+        <small>Monthly expenses ${money(metrics.monthlyExpenses || 0)}</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Pending Payments</span>
+        <strong>${Number(metrics.pendingTransactions || 0)}</strong>
+        <small>Invoices waiting for payment confirmation</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Voided Sales</span>
+        <strong>${Number(metrics.voidedTransactions || 0)}</strong>
+        <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Discrepancy Alerts</span>
+        <strong>${Number(metrics.discrepancyAlerts || 0)}</strong>
+        <small>Shift reviews needing reconciliation</small>
+      </article>
+      <article class="sales-ops-summary-card">
+        <span>Unsynced Operations</span>
+        <strong>${Number(metrics.unsyncedOperations || 0)}</strong>
+        <small>Offline queue items waiting to sync</small>
+      </article>
+    </div>
   `;
 }
 
 function renderAdminTransactions(transactions) {
   if (!transactions.length) {
-    adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    if (adminRangeEl && adminRangeEl.value === 'custom_month') {
+      const monthVal = adminMonthPickerEl ? adminMonthPickerEl.value : '';
+      adminTransactionsEl.innerHTML = `<p>No transactions found for the selected month${monthVal ? ` (${escapeHtml(monthVal)})` : ''}.</p>`;
+    } else {
+      adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    }
     return;
   }
 
@@ -8057,7 +9425,7 @@ function renderAdminTransactions(transactions) {
           <div class="txn-badges">
             <span class="badge ${statusClass}">${escapeHtml(getOverviewMixLabel(normalizedStatus) || t.status)}</span>
             <span class="badge ${methodClass} method-badge">
-              <img class="payment-method-icon" src="${getPaymentMethodIcon(t.paymentMethod)}" alt="${getPaymentMethodLabel(t.paymentMethod)}" />
+              <img class="payment-method-icon payment-method-icon-${escapeHtml(String(t.paymentMethod || '').toLowerCase())}" src="${getPaymentMethodIcon(t.paymentMethod)}" alt="${getPaymentMethodLabel(t.paymentMethod)}" />
               ${getPaymentMethodLabel(t.paymentMethod)}
             </span>
           </div>
@@ -8085,6 +9453,20 @@ function getAdminRangeSearchParams() {
   const params = new URLSearchParams();
   const range = getAdminRangeQueryValue();
   if (range) params.set('range', range);
+  return params;
+}
+
+function getSalesOpsRangeSearchParams() {
+  const params = new URLSearchParams();
+  const range = getSalesOpsRangeQueryValue();
+  params.set('range', range);
+  if (range === 'custom_month') {
+    const bounds = getMonthRangeBounds(getSalesOpsSelectedMonth());
+    if (bounds?.dateFrom && bounds?.dateTo) {
+      params.set('dateFrom', bounds.dateFrom);
+      params.set('dateTo', bounds.dateTo);
+    }
+  }
   return params;
 }
 
@@ -8164,7 +9546,7 @@ function renderCashierMonitoring(cashiers = []) {
 }
 
 async function refreshCashierMonitoring() {
-  if (!cashierMonitoringListEl || !canAccessAdminFeatures()) return;
+  if (!cashierMonitoringListEl || !canAccessOperationsPanel()) return;
   cashierMonitoringListEl.innerHTML = '<p>Loading active cashiers...</p>';
   try {
     const result = await api('/api/admin/cashiers/active', {
@@ -8327,7 +9709,7 @@ function renderCashDrawerAdmin(result) {
 }
 
 async function refreshCashDrawerAdmin() {
-  if (!cashDrawerSummaryEl || !canAccessAdminFeatures()) return;
+  if (!cashDrawerSummaryEl || !canAccessCashDrawerControl()) return;
   if (cashDrawerSummaryEl) cashDrawerSummaryEl.textContent = 'Loading cash drawer summary...';
   if (cashDrawerListEl) cashDrawerListEl.innerHTML = '<p>Loading drawers...</p>';
   if (cashDrawerMovementsListEl) cashDrawerMovementsListEl.innerHTML = '<p>Loading cash drawer activity...</p>';
@@ -8621,7 +10003,7 @@ function renderShiftManagement(result) {
 }
 
 async function refreshShiftManagement() {
-  if (!shiftManagementListEl || !canAccessAdminFeatures()) return;
+  if (!shiftManagementListEl || !canAccessOperationsPanel()) return;
   if (shiftManagementListEl) shiftManagementListEl.innerHTML = '<p>Loading shifts...</p>';
   if (shiftManagementSummaryEl) shiftManagementSummaryEl.textContent = 'Loading shift summary...';
   try {
@@ -8716,7 +10098,7 @@ function renderDiscrepancyAlerts(result) {
 }
 
 async function refreshDiscrepancyAlerts() {
-  if (!discrepancyAlertsListEl || !canAccessAdminFeatures()) return;
+  if (!discrepancyAlertsListEl || !canAccessOperationsPanel()) return;
   if (discrepancySummaryEl) discrepancySummaryEl.textContent = 'Loading discrepancy alerts...';
   discrepancyAlertsListEl.innerHTML = '<p>Loading discrepancy alerts...</p>';
   try {
@@ -8734,87 +10116,48 @@ async function refreshDiscrepancyAlerts() {
 
 function renderSalesOpsDashboard(result) {
   latestSalesOpsDashboard = result || null;
-  const totals = result?.totals || {};
   const rows = Array.isArray(result?.hourlySales) ? result.hourlySales : [];
   const weekdayRows = Array.isArray(result?.weekdaySales) ? result.weekdaySales : [];
-  const peakHour = rows.reduce((best, row) => {
-    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
-  }, null);
-  const bestSalesDay = weekdayRows.reduce((best, row) => {
-    return Number(row?.totalSales || 0) > Number(best?.totalSales || 0) ? row : best;
-  }, null);
-  const busiestDay = weekdayRows.reduce((best, row) => {
-    return Number(row?.transactions || 0) > Number(best?.transactions || 0) ? row : best;
-  }, null);
-  const averagePerHour = rows.length
-    ? rows.reduce((sum, row) => sum + Number(row.totalSales || 0), 0) / rows.length
-    : 0;
   const activeWeekdays = weekdayRows.filter((row) => Number(row?.totalSales || 0) > 0 || Number(row?.transactions || 0) > 0);
 
-  if (salesOpsSummaryEl) {
-    salesOpsSummaryEl.innerHTML = `
-      <div class="sales-ops-summary-grid">
-        <article class="sales-ops-summary-card highlight">
-          <span>Total Sales</span>
-          <strong>${money(totals.totalSales || 0)}</strong>
-          <small>${Number(totals.totalTransactions || 0)} transaction(s) in selected range</small>
-        </article>
-        <article class="sales-ops-summary-card">
-          <span>Best Sales Day</span>
-          <strong>${escapeHtml(bestSalesDay?.fullLabel || '—')}</strong>
-          <small>${money(bestSalesDay?.totalSales || 0)} in paid sales for the selected range</small>
-        </article>
-        <article class="sales-ops-summary-card">
-          <span>Busiest Day</span>
-          <strong>${escapeHtml(busiestDay?.fullLabel || '—')}</strong>
-          <small>${Number(busiestDay?.transactions || 0)} paid order(s) as customer traffic proxy</small>
-        </article>
-        <article class="sales-ops-summary-card">
-          <span>Peak Hour</span>
-          <strong>${escapeHtml(peakHour?.label || '—')}</strong>
-          <small>${money(peakHour?.totalSales || 0)} | Avg per hour ${money(averagePerHour)}</small>
-        </article>
-        <article class="sales-ops-summary-card">
-          <span>Cash Flow</span>
-          <strong>${money(totals.netCashRetained || 0)}</strong>
-          <small>Tendered ${money(totals.cashTendered || 0)} | Change ${money(totals.changeGiven || 0)}</small>
-        </article>
-        <article class="sales-ops-summary-card">
-          <span>Digital Sales</span>
-          <strong>${money(totals.digitalSales || 0)}</strong>
-          <small>Cash sales ${money(totals.cashSales || 0)}</small>
-        </article>
-      </div>
-    `;
-  }
+  renderSalesOpsSummaryCards(result);
 
   if (!hourlySalesGraphEl) return;
 
-  const maxSales = Math.max(...rows.map((x) => Number(x.totalSales || 0)), 0);
   const barChartMarkup = rows.length
     ? `
       <section class="sales-ops-panel">
         <div class="sales-ops-panel-head">
           <h3>Hourly Sales Bar Graph</h3>
+          <div class="sales-ops-panel-actions">
+            <span>${rows.filter((row) => Number(row?.totalSales || 0) > 0).length || 0} hour(s) with paid sales</span>
+            <div class="sales-ops-view-toggle" role="group" aria-label="Hourly chart view">
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsHourlyView === 'bar' ? ' active' : ''}"
+                data-sales-ops-hourly-view="bar"
+              >Bar</button>
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsHourlyView === 'line' ? ' active' : ''}"
+                data-sales-ops-hourly-view="line"
+              >Trend Line</button>
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsHourlyView === 'both' ? ' active' : ''}"
+                data-sales-ops-hourly-view="both"
+              >Both</button>
+            </div>
+          </div>
         </div>
-        <div class="sales-ops-bar-chart sales-ops-bar-chart-minimal">
-          ${rows.map((row) => {
-            const amount = Number(row.totalSales || 0);
-            const height = maxSales > 0 && amount > 0 ? Math.max(10, Math.round((amount / maxSales) * 112)) : 4;
-            const label = String(row.label || '--').trim();
-            const compactValue = amount > 0
-              ? new Intl.NumberFormat('en-PH', { notation: 'compact', maximumFractionDigits: 1 }).format(amount)
-              : '0';
-            return `
-              <div class="sales-ops-bar-column sales-ops-bar-column-minimal" title="${escapeHtml(`${label}: ${money(amount)}`)}">
-                <div class="sales-ops-bar-track sales-ops-bar-track-minimal">
-                  <span class="sales-ops-bar-fill sales-ops-bar-fill-minimal${amount <= 0 ? ' is-zero' : ''}" style="height:${height}px;"></span>
-                </div>
-                <span class="sales-ops-bar-label sales-ops-bar-label-minimal">${escapeHtml(label)}</span>
-                <small class="sales-ops-bar-value-minimal">${escapeHtml(compactValue)}</small>
-              </div>
-            `;
-          }).join('')}
+        <div class="sales-ops-weekday-chart-shell">
+          <div class="sales-ops-weekday-canvas-wrap">
+            <canvas id="salesOpsHourlyChart" aria-label="Hourly sales performance chart"></canvas>
+          </div>
+        </div>
+        <div class="sales-ops-weekday-note">
+          <strong>Reading guide:</strong>
+          <span>Click a bar or point to focus the summary cards on that hour. Hovering still shows the guide line, sales amount, and transaction count.</span>
         </div>
       </section>
     `
@@ -8827,33 +10170,40 @@ function renderSalesOpsDashboard(result) {
       </section>
     `;
 
-  const weekdayMaxSales = Math.max(...weekdayRows.map((row) => Number(row?.totalSales || 0)), 0);
   const weekdayChartMarkup = weekdayRows.length
     ? `
       <section class="sales-ops-panel">
         <div class="sales-ops-panel-head">
           <h3>Weekday Sales Performance</h3>
-          <span>${activeWeekdays.length || 0} day(s) with paid sales</span>
+          <div class="sales-ops-panel-actions">
+            <span>${activeWeekdays.length || 0} day(s) with paid sales</span>
+            <div class="sales-ops-view-toggle" role="group" aria-label="Weekday chart view">
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsWeekdayView === 'bar' ? ' active' : ''}"
+                data-sales-ops-weekday-view="bar"
+              >Bar</button>
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsWeekdayView === 'line' ? ' active' : ''}"
+                data-sales-ops-weekday-view="line"
+              >Trend Line</button>
+              <button
+                type="button"
+                class="secondary small${activeSalesOpsWeekdayView === 'both' ? ' active' : ''}"
+                data-sales-ops-weekday-view="both"
+              >Both</button>
+            </div>
+          </div>
         </div>
-        <div class="sales-ops-bar-chart sales-ops-weekday-chart">
-          ${weekdayRows.map((row) => {
-            const amount = Number(row?.totalSales || 0);
-            const height = weekdayMaxSales > 0 ? Math.max(6, Math.round((amount / weekdayMaxSales) * 160)) : 0;
-            return `
-              <div class="sales-ops-bar-column sales-ops-weekday-column">
-                <span class="sales-ops-bar-value">${money(amount)}</span>
-                <div class="sales-ops-bar-track sales-ops-weekday-track">
-                  <span class="sales-ops-bar-fill sales-ops-weekday-fill" style="height:${height}px;"></span>
-                </div>
-                <span class="sales-ops-bar-label">${escapeHtml(row?.label || '--')}</span>
-                <small class="sales-ops-weekday-meta">${Number(row?.transactions || 0)} order(s)</small>
-              </div>
-            `;
-          }).join('')}
+        <div class="sales-ops-weekday-chart-shell">
+          <div class="sales-ops-weekday-canvas-wrap">
+            <canvas id="salesOpsWeekdayChart" aria-label="Weekday sales performance line chart"></canvas>
+          </div>
         </div>
         <div class="sales-ops-weekday-note">
           <strong>Reading guide:</strong>
-          <span>Sales bars show total peso sales per weekday. Order count is a proxy for customer volume.</span>
+          <span>Click a bar or point to focus the summary cards on that day. Amounts stay on the left axis, with weekday and order counts below.</span>
         </div>
       </section>
     `
@@ -8867,25 +10217,40 @@ function renderSalesOpsDashboard(result) {
     `;
 
   hourlySalesGraphEl.innerHTML = `
-    <div class="sales-ops-dashboard-grid">
-      ${barChartMarkup}
+    <div class="sales-ops-dashboard-grid single-chart">
       ${weekdayChartMarkup}
+      ${barChartMarkup}
     </div>
   `;
+
+  renderSalesOpsHourlyTrendChart(rows);
+  renderSalesOpsWeekdayTrendChart(weekdayRows);
 }
 
-async function refreshSalesOpsDashboard() {
-  if (!salesOpsSummaryEl || !canAccessAdminFeatures()) return;
+async function refreshSalesOpsDashboard(range = activeSalesOpsRange) {
+  if (!salesOpsSummaryEl || !canAccessReportsPanel()) return;
+  activeSalesOpsRange = normalizeSalesOpsRange(range);
+  setActiveSalesOpsSelection(null);
+  syncSalesOpsMonthPickerVisibility(activeSalesOpsRange);
+  saveUserUiState({
+    salesOpsRange: activeSalesOpsRange,
+    salesOpsMonth: activeSalesOpsRange === 'custom_month' ? getSalesOpsSelectedMonth() : ''
+  });
+  if (salesOpsRangeEl && salesOpsRangeEl.value !== activeSalesOpsRange) {
+    salesOpsRangeEl.value = activeSalesOpsRange;
+  }
   if (salesOpsSummaryEl) salesOpsSummaryEl.textContent = 'Loading sales operations dashboard...';
   if (hourlySalesGraphEl) hourlySalesGraphEl.innerHTML = '<p>Loading hourly sales...</p>';
   try {
-    const params = getAdminRangeSearchParams();
+    const params = getSalesOpsRangeSearchParams();
     const query = params.toString();
     const result = await api(`/api/admin/sales/dashboard${query ? `?${query}` : ''}`, {
       headers: buildActorHeaders()
     });
     renderSalesOpsDashboard(result);
   } catch (error) {
+    destroySalesOpsHourlyChart();
+    destroySalesOpsWeekdayChart();
     if (salesOpsSummaryEl) salesOpsSummaryEl.textContent = `Sales operations error: ${error.message}`;
     if (hourlySalesGraphEl) hourlySalesGraphEl.innerHTML = '';
   }
@@ -8897,12 +10262,56 @@ function renderMonthlyClosing(result) {
   const expenses = Array.isArray(result?.expenses) ? result.expenses : [];
   const expenseByCategory = Array.isArray(result?.expenseByCategory) ? result.expenseByCategory : [];
   const topProducts = Array.isArray(result?.topProducts) ? result.topProducts : [];
-  const canEdit = canManageUsers();
+  const canEdit = canManageMonthlyExpenses();
+  const summaryCards = [
+    {
+      label: 'Gross Sales',
+      value: money(summary.totalSales || 0),
+      note: 'Total paid sales recorded for the selected month.',
+      highlight: true
+    },
+    {
+      label: 'Net After Expenses',
+      value: money(summary.netSalesAfterExpenses || 0),
+      note: 'Sales remaining after logged monthly expenses.',
+      highlight: true
+    },
+    {
+      label: 'Expenses',
+      value: money(summary.totalExpenses || 0),
+      note: `${Number(summary.expenseCount || 0).toLocaleString('en-PH')} expense entry/entries logged.`
+    },
+    {
+      label: 'Cash Sales',
+      value: money(summary.cashSales || 0),
+      note: 'Transactions settled through cash payments.'
+    },
+    {
+      label: 'E-Payments',
+      value: money(summary.digitalSales || 0),
+      note: 'GCash and PayMaya sales combined.'
+    },
+    {
+      label: 'Drawer Withdrawals',
+      value: money(summary.drawerWithdrawals || 0),
+      note: 'Recorded cash deductions from drawer operations.'
+    },
+    {
+      label: 'Shift Discrepancies',
+      value: money(summary.totalDiscrepancy || 0),
+      note: 'Combined overage or shortage across reviewed shifts.'
+    },
+    {
+      label: 'Expense Entries',
+      value: Number(summary.expenseCount || 0).toLocaleString('en-PH'),
+      note: 'Monthly expense records included in this closing snapshot.'
+    }
+  ];
 
   if (monthlyClosingAdminNoteEl) {
     monthlyClosingAdminNoteEl.textContent = canEdit
-      ? 'Administrations can log monthly operating expenses here. Supervisor can review the closing summary.'
-      : 'View-only mode. Only Administrations can add monthly expenses.';
+      ? 'This role can log monthly operating expenses here.'
+      : 'View-only mode. Current role can review the closing summary but cannot add expenses.';
   }
 
   if (monthlyExpenseFormEl) {
@@ -8914,17 +10323,22 @@ function renderMonthlyClosing(result) {
   }
 
   if (monthlyClosingSummaryEl) {
-    monthlyClosingSummaryEl.textContent = [
-      `${formatMonthLabel(monthValue)} Closing`,
-      `Gross Sales: ${money(summary.totalSales || 0)}`,
-      `Expenses: ${money(summary.totalExpenses || 0)}`,
-      `Net Sales After Expenses: ${money(summary.netSalesAfterExpenses || 0)}`,
-      `Cash Sales: ${money(summary.cashSales || 0)}`,
-      `Digital Sales: ${money(summary.digitalSales || 0)}`,
-      `Drawer Withdrawals: ${money(summary.drawerWithdrawals || 0)}`,
-      `Shift Discrepancies: ${money(summary.totalDiscrepancy || 0)}`,
-      `Expenses Logged: ${Number(summary.expenseCount || 0)}`
-    ].join(' | ');
+    monthlyClosingSummaryEl.innerHTML = `
+      <div class="monthly-closing-summary-head">
+        <span class="monthly-closing-summary-eyebrow">Closing Snapshot</span>
+        <h4>${escapeHtml(formatMonthLabel(monthValue))}</h4>
+        <p>Sales, expenses, withdrawals, and discrepancies for the selected month.</p>
+      </div>
+      <div class="monthly-closing-summary-grid">
+        ${summaryCards.map((card) => `
+          <article class="monthly-closing-summary-card${card.highlight ? ' highlight' : ''}">
+            <span>${escapeHtml(card.label)}</span>
+            <strong>${escapeHtml(card.value)}</strong>
+            <small>${escapeHtml(card.note)}</small>
+          </article>
+        `).join('')}
+      </div>
+    `;
   }
 
   if (!monthlyExpenseListEl) return;
@@ -8932,99 +10346,123 @@ function renderMonthlyClosing(result) {
   const categoryMarkup = expenseByCategory.length
     ? `
       <div class="monthly-closing-block">
-        <h3>Expense Categories</h3>
-        <table class="admin-inline-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Entries</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${expenseByCategory.map((row) => `
+        <div class="monthly-closing-block-head">
+          <h3>Expense Categories</h3>
+          <p>See where the month’s operating costs are concentrated.</p>
+        </div>
+        <div class="monthly-closing-table-wrap">
+          <table class="admin-inline-table monthly-closing-table">
+            <thead>
               <tr>
-                <td>${escapeHtml(row.category || 'Uncategorized')}</td>
-                <td>${Number(row.count || 0)}</td>
-                <td>${money(row.totalAmount || 0)}</td>
+                <th>Category</th>
+                <th>Entries</th>
+                <th>Total</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${expenseByCategory.map((row) => `
+                <tr>
+                  <td>${escapeHtml(row.category || 'Uncategorized')}</td>
+                  <td>${Number(row.count || 0)}</td>
+                  <td>${money(row.totalAmount || 0)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     `
     : `
       <div class="monthly-closing-block">
-        <h3>Expense Categories</h3>
-        <p>No expenses logged for this month yet.</p>
+        <div class="monthly-closing-block-head">
+          <h3>Expense Categories</h3>
+          <p>See where the month’s operating costs are concentrated.</p>
+        </div>
+        <p class="monthly-closing-empty-state">No expenses logged for this month yet.</p>
       </div>
     `;
 
   const topProductsMarkup = topProducts.length
     ? `
       <div class="monthly-closing-block">
-        <h3>Top Products This Month</h3>
-        <table class="admin-inline-table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Qty Sold</th>
-              <th>Sales</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${topProducts.slice(0, 5).map((row) => `
+        <div class="monthly-closing-block-head">
+          <h3>Top Products This Month</h3>
+          <p>Quick sales snapshot of the strongest-selling products.</p>
+        </div>
+        <div class="monthly-closing-table-wrap">
+          <table class="admin-inline-table monthly-closing-table">
+            <thead>
               <tr>
-                <td>${escapeHtml(row.productName || 'Product')}</td>
-                <td>${Number(row.qtySold || 0)}</td>
-                <td>${money(row.totalSales || 0)}</td>
+                <th>Product</th>
+                <th>Qty Sold</th>
+                <th>Sales</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${topProducts.slice(0, 5).map((row) => `
+                <tr>
+                  <td>${escapeHtml(row.productName || 'Product')}</td>
+                  <td>${Number(row.qtySold || 0)}</td>
+                  <td>${money(row.totalSales || 0)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     `
     : `
       <div class="monthly-closing-block">
-        <h3>Top Products This Month</h3>
-        <p>No paid sales yet for this month.</p>
+        <div class="monthly-closing-block-head">
+          <h3>Top Products This Month</h3>
+          <p>Quick sales snapshot of the strongest-selling products.</p>
+        </div>
+        <p class="monthly-closing-empty-state">No paid sales yet for this month.</p>
       </div>
     `;
 
   const expensesMarkup = expenses.length
     ? `
       <div class="monthly-closing-block full-width-block">
-        <h3>Expense Ledger</h3>
-        <table class="admin-inline-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Note</th>
-              <th>By</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${expenses.map((row) => `
+        <div class="monthly-closing-block-head">
+          <h3>Expense Ledger</h3>
+          <p>Every recorded monthly expense for the selected closing period.</p>
+        </div>
+        <div class="monthly-closing-table-wrap">
+          <table class="admin-inline-table monthly-closing-table">
+            <thead>
               <tr>
-                <td>${escapeHtml(formatDate(row.expenseDate))}</td>
-                <td>${escapeHtml(row.category || 'Uncategorized')}</td>
-                <td>${escapeHtml(row.description || '-')}</td>
-                <td>${money(row.amount || 0)}</td>
-                <td>${escapeHtml(row.note || '-')}</td>
-                <td>${escapeHtml(row.createdByName || row.createdByEmail || '-')}</td>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Note</th>
+                <th>By</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${expenses.map((row) => `
+                <tr>
+                  <td>${escapeHtml(formatDate(row.expenseDate))}</td>
+                  <td>${escapeHtml(row.category || 'Uncategorized')}</td>
+                  <td>${escapeHtml(row.description || '-')}</td>
+                  <td>${money(row.amount || 0)}</td>
+                  <td>${escapeHtml(row.note || '-')}</td>
+                  <td>${escapeHtml(row.createdByName || row.createdByEmail || '-')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     `
     : `
       <div class="monthly-closing-block full-width-block">
-        <h3>Expense Ledger</h3>
-        <p>No expenses logged for this month.</p>
+        <div class="monthly-closing-block-head">
+          <h3>Expense Ledger</h3>
+          <p>Every recorded monthly expense for the selected closing period.</p>
+        </div>
+        <p class="monthly-closing-empty-state">No expenses logged for this month.</p>
       </div>
     `;
 
@@ -9038,28 +10476,28 @@ function renderMonthlyClosing(result) {
 }
 
 async function refreshMonthlyClosingModule() {
-  if (!monthlyClosingSummaryEl || !canAccessAdminFeatures()) return;
+  if (!monthlyClosingSummaryEl || !canAccessMonthlyClosing()) return;
   const monthValue = getMonthlyClosingSelectedMonth();
   if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
     monthlyClosingMonthInputEl.value = monthValue;
   }
-  if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.textContent = 'Loading monthly closing summary...';
-  if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '<p>Loading monthly expenses...</p>';
+  if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly closing summary...</p>';
+  if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly expenses...</p>';
   try {
     const result = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
       headers: buildActorHeaders()
     });
     renderMonthlyClosing(result);
   } catch (error) {
-    if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.textContent = `Monthly closing error: ${error.message}`;
+    if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = `<p class="monthly-closing-loading">Monthly closing error: ${escapeHtml(error.message)}</p>`;
     if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '';
   }
 }
 
 async function handleMonthlyExpenseSubmit(event) {
   event.preventDefault();
-  if (!canManageUsers()) {
-    setStatus('Only Administrations can add monthly expenses.');
+  if (!canManageMonthlyExpenses()) {
+    setStatus('Current role does not have permission to add monthly expenses.');
     return;
   }
 
@@ -9120,13 +10558,13 @@ async function handleMonthlyExpenseSubmit(event) {
 }
 
 async function refreshAdminOperationsModules() {
-  if (!canAccessAdminFeatures()) return;
+  if (!canAccessOperationsPanel() && !canAccessCashDrawerControl() && !canAccessMonthlyClosing() && !canAccessReportsPanel()) return;
   await Promise.all([
     refreshCashierMonitoring(),
     refreshCashDrawerAdmin(),
     refreshShiftManagement(),
     refreshDiscrepancyAlerts(),
-    refreshSalesOpsDashboard(),
+    refreshSalesOpsDashboard(activeSalesOpsRange),
     refreshMonthlyClosingModule()
   ]);
 }
@@ -9916,7 +11354,7 @@ function buildAdminReportExcelWorkbook(report) {
 }
 
 async function generateAdminReport(reportType, label, extraParams = null) {
-  if (!canAccessAdminFeatures()) return;
+  if (!canAccessReportsPanel()) return;
   if (reportsStatusEl) reportsStatusEl.textContent = `Generating ${label} report...`;
 
   try {
@@ -10547,35 +11985,18 @@ function setupEventListeners() {
     resetAfterSale();
     setStatus('Cleared. Ready.');
   });
-  salesDailyBtn.addEventListener('click', () => refreshSalesReport('daily'));
-  salesWeeklyBtn.addEventListener('click', () => refreshSalesReport('weekly'));
-  salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange));
+  if (salesDailyBtn) {
+    salesDailyBtn.addEventListener('click', () => refreshSalesReport('daily', { refreshSalesOps: false }));
+  }
+  if (salesWeeklyBtn) {
+    salesWeeklyBtn.addEventListener('click', () => refreshSalesReport('weekly', { refreshSalesOps: false }));
+  }
+  if (salesRefreshBtn) {
+    salesRefreshBtn.addEventListener('click', () => refreshSalesReport(activeSalesRange, { refreshSalesOps: false }));
+  }
 
   // Admin events
-  if (adminNavOverviewBtn) {
-    adminNavOverviewBtn.addEventListener('click', () => switchAdminPanel('overview'));
-  }
-  if (adminNavInventoryBtn) {
-    adminNavInventoryBtn.addEventListener('click', () => switchAdminPanel('inventory'));
-  }
-  if (adminNavKitSpecBtn) {
-    adminNavKitSpecBtn.addEventListener('click', () => switchAdminPanel('kit-spec'));
-  }
-  if (adminNavUsersBtn) {
-    adminNavUsersBtn.addEventListener('click', () => switchAdminPanel('users'));
-  }
-  if (adminNavOperationsBtn) {
-    adminNavOperationsBtn.addEventListener('click', () => switchAdminPanel('operations'));
-  }
-  if (adminNavReceiptTemplatesBtn) {
-    adminNavReceiptTemplatesBtn.addEventListener('click', () => switchAdminPanel('receipt-templates'));
-  }
-  if (adminNavReportsBtn) {
-    adminNavReportsBtn.addEventListener('click', () => switchAdminPanel('reports'));
-  }
-  if (adminNavOthersBtn) {
-    adminNavOthersBtn.addEventListener('click', () => switchAdminPanel('others'));
-  }
+  setupAdminNavButtons();
   if (receiptTemplateFormEl) {
     receiptTemplateFormEl.addEventListener('input', () => {
       renderReceiptTemplatePreview();
@@ -10605,7 +12026,7 @@ function setupEventListeners() {
   if (receiptTemplateLogoFileInputEl) {
     receiptTemplateLogoFileInputEl.addEventListener('change', async () => {
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can upload a local receipt logo.');
+        setStatus('Current role does not have permission to upload a local receipt logo.');
         if (receiptTemplateLogoFileInputEl) receiptTemplateLogoFileInputEl.value = '';
         return;
       }
@@ -10624,7 +12045,7 @@ function setupEventListeners() {
   if (receiptTemplateLogoClearBtnEl) {
     receiptTemplateLogoClearBtnEl.addEventListener('click', () => {
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can clear a local receipt logo.');
+        setStatus('Current role does not have permission to clear a local receipt logo.');
         return;
       }
       setStoredReceiptTemplateLogo(state.receiptTemplateEditorId || RECEIPT_TEMPLATE_LOCAL_DRAFT_KEY, '');
@@ -10643,12 +12064,12 @@ function setupEventListeners() {
   if (receiptTemplateSaveNewBtnEl) {
     receiptTemplateSaveNewBtnEl.addEventListener('click', async () => {
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can save receipt templates.');
+        setStatus('Current role does not have permission to save order slip templates.');
         return;
       }
       const draft = collectReceiptTemplateDraft();
       if (!draft.name) {
-        setStatus('Enter a receipt template name first.');
+        setStatus('Enter an order slip template name first.');
         receiptTemplateNameInputEl?.focus();
         return;
       }
@@ -10674,7 +12095,7 @@ function setupEventListeners() {
   if (receiptTemplateUpdateBtnEl) {
     receiptTemplateUpdateBtnEl.addEventListener('click', async () => {
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can update receipt templates.');
+        setStatus('Current role does not have permission to update order slip templates.');
         return;
       }
       const draft = collectReceiptTemplateDraft();
@@ -10702,8 +12123,8 @@ function setupEventListeners() {
   if (receiptTemplateActivateBtnEl) {
     receiptTemplateActivateBtnEl.addEventListener('click', async () => {
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can activate receipt templates.');
-        setReceiptTemplatesStatus('Only Administrations can activate receipt templates.', 'error');
+        setStatus('Current role does not have permission to activate order slip templates.');
+        setReceiptTemplatesStatus('Current role does not have permission to activate order slip templates.', 'error');
         return;
       }
       const selectedId = state.receiptTemplateEditorId;
@@ -10725,13 +12146,13 @@ function setupEventListeners() {
             isActive: template.id === selectedId
           })),
           activeReceiptTemplate: activatedTemplate,
-          statusMessage: `Success: receipt template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
+          statusMessage: `Success: order slip template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
           statusTone: 'success'
         });
         setStatus(`Receipt template "${activatedTemplate.name || 'selected'}" is now active for transaction printing.`);
         showConfirmationToast({
-          title: 'Receipt Template Active',
-          message: `${activatedTemplate.name || 'Selected template'} is now used for transaction receipts.`
+          title: 'Order Slip Template Active',
+          message: `${activatedTemplate.name || 'Selected template'} is now used for transaction order slips.`
         });
       } catch (error) {
         setReceiptTemplatesStatus(`Receipt template activation failed: ${error.message}`, 'error');
@@ -10747,7 +12168,7 @@ function setupEventListeners() {
         const template = state.receiptTemplates.find((row) => row.id === templateId);
         if (template) {
           populateReceiptTemplateEditor(template);
-          setStatus(`Loaded receipt template "${template.name}".`);
+          setStatus(`Loaded order slip template "${template.name}".`);
         }
         return;
       }
@@ -10755,8 +12176,8 @@ function setupEventListeners() {
       const activateBtn = event.target.closest('[data-receipt-template-activate]');
       if (activateBtn) {
         if (!canManageReceiptTemplates()) {
-          setStatus('Only Administrations can activate receipt templates.');
-          setReceiptTemplatesStatus('Only Administrations can activate receipt templates.', 'error');
+          setStatus('Current role does not have permission to activate order slip templates.');
+          setReceiptTemplatesStatus('Current role does not have permission to activate order slip templates.', 'error');
           return;
         }
         const templateId = String(activateBtn.getAttribute('data-receipt-template-activate') || '').trim();
@@ -10774,13 +12195,13 @@ function setupEventListeners() {
               isActive: template.id === templateId
             })),
             activeReceiptTemplate: activatedTemplate,
-            statusMessage: `Success: receipt template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
+            statusMessage: `Success: order slip template "${activatedTemplate.name || 'Selected'}" is now active for transaction printing.`,
             statusTone: 'success'
           });
           setStatus(`Receipt template "${activatedTemplate.name || 'selected'}" is now active for transaction printing.`);
           showConfirmationToast({
-            title: 'Receipt Template Active',
-            message: `${activatedTemplate.name || 'Selected template'} is now used for transaction receipts.`
+            title: 'Order Slip Template Active',
+            message: `${activatedTemplate.name || 'Selected template'} is now used for transaction order slips.`
           });
         } catch (error) {
           setReceiptTemplatesStatus(`Receipt template activation failed: ${error.message}`, 'error');
@@ -10792,13 +12213,13 @@ function setupEventListeners() {
       const deleteBtn = event.target.closest('[data-receipt-template-delete]');
       if (!deleteBtn) return;
       if (!canManageReceiptTemplates()) {
-        setStatus('Only Administrations can delete receipt templates.');
+        setStatus('Current role does not have permission to delete order slip templates.');
         return;
       }
       const templateId = String(deleteBtn.getAttribute('data-receipt-template-delete') || '').trim();
       const template = state.receiptTemplates.find((row) => row.id === templateId);
       if (!templateId || !template) return;
-      const confirmed = window.confirm(`Delete receipt template "${template.name}"?`);
+      const confirmed = window.confirm(`Delete order slip template "${template.name}"?`);
       if (!confirmed) return;
       try {
         await api(`/api/admin/receipt-templates/${encodeURIComponent(templateId)}`, {
@@ -10968,24 +12389,86 @@ function setupEventListeners() {
   if (adminUsersListEl) {
     adminUsersListEl.addEventListener('click', handleAdminUsersAction);
   }
+  if (roleAccessListEl) {
+    roleAccessListEl.addEventListener('click', (event) => {
+      handleRoleAccessManagerClick(event).catch((error) => {
+        setStatus(`Role access update failed: ${error.message}`);
+      });
+    });
+    roleAccessListEl.addEventListener('submit', (event) => {
+      handleRoleAccessManagerSubmit(event).catch((error) => {
+        setStatus(`Role access update failed: ${error.message}`);
+      });
+    });
+  }
   adminRefreshBtn.addEventListener('click', () => {
     const selectedRange = String(adminRangeEl?.value || '').trim().toLowerCase();
-    if (selectedRange === 'daily' || selectedRange === 'weekly') {
-      refreshSalesReport(selectedRange);
-      return;
-    }
-    refreshAdminTransactions();
+    refreshSalesReport(selectedRange, { refreshSalesOps: false });
   });
   adminVerifyAllBtn.addEventListener('click', verifyAllPending);
-  adminFilterEl.addEventListener('change', refreshAdminTransactions);
-  adminRangeEl.addEventListener('change', () => {
-    const selectedRange = String(adminRangeEl?.value || '').trim().toLowerCase();
-    if (selectedRange === 'daily' || selectedRange === 'weekly') {
-      refreshSalesReport(selectedRange);
-      return;
-    }
+  if (adminMixToggleBtn) {
+    adminMixToggleBtn.addEventListener('click', () => {
+      setAdminMixPanelVisibility(!isAdminMixPanelOpen);
+    });
+  }
+  adminFilterEl.addEventListener('change', () => {
     refreshAdminTransactions();
   });
+  adminRangeEl.addEventListener('change', () => {
+    const selectedRange = String(adminRangeEl?.value || '').trim().toLowerCase();
+    if (selectedRange === 'custom_month' && adminMonthPickerEl) {
+      adminMonthPickerEl.style.display = 'inline-block';
+      if (!adminMonthPickerEl.value) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        adminMonthPickerEl.value = `${y}-${m}`;
+      }
+    } else if (adminMonthPickerEl) {
+      adminMonthPickerEl.style.display = 'none';
+    }
+    refreshSalesReport(selectedRange, { refreshSalesOps: false });
+  });
+  if (adminMonthPickerEl) {
+    adminMonthPickerEl.addEventListener('change', () => {
+      refreshSalesReport('custom_month', { refreshSalesOps: false });
+    });
+  }
+  if (salesOpsRefreshBtn) {
+    salesOpsRefreshBtn.addEventListener('click', () => refreshSalesOpsDashboard(getSalesOpsRangeQueryValue()));
+  }
+  if (salesOpsRangeEl) {
+    salesOpsRangeEl.addEventListener('change', () => {
+      syncSalesOpsMonthPickerVisibility(getSalesOpsRangeQueryValue());
+      refreshSalesOpsDashboard(getSalesOpsRangeQueryValue());
+    });
+  }
+  if (salesOpsMonthPickerEl) {
+    salesOpsMonthPickerEl.addEventListener('change', () => {
+      refreshSalesOpsDashboard('custom_month');
+    });
+  }
+  if (hourlySalesGraphEl) {
+    hourlySalesGraphEl.addEventListener('click', (event) => {
+      const hourlyToggleBtn = event.target.closest('[data-sales-ops-hourly-view]');
+      if (hourlyToggleBtn && latestSalesOpsDashboard) {
+        const nextView = normalizeSalesOpsHourlyView(hourlyToggleBtn.getAttribute('data-sales-ops-hourly-view'));
+        if (nextView !== activeSalesOpsHourlyView) {
+          activeSalesOpsHourlyView = nextView;
+          saveUserUiState({ salesOpsHourlyView: activeSalesOpsHourlyView });
+          renderSalesOpsDashboard(latestSalesOpsDashboard);
+        }
+        return;
+      }
+      const toggleBtn = event.target.closest('[data-sales-ops-weekday-view]');
+      if (!toggleBtn || !latestSalesOpsDashboard) return;
+      const nextView = normalizeSalesOpsWeekdayView(toggleBtn.getAttribute('data-sales-ops-weekday-view'));
+      if (nextView === activeSalesOpsWeekdayView) return;
+      activeSalesOpsWeekdayView = nextView;
+      saveUserUiState({ salesOpsWeekdayView: activeSalesOpsWeekdayView });
+      renderSalesOpsDashboard(latestSalesOpsDashboard);
+    });
+  }
   if (cashierMonitoringRefreshBtn) {
     cashierMonitoringRefreshBtn.addEventListener('click', refreshCashierMonitoring);
   }
@@ -11086,19 +12569,48 @@ function setupEventListeners() {
     });
   }
   if (discountProfilesListEl) {
-    discountProfilesListEl.addEventListener('change', handleDiscountProfileListChange);
     discountProfilesListEl.addEventListener('click', (event) => {
       handleDiscountProfileListClick(event).catch((error) => {
         setStatus(`Discount type update failed: ${error.message}`);
       });
     });
+    discountProfilesListEl.addEventListener('keydown', handleDiscountProfileListKeydown);
   }
-  salesListEl.addEventListener('click', (e) => {
-    const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
-    if (receiptId) {
-      viewReceipt(receiptId);
-    }
-  });
+  if (discountProfileModalCloseBtnEl) {
+    discountProfileModalCloseBtnEl.addEventListener('click', closeDiscountProfileModal);
+  }
+  if (discountProfileModalEl) {
+    discountProfileModalEl.addEventListener('click', (event) => {
+      if (event.target === discountProfileModalEl) {
+        closeDiscountProfileModal();
+      }
+    });
+  }
+  if (discountProfileModalTypeInputEl) {
+    discountProfileModalTypeInputEl.addEventListener('change', updateDiscountProfileModalAmountField);
+  }
+  if (discountProfileModalFormEl) {
+    discountProfileModalFormEl.addEventListener('submit', (event) => {
+      handleDiscountProfileModalSubmit(event).catch((error) => {
+        setStatus(`Discount type update failed: ${error.message}`);
+      });
+    });
+  }
+  if (discountProfileModalDeleteBtnEl) {
+    discountProfileModalDeleteBtnEl.addEventListener('click', () => {
+      handleDiscountProfileModalDelete().catch((error) => {
+        setStatus(`Discount type delete failed: ${error.message}`);
+      });
+    });
+  }
+  if (salesListEl) {
+    salesListEl.addEventListener('click', (e) => {
+      const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
+      if (receiptId) {
+        viewReceipt(receiptId);
+      }
+    });
+  }
 
   // Delegate verify button clicks in admin transactions list
   adminTransactionsEl.addEventListener('click', (e) => {
@@ -11121,16 +12633,6 @@ function setupEventListeners() {
       viewReceipt(receiptId);
     }
   });
-
-  if (adminLoginBtn) {
-    adminLoginBtn.addEventListener('click', () => {
-      submitAdminLogin();
-    });
-  }
-
-  if (adminCancelBtn) {
-    adminCancelBtn.addEventListener('click', closeAdminLogin);
-  }
 
   if (adminCloseBtn) {
     adminCloseBtn.addEventListener('click', closeAdminDashboard);
@@ -11284,23 +12786,12 @@ function setupEventListeners() {
     refreshConnectivityStatus({ showTransitionToast: true }).catch(() => {});
   });
 
-  if (adminPasswordEl) {
-    adminPasswordEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitAdminLogin();
-      }
-    });
-  }
-
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
-      e.preventDefault();
-      openAdminLogin();
-      return;
-    }
-
     if (e.key === 'Escape') {
+      if (!adminNavContextMenuEl?.hidden) {
+        closeAdminNavContextMenu();
+        return;
+      }
       closeSettingsMenu();
       closeEwalletModal();
       closeScanQrModal();
@@ -11315,7 +12806,6 @@ function setupEventListeners() {
       closeInventoryDeleteModal();
       closeInventoryHistoryModal();
       closeCashDrawerControlModal();
-      closeAdminLogin();
       closeAdminDashboard();
     }
   });
@@ -11328,6 +12818,7 @@ async function init() {
   if (monthlyExpenseDateInputEl && !monthlyExpenseDateInputEl.value) {
     monthlyExpenseDateInputEl.value = new Date().toISOString().slice(0, 10);
   }
+  restoreAdminNavOrder();
   const persistedUiState = readUserUiState();
   const persistedAdminPanel = normalizeAdminPanelName(persistedUiState.adminPanel);
   const shouldRestoreAdminDashboard = Boolean(persistedUiState.adminOpen) && canAccessAdminFeatures();
@@ -11341,6 +12832,16 @@ async function init() {
   if (persistedUiState.salesRange === 'daily' || persistedUiState.salesRange === 'weekly') {
     activeSalesRange = persistedUiState.salesRange;
   }
+  activeSalesOpsRange = normalizeSalesOpsRange(persistedUiState.salesOpsRange);
+  activeSalesOpsHourlyView = normalizeSalesOpsHourlyView(persistedUiState.salesOpsHourlyView);
+  activeSalesOpsWeekdayView = normalizeSalesOpsWeekdayView(persistedUiState.salesOpsWeekdayView);
+  if (salesOpsRangeEl) {
+    salesOpsRangeEl.value = activeSalesOpsRange;
+  }
+  if (salesOpsMonthPickerEl) {
+    salesOpsMonthPickerEl.value = String(persistedUiState.salesOpsMonth || getCurrentMonthValue()).trim();
+  }
+  syncSalesOpsMonthPickerVisibility(activeSalesOpsRange);
 
   const cachedOrFallbackCatalog = readCatalogCache() || getBootstrapCatalogFallback();
   const hasCachedCatalog = hydrateCatalogState(cachedOrFallbackCatalog, { keepCategory: true });
@@ -11380,7 +12881,7 @@ async function init() {
   });
   await refreshSalesReport(activeSalesRange);
 
-  if (canAccessAdminFeatures()) {
+  if (canAccessMenuEditor()) {
     warmMenuEditorInBackground();
   }
 

@@ -9,6 +9,10 @@ const { createClient } = require('@supabase/supabase-js');
 const {
   getAppConfig,
   updateAppConfig,
+  listDiscountManagerProfiles,
+  createDiscountProfile,
+  updateDiscountProfile,
+  deleteDiscountProfile,
   listReceiptTemplates,
   getActiveReceiptTemplate,
   createReceiptTemplate,
@@ -45,6 +49,7 @@ const {
   listProductRecipes,
   replaceProductRecipes,
   listAllInvoices,
+  getEarliestInvoiceDate,
   startCashierShift,
   getCashierShiftById,
   getCashierShiftSummary,
@@ -211,6 +216,49 @@ const provider = providerName === 'paymongo'
   : new MockProvider({ baseUrl });
 
 const AUTH_ROLES = ['administrations', 'supervisor', 'encharge'];
+const ROLE_ACCESS_KEYS = Object.freeze([
+  'control_center_access',
+  'menu_editor_access',
+  'cash_drawer_access',
+  'inventory_access',
+  'inventory_manage',
+  'kit_spec_access',
+  'user_directory_access',
+  'user_management_manage',
+  'operations_access',
+  'receipt_templates_access',
+  'receipt_templates_manage',
+  'reports_access',
+  'discounts_access',
+  'discounts_manage',
+  'monthly_closing_access',
+  'monthly_expenses_manage',
+  'shift_session_access',
+  'shift_monitor_access',
+  'invoice_action_access'
+]);
+const DEFAULT_ROLE_ACCESS = Object.freeze({
+  encharge: Object.freeze([
+    'shift_session_access',
+    'shift_monitor_access',
+    'invoice_action_access'
+  ]),
+  supervisor: Object.freeze([
+    'control_center_access',
+    'menu_editor_access',
+    'cash_drawer_access',
+    'inventory_access',
+    'kit_spec_access',
+    'user_directory_access',
+    'operations_access',
+    'receipt_templates_access',
+    'reports_access',
+    'discounts_access',
+    'monthly_closing_access',
+    'shift_session_access',
+    'invoice_action_access'
+  ])
+});
 const AUDIT_EVENTS = new Set([
   'login_success',
   'login_failed',
@@ -224,6 +272,56 @@ const appUserByIdCache = new Map();
 function normalizeRole(role) {
   const normalized = String(role || '').trim().toLowerCase();
   return AUTH_ROLES.includes(normalized) ? normalized : 'encharge';
+}
+
+function normalizeRoleAccessEntries(entries = [], fallback = []) {
+  const source = Array.isArray(entries) ? entries : fallback;
+  const seen = new Set();
+  return source.reduce((rows, entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (!ROLE_ACCESS_KEYS.includes(key) || seen.has(key)) return rows;
+    seen.add(key);
+    rows.push(key);
+    return rows;
+  }, []);
+}
+
+function normalizeRoleAccessConfig(roleAccess = {}) {
+  const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  return {
+    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+  };
+}
+
+function roleHasAccess(role, permissionKey, appConfig = getAppConfig()) {
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === 'administrations') return true;
+  const safePermissionKey = String(permissionKey || '').trim().toLowerCase();
+  if (!ROLE_ACCESS_KEYS.includes(safePermissionKey)) return false;
+  const roleAccess = normalizeRoleAccessConfig(appConfig?.roleAccess);
+  return Array.isArray(roleAccess?.[normalizedRole]) && roleAccess[normalizedRole].includes(safePermissionKey);
+}
+
+function requireRoleAccess(permissionKey, errorMessage = 'Current role does not have access to this endpoint.') {
+  return (req, res, next) => {
+    const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+    if (!roleHasAccess(role, permissionKey)) {
+      return res.status(403).json({ error: errorMessage });
+    }
+    return next();
+  };
+}
+
+function requireAnyRoleAccess(permissionKeys = [], errorMessage = 'Current role does not have access to this endpoint.') {
+  const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
+  return (req, res, next) => {
+    const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+    if (!keys.some((permissionKey) => roleHasAccess(role, permissionKey))) {
+      return res.status(403).json({ error: errorMessage });
+    }
+    return next();
+  };
 }
 
 function getCachedAppUserById(userId) {
@@ -283,6 +381,7 @@ function canManageInvoiceLifecycle({
   actorEmail
 }) {
   if (!invoice) return false;
+  if (!roleHasAccess(role, 'invoice_action_access')) return false;
   if (role === 'administrations' || role === 'supervisor') return true;
   if (role !== 'encharge') return false;
   const normalizedNextStatus = String(nextStatus || '').trim().toUpperCase();
@@ -384,6 +483,10 @@ function buildSalesRange(query) {
     start = new Date(now);
     start.setUTCDate(now.getUTCDate() - 6);
     start.setUTCHours(0, 0, 0, 0);
+  } else if (range === 'monthly') {
+    start = new Date(now);
+    start.setUTCDate(1);
+    start.setUTCHours(0, 0, 0, 0);
   } else {
     start = new Date(now);
     start.setUTCHours(0, 0, 0, 0);
@@ -393,7 +496,7 @@ function buildSalesRange(query) {
   end.setUTCHours(23, 59, 59, 999);
 
   return {
-    label: range === 'weekly' ? 'weekly' : 'daily',
+    label: range === 'weekly' ? 'weekly' : (range === 'monthly' ? 'monthly' : 'daily'),
     dateFrom: start.toISOString(),
     dateTo: end.toISOString()
   };
@@ -409,11 +512,19 @@ function buildOptionalRange(query, defaultRange = null) {
   }
 
   const range = String(query?.range || '').trim().toLowerCase();
-  if (range === 'daily' || range === 'weekly') {
+  if (range === 'all') {
+    return {
+      label: 'all',
+      dateFrom: null,
+      dateTo: null
+    };
+  }
+
+  if (range === 'daily' || range === 'weekly' || range === 'monthly') {
     return buildSalesRange({ range });
   }
 
-  if (defaultRange === 'daily' || defaultRange === 'weekly') {
+  if (defaultRange === 'daily' || defaultRange === 'weekly' || defaultRange === 'monthly') {
     return buildSalesRange({ range: defaultRange });
   }
 
@@ -494,20 +605,42 @@ function buildHourlySalesRows(transactions = []) {
     hour,
     label: HOUR_LABELS[hour],
     totalSales: 0,
-    transactions: 0
+    transactions: 0,
+    cashSales: 0,
+    cashTendered: 0,
+    changeGiven: 0,
+    netCashRetained: 0,
+    digitalSales: 0
   }));
 
   (transactions || []).forEach((txn) => {
     const hour = getManilaHourIndex(txn?.payment?.paidAt || txn?.updatedAt || txn?.createdAt);
     if (hour === null) return;
     const amount = toMoney(txn?.total ?? 0);
-    buckets[hour].totalSales += amount;
-    buckets[hour].transactions += 1;
+    const bucket = buckets[hour];
+    const method = String(txn?.paymentMethod || txn?.payment?.method || 'other').toLowerCase();
+    bucket.totalSales += amount;
+    bucket.transactions += 1;
+    if (method === 'cash') {
+      const tendered = toMoney(txn?.payment?.amountPaid ?? amount);
+      const change = toMoney(txn?.payment?.change ?? 0);
+      bucket.cashSales += amount;
+      bucket.cashTendered += tendered;
+      bucket.changeGiven += Math.max(0, change);
+      bucket.netCashRetained += toMoney(tendered - Math.max(0, change));
+    } else {
+      bucket.digitalSales += amount;
+    }
   });
 
   return buckets.map((x) => ({
     ...x,
-    totalSales: toMoney(x.totalSales)
+    totalSales: toMoney(x.totalSales),
+    cashSales: toMoney(x.cashSales),
+    cashTendered: toMoney(x.cashTendered),
+    changeGiven: toMoney(x.changeGiven),
+    netCashRetained: toMoney(x.netCashRetained),
+    digitalSales: toMoney(x.digitalSales)
   }));
 }
 
@@ -518,7 +651,12 @@ function buildWeekdaySalesRows(transactions = []) {
       {
         ...row,
         totalSales: 0,
-        transactions: 0
+        transactions: 0,
+        cashSales: 0,
+        cashTendered: 0,
+        changeGiven: 0,
+        netCashRetained: 0,
+        digitalSales: 0
       }
     ])
   );
@@ -527,15 +665,32 @@ function buildWeekdaySalesRows(transactions = []) {
     const key = getManilaWeekdayKey(txn?.payment?.paidAt || txn?.updatedAt || txn?.createdAt);
     if (!key || !buckets.has(key)) return;
     const bucket = buckets.get(key);
-    bucket.totalSales += toMoney(txn?.total ?? 0);
+    const amount = toMoney(txn?.total ?? 0);
+    const method = String(txn?.paymentMethod || txn?.payment?.method || 'other').toLowerCase();
+    bucket.totalSales += amount;
     bucket.transactions += 1;
+    if (method === 'cash') {
+      const tendered = toMoney(txn?.payment?.amountPaid ?? amount);
+      const change = toMoney(txn?.payment?.change ?? 0);
+      bucket.cashSales += amount;
+      bucket.cashTendered += tendered;
+      bucket.changeGiven += Math.max(0, change);
+      bucket.netCashRetained += toMoney(tendered - Math.max(0, change));
+    } else {
+      bucket.digitalSales += amount;
+    }
   });
 
   return WEEKDAY_ROWS.map((row) => {
     const bucket = buckets.get(row.key);
     return {
       ...bucket,
-      totalSales: toMoney(bucket?.totalSales || 0)
+      totalSales: toMoney(bucket?.totalSales || 0),
+      cashSales: toMoney(bucket?.cashSales || 0),
+      cashTendered: toMoney(bucket?.cashTendered || 0),
+      changeGiven: toMoney(bucket?.changeGiven || 0),
+      netCashRetained: toMoney(bucket?.netCashRetained || 0),
+      digitalSales: toMoney(bucket?.digitalSales || 0)
     };
   });
 }
@@ -1527,7 +1682,7 @@ app.get('/api/reports/sales/detailed', async (_req, res) => {
   }
 });
 
-app.get('/api/admin/inventory/report', async (_req, res) => {
+app.get('/api/admin/inventory/report', requireAdminOrSupervisorRole, async (_req, res) => {
   try {
     const report = await getInventoryReport();
     return res.json(report);
@@ -1654,9 +1809,84 @@ app.put('/api/admin/app-config', requireAdminRole, async (req, res) => {
   try {
     const appConfig = await updateAppConfig({
       enforceKitSpec: req.body?.enforceKitSpec,
-      discountProfiles: req.body?.discountProfiles
+      discountProfiles: req.body?.discountProfiles,
+      roleAccess: req.body?.roleAccess
     });
     return res.json({ appConfig });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/role-access', requireAdminRole, async (req, res) => {
+  try {
+    const appConfig = await updateAppConfig({
+      roleAccess: req.body?.roleAccess
+    });
+    return res.json({ appConfig });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/discount-profiles', requireAdminOrSupervisorRole, async (_req, res) => {
+  try {
+    const [appConfig, profiles] = await Promise.all([
+      Promise.resolve(getAppConfig()),
+      listDiscountManagerProfiles()
+    ]);
+    return res.json({ appConfig, profiles });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/discount-profiles', requireAdminRole, async (req, res) => {
+  try {
+    const result = await createDiscountProfile({
+      name: req.body?.name,
+      type: req.body?.type,
+      amount: req.body?.amount
+    });
+    const profiles = await listDiscountManagerProfiles();
+    return res.status(201).json({
+      profile: result.profile,
+      appConfig: result.appConfig,
+      profiles
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/discount-profiles/:profileId', requireAdminRole, async (req, res) => {
+  try {
+    const result = await updateDiscountProfile(req.params.profileId, {
+      name: req.body?.name,
+      type: req.body?.type,
+      amount: req.body?.amount
+    });
+    const profiles = await listDiscountManagerProfiles();
+    return res.json({
+      profile: result.profile,
+      appConfig: result.appConfig,
+      profiles
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/admin/discount-profiles/:profileId', requireAdminRole, async (req, res) => {
+  try {
+    const result = await deleteDiscountProfile(req.params.profileId);
+    const profiles = await listDiscountManagerProfiles();
+    return res.json({
+      deleted: true,
+      profile: result.profile,
+      appConfig: result.appConfig,
+      profiles
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
@@ -1881,18 +2111,12 @@ app.post('/api/mock/gcash/pay', async (req, res) => {
 // ── Admin: list all transactions (pending + paid) ──
 app.get('/api/admin/transactions', requireAdminOrSupervisorRole, async (req, res) => {
   try {
-    const { status: filterStatus, range } = req.query;
-    let dateFrom, dateTo;
-
-    if (range) {
-      const rangeData = buildSalesRange({ range });
-      dateFrom = rangeData.dateFrom;
-      dateTo = rangeData.dateTo;
-    }
+    const { status: filterStatus } = req.query;
+    const range = buildOptionalRange(req.query, null);
 
     let transactions = await listAllInvoices({
-      dateFrom,
-      dateTo,
+      dateFrom: range.dateFrom || undefined,
+      dateTo: range.dateTo || undefined,
       status: filterStatus || undefined
     });
 
@@ -2496,9 +2720,22 @@ app.patch('/api/admin/shifts/:shiftId/review', requireAdminOrSupervisorRole, asy
 app.get('/api/admin/sales/dashboard', requireAdminOrSupervisorRole, async (req, res) => {
   try {
     const range = buildOptionalRange(req.query, 'daily');
+    let resolvedRange = range;
+
+    if (range.label === 'all' && (!range.dateFrom || !range.dateTo)) {
+      const earliestPaidDate = await getEarliestInvoiceDate({ status: 'PAID' });
+      const rangeEnd = new Date();
+      rangeEnd.setUTCHours(23, 59, 59, 999);
+      resolvedRange = {
+        label: 'all',
+        dateFrom: earliestPaidDate,
+        dateTo: rangeEnd.toISOString()
+      };
+    }
+
     const transactions = await listAllInvoices({
-      dateFrom: range.dateFrom || undefined,
-      dateTo: range.dateTo || undefined,
+      dateFrom: resolvedRange.dateFrom || undefined,
+      dateTo: resolvedRange.dateTo || undefined,
       status: 'PAID'
     });
 
@@ -2535,18 +2772,20 @@ app.get('/api/admin/sales/dashboard', requireAdminOrSupervisorRole, async (req, 
     totals.netCashRetained = toMoney(totals.cashTendered - totals.changeGiven);
     totals.digitalSales = toMoney(totals.digitalSales);
 
-    const topSellingProducts = await getTopSalesPerProductByRange({
-      dateFrom: range.dateFrom || undefined,
-      dateTo: range.dateTo || undefined,
-      limit: Number(req.query?.limit || 10)
-    });
+    const topSellingProducts = resolvedRange.dateFrom && resolvedRange.dateTo
+      ? await getTopSalesPerProductByRange({
+        dateFrom: resolvedRange.dateFrom,
+        dateTo: resolvedRange.dateTo,
+        limit: Number(req.query?.limit || 10)
+      })
+      : [];
 
     const hourlySales = buildHourlySalesRows(transactions);
     const weekdaySales = buildWeekdaySalesRows(transactions);
 
     return res.json({
       generatedAt: new Date().toISOString(),
-      range,
+      range: resolvedRange,
       totals,
       paymentMethods,
       topSellingProducts,

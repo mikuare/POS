@@ -76,6 +76,9 @@ const expenseEntries = new Map();
 const supabase = getSupabase();
 const PG_INT_MAX = 2147483647;
 const LINE_ITEM_UUID_NAMESPACE = '44f6ebf6-8e53-48a7-bf63-853f4ea6848b';
+const ORDER_SLIP_PREFIX = 'OR-';
+const ORDER_SLIP_DIGITS = 13;
+const ORDER_SLIP_REGEX = /^OR-(\d{13})$/;
 const INVOICE_STATUSES = new Set(['PENDING', 'PAID', 'HOLD_FOR_VOID', 'CANCELLED', 'VOIDED']);
 const APP_CONFIG_KEY = 'app_config';
 const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
@@ -83,9 +86,53 @@ const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
   { id: 'senior', name: 'Seniors', type: 'percent', amount: 20 },
   { id: 'pwd', name: 'PWD', type: 'percent', amount: 20 }
 ]);
+const ROLE_ACCESS_KEYS = Object.freeze([
+  'control_center_access',
+  'menu_editor_access',
+  'cash_drawer_access',
+  'inventory_access',
+  'inventory_manage',
+  'kit_spec_access',
+  'user_directory_access',
+  'user_management_manage',
+  'operations_access',
+  'receipt_templates_access',
+  'receipt_templates_manage',
+  'reports_access',
+  'discounts_access',
+  'discounts_manage',
+  'monthly_closing_access',
+  'monthly_expenses_manage',
+  'shift_session_access',
+  'shift_monitor_access',
+  'invoice_action_access'
+]);
+const DEFAULT_ROLE_ACCESS = Object.freeze({
+  encharge: Object.freeze([
+    'shift_session_access',
+    'shift_monitor_access',
+    'invoice_action_access'
+  ]),
+  supervisor: Object.freeze([
+    'control_center_access',
+    'menu_editor_access',
+    'cash_drawer_access',
+    'inventory_access',
+    'kit_spec_access',
+    'user_directory_access',
+    'operations_access',
+    'receipt_templates_access',
+    'reports_access',
+    'discounts_access',
+    'monthly_closing_access',
+    'shift_session_access',
+    'invoice_action_access'
+  ])
+});
 const DEFAULT_APP_CONFIG = Object.freeze({
   enforceKitSpec: true,
-  discountProfiles: DEFAULT_DISCOUNT_PROFILES
+  discountProfiles: DEFAULT_DISCOUNT_PROFILES,
+  roleAccess: DEFAULT_ROLE_ACCESS
 });
 const DEFAULT_RECEIPT_TEMPLATE_ID = 'classic-roast-beef';
 const DEFAULT_RECEIPT_TEMPLATE_SETTINGS = Object.freeze({
@@ -110,6 +157,7 @@ const DEFAULT_RECEIPT_TEMPLATE_SETTINGS = Object.freeze({
   borderColor: '#c8a88f',
   borderStyle: 'dashed',
   dividerStyle: 'dashed',
+  orderSlipTitle: 'Order Slip',
   storeName: "Ruel's Roast Beef",
   storeAddress: 'Location : Tres Martires, City of Baybay, 6521 Leyte',
   taxLine: 'Vat Registered TIN 342-231-312-00000',
@@ -144,6 +192,8 @@ let getReceiptTemplateStmt = null;
 let upsertReceiptTemplateStmt = null;
 let activateReceiptTemplateStmt = null;
 let deleteReceiptTemplateStmt = null;
+let nextOrderSlipSequence = null;
+let initOrderSlipSequencePromise = null;
 
 if (db) {
   getAppConfigStmt = db.prepare(`
@@ -334,10 +384,31 @@ function normalizeDiscountProfiles(profiles = []) {
   }, []);
 }
 
+function normalizeRoleAccessEntries(entries = [], fallback = []) {
+  const source = Array.isArray(entries) ? entries : fallback;
+  const seenKeys = new Set();
+  return source.reduce((rows, entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (!ROLE_ACCESS_KEYS.includes(key) || seenKeys.has(key)) return rows;
+    seenKeys.add(key);
+    rows.push(key);
+    return rows;
+  }, []);
+}
+
+function normalizeRoleAccessConfig(roleAccess = {}) {
+  const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  return {
+    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+  };
+}
+
 function normalizeAppConfig(config = {}) {
   return {
     enforceKitSpec: config?.enforceKitSpec !== false,
-    discountProfiles: normalizeDiscountProfiles(config?.discountProfiles)
+    discountProfiles: normalizeDiscountProfiles(config?.discountProfiles),
+    roleAccess: normalizeRoleAccessConfig(config?.roleAccess)
   };
 }
 
@@ -399,6 +470,7 @@ function normalizeReceiptTemplateSettings(settings = {}) {
     borderColor: normalizeTemplateColor(settings?.borderColor, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.borderColor),
     borderStyle: normalizeTemplateBorderStyle(settings?.borderStyle, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.borderStyle),
     dividerStyle: normalizeTemplateBorderStyle(settings?.dividerStyle, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.dividerStyle),
+    orderSlipTitle: normalizeTemplateText(settings?.orderSlipTitle, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.orderSlipTitle, 60),
     storeName: normalizeTemplateText(settings?.storeName, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.storeName, 80),
     storeAddress: normalizeTemplateText(settings?.storeAddress, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.storeAddress, 180),
     taxLine: normalizeTemplateText(settings?.taxLine, DEFAULT_RECEIPT_TEMPLATE_SETTINGS.taxLine, 180),
@@ -484,6 +556,28 @@ function getAppConfig() {
   return { ...appConfigMemory };
 }
 
+function validateDiscountProfileInput({ name, type, amount } = {}) {
+  const nextName = String(name || '').trim().slice(0, 60);
+  const nextType = String(type || '').trim().toLowerCase() === 'fixed' ? 'fixed' : 'percent';
+  const nextAmount = Number(amount);
+
+  if (!nextName) {
+    throw new Error('Discount name is required.');
+  }
+
+  if (!Number.isFinite(nextAmount) || nextAmount < 0 || (nextType === 'percent' && nextAmount > 100)) {
+    throw new Error(nextType === 'fixed'
+      ? 'Minus discount amount must be 0 or more.'
+      : 'Discount percent must be between 0 and 100.');
+  }
+
+  return {
+    name: nextName,
+    type: nextType,
+    amount: nextAmount
+  };
+}
+
 async function updateAppConfig(patch = {}) {
   const nextConfig = normalizeAppConfig({
     ...getAppConfig(),
@@ -504,6 +598,145 @@ async function updateAppConfig(patch = {}) {
   }
 
   return { ...nextConfig };
+}
+
+function buildDiscountProfileUsageMap(rows = []) {
+  const usageById = new Map();
+  const trackedStatuses = new Set(['PAID', 'HOLD_FOR_VOID', 'VOIDED']);
+
+  (rows || []).forEach((row) => {
+    const normalizedStatus = normalizeInvoiceStatus(row?.status);
+    if (!trackedStatuses.has(normalizedStatus)) return;
+
+    const profile = parseStoredDiscountProfile(
+      row?.discount_profile_json
+      ?? row?.discountProfile
+      ?? row?.discount_profile
+      ?? null
+    ) || normalizeInvoiceDiscountProfile(row?.discountProfile);
+    if (!profile?.id) return;
+
+    const usage = usageById.get(profile.id) || {
+      usageCount: 0,
+      lastUsedAt: null
+    };
+    usage.usageCount += 1;
+
+    const usedAt = row?.created_at || row?.createdAt || row?.updated_at || row?.updatedAt || null;
+    if (usedAt && (!usage.lastUsedAt || new Date(usedAt) > new Date(usage.lastUsedAt))) {
+      usage.lastUsedAt = usedAt;
+    }
+
+    usageById.set(profile.id, usage);
+  });
+
+  return usageById;
+}
+
+async function getDiscountProfileUsageMap() {
+  if (isSupabaseEnabled()) {
+    try {
+      const { data, error } = await supabase
+        .from('pos_invoices')
+        .select('status,created_at,updated_at,discount_profile_json');
+      if (error) {
+        throw error;
+      }
+      return buildDiscountProfileUsageMap(data || []);
+    } catch (error) {
+      console.warn('[DiscountProfiles] Supabase usage lookup failed, using in-memory fallback:', error.message);
+    }
+  }
+
+  return buildDiscountProfileUsageMap(Array.from(invoices.values()));
+}
+
+async function listDiscountManagerProfiles() {
+  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const usageById = await getDiscountProfileUsageMap();
+
+  return profiles.map((profile) => {
+    const usage = usageById.get(profile.id);
+    const usageCount = Number(usage?.usageCount || 0);
+    return {
+      ...profile,
+      usageCount,
+      lastUsedAt: usage?.lastUsedAt || null,
+      canDelete: usageCount === 0
+    };
+  });
+}
+
+async function createDiscountProfile({ name, type, amount }) {
+  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const input = validateDiscountProfileInput({ name, type, amount });
+  const profile = normalizeDiscountProfile({
+    id: `${normalizeDiscountProfileId(input.name)}-${Date.now()}`,
+    ...input
+  }, profiles.length);
+  const appConfig = await updateAppConfig({
+    discountProfiles: [...profiles, profile]
+  });
+
+  return {
+    profile,
+    appConfig
+  };
+}
+
+async function updateDiscountProfile(profileId, { name, type, amount }) {
+  const safeProfileId = String(profileId || '').trim();
+  if (!safeProfileId) {
+    throw new Error('Discount profile id is required.');
+  }
+
+  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const existing = profiles.find((profile) => profile.id === safeProfileId);
+  if (!existing) {
+    throw new Error('Discount profile not found.');
+  }
+
+  const input = validateDiscountProfileInput({ name, type, amount });
+  const profile = normalizeDiscountProfile({
+    ...existing,
+    ...input
+  });
+  const appConfig = await updateAppConfig({
+    discountProfiles: profiles.map((row) => (row.id === safeProfileId ? profile : row))
+  });
+
+  return {
+    profile,
+    appConfig
+  };
+}
+
+async function deleteDiscountProfile(profileId) {
+  const safeProfileId = String(profileId || '').trim();
+  if (!safeProfileId) {
+    throw new Error('Discount profile id is required.');
+  }
+
+  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const existing = profiles.find((profile) => profile.id === safeProfileId);
+  if (!existing) {
+    throw new Error('Discount profile not found.');
+  }
+
+  const usageById = await getDiscountProfileUsageMap();
+  const usage = usageById.get(safeProfileId);
+  if (Number(usage?.usageCount || 0) > 0) {
+    throw new Error('This discount type cannot be deleted because it is already used in transaction history.');
+  }
+
+  const appConfig = await updateAppConfig({
+    discountProfiles: profiles.filter((profile) => profile.id !== safeProfileId)
+  });
+
+  return {
+    profile: existing,
+    appConfig
+  };
 }
 
 async function ensureReceiptTemplateDefaults() {
@@ -1478,6 +1711,9 @@ function toDbInvoice(invoice) {
     cashier_email: invoice.cashierEmail || null,
     cashier_name: invoice.cashierName || null,
     cashier_role: invoice.cashierRole || null,
+    subtotal_amount: toMoney(invoice.subtotal ?? invoice.total),
+    discount_amount: toMoney(invoice.discount || 0),
+    discount_profile_json: normalizeInvoiceDiscountProfile(invoice.discountProfile),
     total_amount: invoice.total,
     created_at: invoice.createdAt,
     updated_at: invoice.updatedAt
@@ -1579,7 +1815,7 @@ function toAppPayment(dbPayment) {
 }
 
 function shouldUseLegacyInvoiceSchema(error) {
-  return /status_reason|status_changed_at|status_changed_by_user_id|status_changed_by_email/i.test(String(error?.message || error || ''));
+  return /status_reason|status_changed_at|status_changed_by_user_id|status_changed_by_email|subtotal_amount|discount_amount|discount_profile_json/i.test(String(error?.message || error || ''));
 }
 
 function toDbInvoiceLegacy(invoice) {
@@ -1753,7 +1989,7 @@ async function createInvoice({
   discountProfile = null,
   orderType = null,
   invoiceId: requestedInvoiceId = null,
-  reference: requestedReference = null,
+  reference: _requestedReference = null,
   cashierUserId = null,
   cashierEmail = null,
   cashierName = null,
@@ -1807,11 +2043,10 @@ async function createInvoice({
     : 0;
   const total = Math.max(0, subtotal - discount);
   const providedInvoiceId = String(requestedInvoiceId || '').trim();
-  const providedReference = String(requestedReference || '').trim();
   const invoiceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(providedInvoiceId)
     ? providedInvoiceId
     : uuidv4();
-  const invoiceReference = providedReference || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const invoiceReference = await generateNextOrderSlipReference();
   const invoice = {
     id: invoiceId,
     reference: invoiceReference,
@@ -1954,6 +2189,81 @@ async function setInvoicePaid(invoiceId, paymentData) {
   await applyInventoryUsageForPaidInvoice(invoice);
 
   return invoice;
+}
+
+function parseOrderSlipSequence(reference) {
+  const safeReference = String(reference || '').trim().toUpperCase();
+  const match = ORDER_SLIP_REGEX.exec(safeReference);
+  if (!match) return 0;
+  const sequence = Number(match[1]);
+  if (!Number.isFinite(sequence) || sequence <= 0) return 0;
+  return Math.floor(sequence);
+}
+
+function formatOrderSlipReference(sequence) {
+  const safeSequence = Math.max(1, Math.floor(Number(sequence) || 1));
+  return `${ORDER_SLIP_PREFIX}${String(safeSequence).padStart(ORDER_SLIP_DIGITS, '0')}`;
+}
+
+function getMaxOrderSlipSequenceFromInMemoryInvoices() {
+  let max = 0;
+  invoices.forEach((invoice) => {
+    const sequence = parseOrderSlipSequence(invoice?.reference);
+    if (sequence > max) max = sequence;
+  });
+  return max;
+}
+
+async function getMaxOrderSlipSequenceFromSupabaseInvoices() {
+  if (!isSupabaseEnabled()) return 0;
+  const { data, error } = await supabase
+    .from('pos_invoices')
+    .select('reference')
+    .ilike('reference', `${ORDER_SLIP_PREFIX}%`)
+    .order('reference', { ascending: false })
+    .limit(1);
+  if (error) {
+    throw new Error(`Supabase order slip sequence lookup failed: ${error.message}`);
+  }
+  return parseOrderSlipSequence(data?.[0]?.reference);
+}
+
+async function ensureOrderSlipSequenceInitialized() {
+  if (Number.isFinite(nextOrderSlipSequence) && nextOrderSlipSequence > 0) return;
+  if (initOrderSlipSequencePromise) {
+    await initOrderSlipSequencePromise;
+    return;
+  }
+
+  initOrderSlipSequencePromise = (async () => {
+    const inMemoryMax = getMaxOrderSlipSequenceFromInMemoryInvoices();
+    let supabaseMax = 0;
+    try {
+      supabaseMax = await getMaxOrderSlipSequenceFromSupabaseInvoices();
+    } catch (error) {
+      console.warn('[OrderSlip] Falling back to in-memory sequence initialization:', error.message);
+    }
+    nextOrderSlipSequence = Math.max(inMemoryMax, supabaseMax) + 1;
+  })();
+
+  try {
+    await initOrderSlipSequencePromise;
+  } finally {
+    initOrderSlipSequencePromise = null;
+  }
+}
+
+async function generateNextOrderSlipReference() {
+  await ensureOrderSlipSequenceInitialized();
+  let attempts = 0;
+  while (attempts < 10) {
+    const reference = formatOrderSlipReference(nextOrderSlipSequence);
+    nextOrderSlipSequence += 1;
+    const duplicate = Array.from(invoices.values()).some((invoice) => String(invoice?.reference || '').trim().toUpperCase() === reference);
+    if (!duplicate) return reference;
+    attempts += 1;
+  }
+  throw new Error('Unable to allocate unique order slip reference');
 }
 
 function toDbSession(session) {
@@ -3671,7 +3981,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
 
   if (isSupabaseEnabled()) {
     try {
-      const invoiceSelect = 'id,reference,total_amount,payment_method,status,status_reason,status_changed_at,status_changed_by_user_id,status_changed_by_email,order_type,cashier_user_id,cashier_email,cashier_name,cashier_role,created_at,updated_at';
+      const invoiceSelect = 'id,reference,total_amount,subtotal_amount,discount_amount,discount_profile_json,payment_method,status,status_reason,status_changed_at,status_changed_by_user_id,status_changed_by_email,order_type,cashier_user_id,cashier_email,cashier_name,cashier_role,created_at,updated_at';
       const legacyInvoiceSelect = 'id,reference,total_amount,payment_method,status,order_type,cashier_user_id,cashier_email,cashier_name,cashier_role,created_at,updated_at';
       let query = supabase
         .from('pos_invoices')
@@ -3831,6 +4141,36 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
       gcashSession: gcashSessions.get(inv.id) || null
     }))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+async function getEarliestInvoiceDate({ status } = {}) {
+  const safeStatus = status ? String(status).trim().toUpperCase() : null;
+
+  if (isSupabaseEnabled()) {
+    let query = supabase
+      .from('pos_invoices')
+      .select('created_at')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (safeStatus) query = query.eq('status', safeStatus);
+
+    const { data, error } = await query;
+    if (error) throw new Error(`Supabase earliest invoice lookup failed: ${error.message}`);
+
+    const createdAt = data?.[0]?.created_at || null;
+    return createdAt ? new Date(createdAt).toISOString() : null;
+  }
+
+  let rows = Array.from(invoices.values());
+  if (safeStatus) {
+    rows = rows.filter((invoice) => String(invoice.status || '').trim().toUpperCase() === safeStatus);
+  }
+  if (!rows.length) return null;
+
+  rows.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  const createdAt = rows[0]?.createdAt || null;
+  return createdAt ? new Date(createdAt).toISOString() : null;
 }
 
 function toAppCashierShift(dbShift) {
@@ -5025,6 +5365,10 @@ function getOfflineQueueSummary() {
 module.exports = {
   getAppConfig,
   updateAppConfig,
+  listDiscountManagerProfiles,
+  createDiscountProfile,
+  updateDiscountProfile,
+  deleteDiscountProfile,
   listReceiptTemplates,
   getReceiptTemplateById,
   getActiveReceiptTemplate,
@@ -5062,6 +5406,7 @@ module.exports = {
   listProductRecipes,
   replaceProductRecipes,
   listAllInvoices,
+  getEarliestInvoiceDate,
   startCashierShift,
   getCashierShiftOpeningContext,
   getCashierShiftById,

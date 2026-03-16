@@ -206,7 +206,7 @@
                       <p>Vat Registered TIN 342-231-312-00000</p>
                     </div>
                     <div class="receipt-meta">
-                      <div><span>Receipt No:</span> <strong id="receiptRef">-</strong></div>
+                      <div><span>Order Slip No.:</span> <strong id="receiptRef">-</strong></div>
                       <div><span>Date:</span> <strong id="receiptDate">-</strong></div>
                       <div><span>Order Type:</span> <strong id="receiptOrderType">-</strong></div>
                       <div><span>Payment:</span> <strong id="receiptPaymentMethod">-</strong></div>
@@ -310,20 +310,7 @@
           </section>
 
           <section class="card full-width">
-            <h2>Sales: Detailed Output</h2>
-            <div id="salesDetailedGrid" class="sales-detailed-grid">
-              <div class="stat-item">
-                <span class="stat-label">Daily Sales</span>
-                <span class="stat-value" id="detailDailySales">PHP 0.00</span>
-                <span class="stat-label" id="detailDailyMeta">0 transactions</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Monthly Sales</span>
-                <span class="stat-value" id="detailMonthlySales">PHP 0.00</span>
-                <span class="stat-label" id="detailMonthlyMeta">0 transactions</span>
-              </div>
-            </div>
-            <div class="card" style="margin-top:10px;">
+            <div class="card">
               <h3 style="margin-bottom:8px;">Top Sales per Product</h3>
               <div id="topProductsList" class="sales-list">
                 <p>Loading top products...</p>
@@ -331,31 +318,36 @@
             </div>
           </section>
 
-          <!-- Transaction Filters -->
+          <!-- Transactions Master Panel -->
           <section class="card full-width">
-            <h2>All Transactions</h2>
-            <div class="row">
-              <label for="adminFilter">Filter:</label>
-              <select id="adminFilter">
-                <option value="">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="PAID">Paid</option>
-              </select>
-              <label for="adminRange">Range:</label>
-              <select id="adminRange">
-                <option value="daily">Today</option>
-                <option value="weekly">Last 7 Days</option>
-                <option value="">All Time</option>
-              </select>
-              <button id="adminRefreshBtn">Refresh</button>
-              <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
+            <div class="sales-ops-header">
+              <div>
+                <h2>All Transactions</h2>
+                <p>Review transaction filters and business health before checking the full transaction list below.</p>
+              </div>
+              <div class="row sales-ops-toolbar">
+                <label for="adminFilter">Filter:</label>
+                <select id="adminFilter">
+                  <option value="">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="PAID">Paid</option>
+                </select>
+                <label for="adminRange">Range:</label>
+                <select id="adminRange">
+                  <option value="daily">Today</option>
+                  <option value="weekly">Last 7 Days</option>
+                  <option value="monthly">This Month</option>
+                  <option value="custom_month">Specific Month</option>
+                  <option value="">All Time</option>
+                </select>
+                <input type="month" id="adminMonthPicker" style="display:none;" />
+                <button id="adminRefreshBtn">Refresh</button>
+                <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
+              </div>
             </div>
-          </section>
 
-          <!-- Transaction Stats -->
-          <section class="card">
-            <h2>Quick Stats</h2>
-            <div id="adminStats" class="admin-stats">
+            <h3 style="margin-bottom: 12px;">Quick Stats</h3>
+            <div id="adminStats" class="admin-stats" style="margin-bottom: 24px;">
               <div class="stat-item">
                 <span class="stat-label">Total Transactions</span>
                 <span class="stat-value" id="statTotal">0</span>
@@ -381,11 +373,8 @@
                 <span class="stat-value" id="statGcash">PHP 0.00</span>
               </div>
             </div>
-          </section>
 
-          <!-- Transaction List -->
-          <section class="card">
-            <h2>Transaction List</h2>
+            <h3 style="margin-bottom: 12px;">Transaction List</h3>
             <div id="adminTransactions" class="admin-transactions">
               <p>Loading transactions...</p>
             </div>
@@ -432,7 +421,7 @@
               <p>Vat Registered TIN 342-231-312-00000</p>
             </div>
             <div class="receipt-meta">
-              <div><span>Receipt No:</span> <strong id="adminReceiptRef">-</strong></div>
+              <div><span>Order Slip No.:</span> <strong id="adminReceiptRef">-</strong></div>
               <div><span>Date:</span> <strong id="adminReceiptDate">-</strong></div>
               <div><span>Order Type:</span> <strong id="adminReceiptOrderType">-</strong></div>
               <div><span>Payment:</span> <strong id="adminReceiptPaymentMethod">-</strong></div>

@@ -138,6 +138,7 @@ const customerPhoneEl = document.getElementById('customerPhone');
 // -- Admin Tab Elements --
 const adminFilterEl = document.getElementById('adminFilter');
 const adminRangeEl = document.getElementById('adminRange');
+const adminMonthPickerEl = document.getElementById('adminMonthPicker');
 const adminRefreshBtn = document.getElementById('adminRefreshBtn');
 const adminVerifyAllBtn = document.getElementById('adminVerifyAllBtn');
 const adminTransactionsEl = document.getElementById('adminTransactions');
@@ -631,8 +632,26 @@ function isNetworkLikeError(error) {
   return txt.includes('fetch') || txt.includes('network') || txt.includes('offline') || txt.includes('failed to fetch');
 }
 
-function createClientInvoiceReference(invoiceId) {
-  return `INV-${String(invoiceId).slice(0, 8).toUpperCase()}-${Date.now()}`;
+const CLIENT_ORDER_SLIP_SEQUENCE_KEY = 'pos_client_order_slip_sequence_v1';
+const CLIENT_ORDER_SLIP_DIGITS = 13;
+
+function formatClientOrderSlipReference(sequence) {
+  const safeSequence = Math.max(1, Math.floor(Number(sequence) || 1));
+  return `OR-${String(safeSequence).padStart(CLIENT_ORDER_SLIP_DIGITS, '0')}`;
+}
+
+function createClientInvoiceReference(_invoiceId) {
+  let nextSequence = 1;
+  try {
+    const previous = Number(localStorage.getItem(CLIENT_ORDER_SLIP_SEQUENCE_KEY) || 0);
+    nextSequence = Number.isFinite(previous) && previous > 0
+      ? Math.floor(previous) + 1
+      : 1;
+    localStorage.setItem(CLIENT_ORDER_SLIP_SEQUENCE_KEY, String(nextSequence));
+  } catch (_error) {
+    nextSequence = Math.max(1, Math.floor(Date.now()));
+  }
+  return formatClientOrderSlipReference(nextSequence);
 }
 
 function toOfflineInvoiceViewModel({ sale, invoiceId, reference, createdAt, paidAt }) {
@@ -3227,7 +3246,18 @@ async function refreshSalesReport(range = activeSalesRange) {
   try {
     activeSalesRange = range;
     saveUserUiState({ salesRange: activeSalesRange });
-    const report = await api(`/api/reports/sales?range=${encodeURIComponent(range)}`);
+    
+    let url = `/api/reports/sales?range=${encodeURIComponent(range)}`;
+    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
+      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
+      const year = parseInt(monthVal.split('-')[0], 10);
+      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
+      const from = new Date(year, month, 1, 0, 0, 0);
+      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      url += `&dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}`;
+    }
+
+    const report = await api(url);
     renderSalesReport(report);
     await refreshDetailedSalesReport();
   } catch (error) {
@@ -3443,6 +3473,15 @@ async function refreshAdminTransactions() {
     let url = '/api/admin/transactions?';
     if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
     if (range) url += `range=${encodeURIComponent(range)}&`;
+    
+    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
+      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
+      const year = parseInt(monthVal.split('-')[0], 10);
+      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
+      const from = new Date(year, month, 1, 0, 0, 0);
+      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      url += `dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}&`;
+    }
 
     const { transactions } = await api(url);
     renderAdminTransactions(transactions);
@@ -3475,7 +3514,12 @@ function renderAdminStats(transactions) {
 
 function renderAdminTransactions(transactions) {
   if (!transactions.length) {
-    adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    if (adminRangeEl && adminRangeEl.value === 'custom_month') {
+      const monthVal = adminMonthPickerEl ? adminMonthPickerEl.value : '';
+      adminTransactionsEl.innerHTML = `<p>No transactions found for the selected month (${monthVal || 'this month'}).</p>`;
+    } else {
+      adminTransactionsEl.innerHTML = '<p>No transactions found.</p>';
+    }
     return;
   }
 
@@ -3792,10 +3836,33 @@ function setupEventListeners() {
   if (inventoryIngredientFormEl) {
     inventoryIngredientFormEl.addEventListener('submit', handleIngredientSubmit);
   }
-  adminRefreshBtn.addEventListener('click', refreshAdminTransactions);
+  adminRefreshBtn.addEventListener('click', () => {
+    refreshAdminTransactions();
+    refreshSalesReport(adminRangeEl.value);
+  });
   adminVerifyAllBtn.addEventListener('click', verifyAllPending);
   adminFilterEl.addEventListener('change', refreshAdminTransactions);
-  adminRangeEl.addEventListener('change', refreshAdminTransactions);
+  adminRangeEl.addEventListener('change', () => {
+    if (adminRangeEl.value === 'custom_month' && adminMonthPickerEl) {
+      adminMonthPickerEl.style.display = 'inline-block';
+      if (!adminMonthPickerEl.value) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        adminMonthPickerEl.value = `${y}-${m}`;
+      }
+    } else if (adminMonthPickerEl) {
+      adminMonthPickerEl.style.display = 'none';
+    }
+    refreshAdminTransactions();
+    refreshSalesReport(adminRangeEl.value);
+  });
+  if (adminMonthPickerEl) {
+    adminMonthPickerEl.addEventListener('change', () => {
+      refreshAdminTransactions();
+      refreshSalesReport(adminRangeEl.value);
+    });
+  }
   salesListEl.addEventListener('click', (e) => {
     const receiptId = e.target.closest('[data-receipt]')?.getAttribute('data-receipt');
     if (receiptId) {

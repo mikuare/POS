@@ -70,9 +70,14 @@ const menuCategories = new Map(DEFAULT_MENU_CATEGORIES.map((x) => [x.key, x]));
 const supabase = getSupabase();
 const PG_INT_MAX = 2147483647;
 const LINE_ITEM_UUID_NAMESPACE = '44f6ebf6-8e53-48a7-bf63-853f4ea6848b';
+const ORDER_SLIP_PREFIX = 'OR-';
+const ORDER_SLIP_DIGITS = 13;
+const ORDER_SLIP_REGEX = /^OR-(\d{13})$/;
 const SUPABASE_NETWORK_COOLDOWN_MS = Math.max(5000, Number(process.env.SUPABASE_NETWORK_COOLDOWN_MS || 30000));
 let supabaseNetworkBackoffUntil = 0;
 let lastSupabaseBackoffLogAt = 0;
+let nextOrderSlipSequence = null;
+let initOrderSlipSequencePromise = null;
 
 function isLikelySupabaseNetworkError(error) {
   const text = String(error?.message || error || '').toLowerCase();
@@ -864,7 +869,7 @@ async function persistInvoice(invoice) {
   }
 }
 
-async function createInvoice({ items, paymentMethod, discountAmount = 0, orderType = null, invoiceId: requestedInvoiceId = null, reference: requestedReference = null }) {
+async function createInvoice({ items, paymentMethod, discountAmount = 0, orderType = null, invoiceId: requestedInvoiceId = null, reference: _requestedReference = null }) {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error('Invoice must contain at least one item');
   }
@@ -897,11 +902,10 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
     : 0;
   const total = Math.max(0, subtotal - discount);
   const providedInvoiceId = String(requestedInvoiceId || '').trim();
-  const providedReference = String(requestedReference || '').trim();
   const invoiceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(providedInvoiceId)
     ? providedInvoiceId
     : uuidv4();
-  const invoiceReference = providedReference || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const invoiceReference = await generateNextOrderSlipReference();
   const invoice = {
     id: invoiceId,
     reference: invoiceReference,
@@ -924,6 +928,82 @@ async function createInvoice({ items, paymentMethod, discountAmount = 0, orderTy
   await persistInvoice(invoice);
 
   return invoice;
+}
+
+function parseOrderSlipSequence(reference) {
+  const safeReference = String(reference || '').trim().toUpperCase();
+  const match = ORDER_SLIP_REGEX.exec(safeReference);
+  if (!match) return 0;
+  const sequence = Number(match[1]);
+  if (!Number.isFinite(sequence) || sequence <= 0) return 0;
+  return Math.floor(sequence);
+}
+
+function formatOrderSlipReference(sequence) {
+  const safeSequence = Math.max(1, Math.floor(Number(sequence) || 1));
+  return `${ORDER_SLIP_PREFIX}${String(safeSequence).padStart(ORDER_SLIP_DIGITS, '0')}`;
+}
+
+function getMaxOrderSlipSequenceFromInMemoryInvoices() {
+  let max = 0;
+  invoices.forEach((invoice) => {
+    const sequence = parseOrderSlipSequence(invoice?.reference);
+    if (sequence > max) max = sequence;
+  });
+  return max;
+}
+
+async function getMaxOrderSlipSequenceFromSupabaseInvoices() {
+  if (!isSupabaseEnabled() || isSupabaseInNetworkBackoff()) return 0;
+  const { data, error } = await supabase
+    .from('pos_invoices')
+    .select('reference')
+    .ilike('reference', `${ORDER_SLIP_PREFIX}%`)
+    .order('reference', { ascending: false })
+    .limit(1);
+  if (error) {
+    throw new Error(`Supabase order slip sequence lookup failed: ${error.message}`);
+  }
+  return parseOrderSlipSequence(data?.[0]?.reference);
+}
+
+async function ensureOrderSlipSequenceInitialized() {
+  if (Number.isFinite(nextOrderSlipSequence) && nextOrderSlipSequence > 0) return;
+  if (initOrderSlipSequencePromise) {
+    await initOrderSlipSequencePromise;
+    return;
+  }
+
+  initOrderSlipSequencePromise = (async () => {
+    const inMemoryMax = getMaxOrderSlipSequenceFromInMemoryInvoices();
+    let supabaseMax = 0;
+    try {
+      supabaseMax = await getMaxOrderSlipSequenceFromSupabaseInvoices();
+    } catch (error) {
+      markSupabaseNetworkBackoff(error, 'loadOrderSlipSequence');
+      console.warn('[OrderSlip] Falling back to in-memory sequence initialization:', error.message);
+    }
+    nextOrderSlipSequence = Math.max(inMemoryMax, supabaseMax) + 1;
+  })();
+
+  try {
+    await initOrderSlipSequencePromise;
+  } finally {
+    initOrderSlipSequencePromise = null;
+  }
+}
+
+async function generateNextOrderSlipReference() {
+  await ensureOrderSlipSequenceInitialized();
+  let attempts = 0;
+  while (attempts < 10) {
+    const reference = formatOrderSlipReference(nextOrderSlipSequence);
+    nextOrderSlipSequence += 1;
+    const duplicate = Array.from(invoices.values()).some((invoice) => String(invoice?.reference || '').trim().toUpperCase() === reference);
+    if (!duplicate) return reference;
+    attempts += 1;
+  }
+  throw new Error('Unable to allocate unique order slip reference');
 }
 
 async function getInvoice(invoiceId) {

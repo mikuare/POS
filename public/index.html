@@ -70,7 +70,7 @@
         <div class="settings-menu-wrap">
           <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
           <div id="settingsMenu" class="settings-menu" aria-hidden="true">
-            <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Admin Dashboard</button>
+            <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Control Center Dashboard</button>
             <button id="settingsEditMenuBtn" type="button" style="display:none;">Edit Menu</button>
             <button id="settingsCashDrawerBtn" type="button" style="display:none;">Cash Drawer Control</button>
             <button id="logoutBtn" type="button">Logout</button>
@@ -208,12 +208,13 @@
                   <div id="receiptPrintArea" class="receipt-print-area">
                     <div class="receipt-header">
                       <img id="receiptLogo" class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+                      <p id="receiptOrderSlipTitle" class="receipt-order-slip-title">Order Slip</p>
                       <h3 id="receiptStoreName" class="receipt-store-name">Ruel's Roast Beef</h3>
                       <p id="receiptStoreAddress" class="receipt-store-address">Location : Tres Martires, City of Baybay, 6521 Leyte</p>
                       <p id="receiptStoreTax" class="receipt-store-tax">Vat Registered TIN 342-231-312-00000</p>
                     </div>
                     <div class="receipt-meta">
-                      <div><span>Receipt No:</span> <strong id="receiptRef">-</strong></div>
+                      <div><span>Order Slip No.:</span> <strong id="receiptRef">-</strong></div>
                       <div><span>Date:</span> <strong id="receiptDate">-</strong></div>
                       <div><span>Order Type:</span> <strong id="receiptOrderType">-</strong></div>
                       <div><span>Payment:</span> <strong id="receiptPaymentMethod">-</strong></div>
@@ -298,86 +299,117 @@
         <div class="admin-shell">
           <div class="admin-shell-sticky">
             <div class="admin-shell-header">
-              <h2>Admin Dashboard</h2>
+              <div class="admin-shell-heading">
+                <h2>Control Center Dashboard</h2>
+              </div>
               <button id="adminCloseBtn" class="secondary">Close</button>
             </div>
-            <div class="admin-nav">
-              <button id="adminNavOverviewBtn" class="secondary admin-nav-btn active" type="button">Overview</button>
-              <button id="adminNavInventoryBtn" class="secondary admin-nav-btn" type="button">Inventory</button>
-              <button id="adminNavKitSpecBtn" class="secondary admin-nav-btn" type="button">Kit Specification</button>
-              <button id="adminNavUsersBtn" class="secondary admin-nav-btn" type="button">User Management</button>
-              <button id="adminNavOperationsBtn" class="secondary admin-nav-btn" type="button">Operations</button>
-              <button id="adminNavReceiptTemplatesBtn" class="secondary admin-nav-btn" type="button">Receipt Templates</button>
-              <button id="adminNavReportsBtn" class="secondary admin-nav-btn" type="button">Reports</button>
-              <button id="adminNavOthersBtn" class="secondary admin-nav-btn" type="button">Others</button>
+            <p class="admin-nav-hint">Right-click any tab card to move it left or right.</p>
+            <div id="adminNav" class="admin-nav">
+              <div id="adminNavOverviewBtn" class="admin-nav-btn active" data-admin-panel="overview">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Overview</span>
+                  </span>
+                  <small>Sales health and quick insights</small>
+                </button>
+              </div>
+              <div id="adminNavInventoryBtn" class="admin-nav-btn" data-admin-panel="inventory">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Inventory</span>
+                  </span>
+                  <small>Stock levels and ingredient value</small>
+                </button>
+              </div>
+              <div id="adminNavKitSpecBtn" class="admin-nav-btn" data-admin-panel="kit-spec">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Kit Specification</span>
+                  </span>
+                  <small>Recipe coverage and order requirements</small>
+                </button>
+              </div>
+              <div id="adminNavUsersBtn" class="admin-nav-btn" data-admin-panel="users">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">User Management</span>
+                  </span>
+                  <small>Accounts, roles, and access control</small>
+                </button>
+              </div>
+              <div id="adminNavOperationsBtn" class="admin-nav-btn" data-admin-panel="operations">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Operations</span>
+                  </span>
+                  <small>Cashiers, shifts, and drawer activity</small>
+                </button>
+              </div>
+              <div id="adminNavReceiptTemplatesBtn" class="admin-nav-btn" data-admin-panel="receipt-templates">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Order Slip Templates</span>
+                  </span>
+                  <small>Receipt design and print settings</small>
+                </button>
+              </div>
+              <div id="adminNavReportsBtn" class="admin-nav-btn" data-admin-panel="reports">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Reports</span>
+                  </span>
+                  <small>Exports and print-ready summaries</small>
+                </button>
+              </div>
+              <div id="adminNavOthersBtn" class="admin-nav-btn" data-admin-panel="others">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">Others</span>
+                  </span>
+                  <small>Discounts, expenses, and monthly closing</small>
+                </button>
+              </div>
+            </div>
+            <div id="adminNavContextMenu" class="admin-nav-context-menu" hidden>
+              <button id="adminNavContextPrevBtn" class="admin-nav-context-btn" type="button">Move Prev</button>
+              <button id="adminNavContextNextBtn" class="admin-nav-context-btn" type="button">Move Next</button>
             </div>
           </div>
 
           <div id="adminPanelOverview" class="admin-panel active">
           <div class="admin-grid">
           <section class="card full-width">
-            <h2>Overview Dashboard</h2>
-            <div class="row">
-              <button id="salesDailyBtn" class="secondary">Today</button>
-              <button id="salesWeeklyBtn" class="secondary">Last 7 Days</button>
-              <button id="salesRefreshBtn">Refresh</button>
-            </div>
-            <div id="salesSummary" class="status">Loading overview dashboard...</div>
-            <div id="salesList" class="sales-list"></div>
-          </section>
-
-          <section class="card full-width">
-            <h2>Analysis and Mix</h2>
-            <div id="salesDetailedGrid" class="sales-detailed-grid">
-              <div class="stat-item">
-                <span class="stat-label">Daily Sales</span>
-                <span class="stat-value" id="detailDailySales">PHP 0.00</span>
-                <span class="stat-label" id="detailDailyMeta">0 transactions</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-label">Monthly Sales</span>
-                <span class="stat-value" id="detailMonthlySales">PHP 0.00</span>
-                <span class="stat-label" id="detailMonthlyMeta">0 transactions</span>
-              </div>
-            </div>
-            <div class="card" style="margin-top:10px;">
-              <h3 style="margin-bottom:8px;">Top Sales per Product</h3>
-              <div id="topProductsList" class="sales-list">
-                <p>Loading top products...</p>
-              </div>
-            </div>
-          </section>
-
-          <section class="card full-width">
-            <div class="overview-transactions-shell">
-              <div class="overview-transactions-head">
+            <div class="sales-ops-header">
+              <div>
                 <h2>All Transactions</h2>
                 <p>Review transaction filters and business health before checking the full transaction list below.</p>
               </div>
-              <div class="overview-transactions-section">
-                <div class="row">
-                  <label for="adminFilter">Filter:</label>
-                  <select id="adminFilter">
-                    <option value="">All Statuses</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="PAID">Paid</option>
-                    <option value="HOLD_FOR_VOID">Hold for Void</option>
-                    <option value="VOIDED">Voided</option>
-                  </select>
-                  <label for="adminRange">Range:</label>
-                  <select id="adminRange">
-                    <option value="daily">Today</option>
-                    <option value="weekly">Last 7 Days</option>
-                    <option value="">All Time</option>
-                  </select>
-                  <button id="adminRefreshBtn">Refresh</button>
-                  <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
-                </div>
+              <div class="row sales-ops-toolbar">
+                <label for="adminFilter">Filter:</label>
+                <select id="adminFilter">
+                  <option value="">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="PAID">Paid</option>
+                  <option value="HOLD_FOR_VOID">Hold for Void</option>
+                  <option value="VOIDED">Voided</option>
+                </select>
+                <label for="adminRange">Range:</label>
+                <select id="adminRange">
+                  <option value="daily">Today</option>
+                  <option value="weekly">Last 7 Days</option>
+                  <option value="monthly">This Month</option>
+                  <option value="custom_month">Specific Month</option>
+                  <option value="">All Time</option>
+                </select>
+                <input type="month" id="adminMonthPicker" style="display:none;" />
+                <button id="adminRefreshBtn">Refresh</button>
+                <button id="adminVerifyAllBtn" class="verify-btn">Verify All Pending</button>
+                <button id="adminMixToggleBtn" class="secondary" type="button" aria-expanded="false">Comparison</button>
               </div>
+            </div>
+            <div class="overview-transactions-shell">
               <div class="overview-transactions-section">
-                <div class="overview-transactions-subhead">
-                  <h3>Business Health</h3>
-                </div>
                 <div id="adminStats" class="admin-stats">
                   <div class="stat-item">
                     <span class="stat-label">Total Transactions</span>
@@ -405,23 +437,59 @@
                   </div>
                 </div>
               </div>
+
+              <div id="adminMixSection" class="overview-transactions-section hidden-control">
+                <div id="adminMixPanel"></div>
+              </div>
+
+              <div id="adminTransactionsGroupHead" class="overview-transactions-group-head">
+                <h3>Transactions and Product Sales</h3>
+                <p>Review transaction records alongside the top-selling products for the selected dashboard range.</p>
+              </div>
+
+              <div id="adminTransactionsRow" class="overview-transactions-row">
+                <div class="overview-transactions-section overview-transactions-main">
+                  <div class="overview-transactions-subhead">
+                    <h3>Transaction List</h3>
+                    <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.9rem;">Full transaction records for the selected filter and date range.</p>
+                  </div>
+                  <div id="adminTransactions" class="admin-transactions">
+                    <p>Loading transactions...</p>
+                  </div>
+                </div>
+
+                <div class="overview-transactions-section overview-transactions-side">
+                  <div class="overview-transactions-subhead">
+                    <h3>Top Sales per Product</h3>
+                    <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.9rem;">Best-selling items for the selected dashboard range.</p>
+                  </div>
+                  <div id="topProductsList" class="sales-list">
+                    <p>Loading top products...</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
           <section class="card full-width">
-            <div class="overview-transactions-shell">
-              <div class="overview-transactions-head">
-                <h2>Transaction List</h2>
-                <p>Full transaction records for the selected filter and date range.</p>
+            <div class="sales-ops-header">
+              <div>
+                <h2>Sales Operations Dashboard</h2>
+                <p>Track paid sales performance with a dedicated dashboard range filter.</p>
               </div>
-              <div id="adminTransactions" class="admin-transactions">
-                <p>Loading transactions...</p>
+              <div class="row sales-ops-toolbar">
+                <label for="salesOpsRange">Range:</label>
+                <select id="salesOpsRange">
+                  <option value="daily">Today</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">This Month</option>
+                  <option value="custom_month">Specific Month</option>
+                  <option value="all">All Transactions</option>
+                </select>
+                <input type="month" id="salesOpsMonthPicker" style="display:none;" />
+                <button id="salesOpsRefreshBtn" type="button">Refresh</button>
               </div>
             </div>
-          </section>
-
-          <section class="card full-width">
-            <h2>Sales Operations Dashboard</h2>
             <div id="salesOpsSummary" class="status">Loading sales operations dashboard...</div>
             <div id="hourlySalesGraph" class="hourly-sales-graph">
               <p>Loading hourly sales...</p>
@@ -565,6 +633,16 @@
                       <p>Loading users...</p>
                     </div>
                   </section>
+                  <section class="user-management-access-card">
+                    <div class="user-management-panel-header">
+                      <span class="user-management-panel-eyebrow">Role Access</span>
+                      <h3>Role Access Summary</h3>
+                      <p>List the built-in functions currently available to Encharge and Supervisor without changing the existing system controls.</p>
+                    </div>
+                    <div id="roleAccessList" class="user-management-role-access-shell">
+                      <p>Loading role access summary...</p>
+                    </div>
+                  </section>
                 </div>
               </div>
             </section>
@@ -638,12 +716,12 @@
             <section class="card full-width">
               <div class="receipt-template-summary-shell">
                 <div class="receipt-template-summary-header">
-                  <span class="receipt-template-summary-eyebrow">Receipt Printing</span>
-                  <h3>Receipt Template Studio</h3>
-                  <p>Edit the print layout style, save multiple templates, and choose which one is used for transaction receipts.</p>
+                  <span class="receipt-template-summary-eyebrow">Order Slip Printing</span>
+                  <h3>Order Slip Template Studio</h3>
+                  <p>Edit the print layout style, save multiple templates, and choose which one is used for transaction order slips.</p>
                 </div>
               </div>
-              <div id="receiptTemplatesStatus" class="status">Loading receipt templates...</div>
+              <div id="receiptTemplatesStatus" class="status">Loading order slip templates...</div>
               <div class="receipt-template-workspace-panel">
                 <div class="receipt-template-workspace-grid">
                   <section class="receipt-template-editor-card">
@@ -657,6 +735,10 @@
                       <div class="receipt-template-field">
                         <label for="receiptTemplateNameInput">Template Name</label>
                         <input id="receiptTemplateNameInput" type="text" placeholder="Enter template name" required />
+                      </div>
+                      <div class="receipt-template-field">
+                        <label for="receiptTemplateOrderSlipTitleInput">Order Slip Heading</label>
+                        <input id="receiptTemplateOrderSlipTitleInput" type="text" placeholder="Order Slip" />
                       </div>
                       <div class="receipt-template-field">
                         <label for="receiptTemplateStoreNameInput">Store Name</label>
@@ -964,53 +1046,72 @@
                 </div>
               </div>
               <div class="reports-workspace-panel">
-                <div class="reports-generator-card">
-                  <div class="reports-panel-header">
-                    <span class="reports-panel-eyebrow">Customer Discounts</span>
-                    <h3>Discount Manager</h3>
-                    <p>Create, rename, delete, and adjust the percent for each customer discount type used by cashiers.</p>
+                <div class="others-tools-grid">
+                  <div class="reports-generator-card others-discount-card">
+                    <div class="reports-panel-header">
+                      <span class="reports-panel-eyebrow">Customer Discounts</span>
+                      <h3>Discount Manager</h3>
+                      <p>Create discount types for cashiers, then click any row below to edit it or delete it when it has no recorded transaction history yet.</p>
+                    </div>
+                    <div id="discountConfigAdminNote" class="status">Loading discount settings...</div>
+                    <form id="discountProfileForm" class="row">
+                      <input id="discountProfileNameInput" type="text" placeholder="Discount name" maxlength="60" required />
+                      <select id="discountProfileTypeInput">
+                        <option value="percent">Percent</option>
+                        <option value="fixed">Minus Amount</option>
+                      </select>
+                      <input id="discountProfilePercentInput" type="number" min="0" step="0.01" placeholder="Value" required />
+                      <button id="discountProfileAddBtn" type="submit">Add Discount Type</button>
+                    </form>
+                    <div id="discountProfilesList" class="admin-transactions reports-preview-area">
+                      <p>Loading discount profiles...</p>
+                    </div>
                   </div>
-                  <div id="discountConfigAdminNote" class="status">Loading discount settings...</div>
-                  <form id="discountProfileForm" class="row">
-                    <input id="discountProfileNameInput" type="text" placeholder="Discount name" maxlength="60" required />
-                    <select id="discountProfileTypeInput">
-                      <option value="percent">Percent</option>
-                      <option value="fixed">Minus Amount</option>
-                    </select>
-                    <input id="discountProfilePercentInput" type="number" min="0" step="0.01" placeholder="Value" required />
-                    <button id="discountProfileAddBtn" type="submit">Add Discount Type</button>
-                  </form>
-                  <div id="discountProfilesList" class="admin-transactions reports-preview-area">
-                    <p>Loading discount profiles...</p>
-                  </div>
-                </div>
-                <div class="reports-generator-card">
-                  <div class="row">
-                    <label for="monthlyClosingMonthInput">Month</label>
-                    <input id="monthlyClosingMonthInput" type="month" />
-                    <button id="monthlyClosingRefreshBtn" class="secondary" type="button">Refresh Closing</button>
-                  </div>
-                  <form id="monthlyExpenseForm" class="row">
-                    <input id="monthlyExpenseDateInput" type="date" required />
-                    <input id="monthlyExpenseCategoryInput" type="text" list="monthlyExpenseCategorySuggestions" placeholder="Expense category" required />
-                    <datalist id="monthlyExpenseCategorySuggestions">
-                      <option value="Rent"></option>
-                      <option value="Utilities"></option>
-                      <option value="Supplies"></option>
-                      <option value="Salary"></option>
-                      <option value="Transport"></option>
-                      <option value="Maintenance"></option>
-                      <option value="Miscellaneous"></option>
-                    </datalist>
-                    <input id="monthlyExpenseDescriptionInput" type="text" placeholder="Expense description" required />
-                    <input id="monthlyExpenseAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount (PHP)" required />
-                    <input id="monthlyExpenseNoteInput" type="text" placeholder="Optional note" />
-                    <button id="monthlyExpenseSaveBtn" type="submit">Add Expense</button>
-                  </form>
-                  <div id="monthlyClosingAdminNote" class="status">Loading monthly closing controls...</div>
-                  <div id="monthlyClosingSummary" class="status">Loading monthly closing summary...</div>
-                  <div id="monthlyExpenseList" class="admin-transactions reports-preview-area">
-                    <p>Loading monthly expenses...</p>
+                  <div class="reports-generator-card others-monthly-card">
+                    <div class="reports-panel-header">
+                      <span class="reports-panel-eyebrow">Monthly Closing</span>
+                      <h3>Expenses and Closing</h3>
+                      <p>Track operating expenses and review the monthly closing snapshot without leaving the discount manager panel.</p>
+                    </div>
+                    <section class="monthly-closing-section">
+                      <div class="monthly-closing-section-head">
+                        <h4>Closing Period</h4>
+                        <p>Select the month you want to review, then refresh the closing summary and expense ledger.</p>
+                      </div>
+                      <div class="monthly-closing-toolbar">
+                        <label for="monthlyClosingMonthInput">Month</label>
+                        <input id="monthlyClosingMonthInput" type="month" />
+                        <button id="monthlyClosingRefreshBtn" class="secondary" type="button">Refresh Closing</button>
+                      </div>
+                    </section>
+                    <section class="monthly-closing-section">
+                      <div class="monthly-closing-section-head">
+                        <h4>Log Expense</h4>
+                        <p>Add monthly operating costs here so the closing summary updates with the latest expenses.</p>
+                      </div>
+                      <form id="monthlyExpenseForm" class="monthly-expense-form-grid">
+                        <input id="monthlyExpenseDateInput" type="date" required />
+                        <input id="monthlyExpenseCategoryInput" type="text" list="monthlyExpenseCategorySuggestions" placeholder="Expense category" required />
+                        <datalist id="monthlyExpenseCategorySuggestions">
+                          <option value="Rent"></option>
+                          <option value="Utilities"></option>
+                          <option value="Supplies"></option>
+                          <option value="Salary"></option>
+                          <option value="Transport"></option>
+                          <option value="Maintenance"></option>
+                          <option value="Miscellaneous"></option>
+                        </datalist>
+                        <input id="monthlyExpenseDescriptionInput" type="text" placeholder="Expense description" required />
+                        <input id="monthlyExpenseAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount (PHP)" required />
+                        <input id="monthlyExpenseNoteInput" type="text" placeholder="Optional note" />
+                        <button id="monthlyExpenseSaveBtn" type="submit">Add Expense</button>
+                      </form>
+                    </section>
+                    <div id="monthlyClosingAdminNote" class="status monthly-closing-note">Loading monthly closing controls...</div>
+                    <div id="monthlyClosingSummary" class="monthly-closing-summary-shell">Loading monthly closing summary...</div>
+                    <div id="monthlyExpenseList" class="admin-transactions reports-preview-area monthly-expense-archive">
+                      <p>Loading monthly expenses...</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1024,12 +1125,13 @@
           <div id="adminReceiptPrintArea" class="receipt-print-area">
             <div class="receipt-header">
               <img id="adminReceiptLogo" class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
+              <p id="adminReceiptOrderSlipTitle" class="receipt-order-slip-title">Order Slip</p>
               <h3 id="adminReceiptStoreName" class="receipt-store-name">Ruel's Roast Beef</h3>
               <p id="adminReceiptStoreAddress" class="receipt-store-address">Location : Tres Martires, City of Baybay, 6521 Leyte</p>
               <p id="adminReceiptStoreTax" class="receipt-store-tax">Vat Registered TIN 342-231-312-00000</p>
             </div>
             <div class="receipt-meta">
-              <div><span>Receipt No:</span> <strong id="adminReceiptRef">-</strong></div>
+              <div><span>Order Slip No.:</span> <strong id="adminReceiptRef">-</strong></div>
               <div><span>Date:</span> <strong id="adminReceiptDate">-</strong></div>
               <div><span>Order Type:</span> <strong id="adminReceiptOrderType">-</strong></div>
               <div><span>Payment:</span> <strong id="adminReceiptPaymentMethod">-</strong></div>
@@ -1050,25 +1152,6 @@
             <button id="adminReceiptPrintBtn">Print Receipt</button>
             <button id="adminReceiptCloseBtn" class="secondary">Cancel</button>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="adminLoginModal" class="admin-login-backdrop" aria-hidden="true">
-      <div class="admin-login-card">
-        <h2>Admin Login</h2>
-        <div class="row">
-          <label for="adminUsername">Username:</label>
-          <input id="adminUsername" type="text" autocomplete="off" />
-        </div>
-        <div class="row">
-          <label for="adminPassword">Password:</label>
-          <input id="adminPassword" type="password" autocomplete="new-password" />
-        </div>
-        <div id="adminLoginError" class="admin-login-error"></div>
-        <div class="row">
-          <button id="adminLoginBtn">Login</button>
-          <button id="adminCancelBtn" class="secondary">Cancel</button>
         </div>
       </div>
     </div>
@@ -1196,23 +1279,48 @@
       </div>
     </div>
 
-    <div id="inventoryHistoryModal" class="shift-monitor-backdrop" aria-hidden="true">
-      <div class="shift-monitor-card inventory-history-card">
-        <div class="shift-monitor-header">
-          <h2>Ingredient History</h2>
-          <button id="inventoryHistoryCloseBtn" class="secondary" type="button">Close</button>
+      <div id="inventoryHistoryModal" class="shift-monitor-backdrop" aria-hidden="true">
+        <div class="shift-monitor-card inventory-history-card">
+          <div class="shift-monitor-header">
+            <h2>Ingredient History</h2>
+            <button id="inventoryHistoryCloseBtn" class="secondary" type="button">Close</button>
         </div>
         <div id="inventoryHistorySummary" class="status">Loading ingredient history...</div>
         <div id="inventoryHistoryTableWrap" class="admin-transactions">
           <p>Loading movement history...</p>
         </div>
+        </div>
       </div>
-    </div>
 
-    <div id="cashDrawerControlModal" class="shift-monitor-backdrop" aria-hidden="true">
-      <div class="shift-monitor-card cash-drawer-control-card">
-        <div class="shift-monitor-header">
-          <h2>Cash Drawer Control</h2>
+      <div id="discountProfileModal" class="shift-monitor-backdrop" aria-hidden="true">
+        <div class="shift-monitor-card discount-profile-modal-card">
+          <div class="shift-monitor-header">
+            <h2 id="discountProfileModalTitle">Discount Type</h2>
+            <button id="discountProfileModalCloseBtn" class="secondary" type="button">Close</button>
+          </div>
+          <div id="discountProfileModalNote" class="status">Loading discount details...</div>
+          <form id="discountProfileModalForm" class="discount-profile-modal-form">
+            <label for="discountProfileModalNameInput">Name</label>
+            <input id="discountProfileModalNameInput" type="text" maxlength="60" required />
+            <label for="discountProfileModalTypeInput">Deduction Type</label>
+            <select id="discountProfileModalTypeInput">
+              <option value="percent">Percent</option>
+              <option value="fixed">Minus Amount</option>
+            </select>
+            <label id="discountProfileModalAmountLabel" for="discountProfileModalAmountInput">Percent</label>
+            <input id="discountProfileModalAmountInput" type="number" min="0" max="100" step="0.01" required />
+            <div class="discount-profile-modal-actions">
+              <button type="submit">Save Changes</button>
+              <button id="discountProfileModalDeleteBtn" class="secondary" type="button">Delete</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="cashDrawerControlModal" class="shift-monitor-backdrop" aria-hidden="true">
+        <div class="shift-monitor-card cash-drawer-control-card">
+          <div class="shift-monitor-header">
+            <h2>Cash Drawer Control</h2>
           <button id="cashDrawerControlCloseBtn" class="secondary" type="button">Close</button>
         </div>
         <p>Administrations can create named drawers, set the first amount in each drawer, and document every deduction.</p>
@@ -1279,6 +1387,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
     <script src="/offline-outbox.js"></script>
+    <script src="/vendor/chart.umd.min.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

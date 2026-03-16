@@ -9,6 +9,9 @@ create table if not exists public.pos_invoices (
   status_changed_by_user_id uuid,
   status_changed_by_email text,
   payment_method text not null,
+  subtotal_amount numeric(12,2),
+  discount_amount numeric(12,2),
+  discount_profile_json jsonb,
   total_amount numeric(12,2) not null,
   created_at timestamptz not null,
   updated_at timestamptz not null
