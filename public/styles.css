@@ -3552,15 +3552,58 @@ body.receipt-template-dragging .receipt-template-preview-surface .receipt-previe
   gap: 10px;
 }
 
+.role-access-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.role-access-group {
+  display: grid;
+  gap: 10px;
+}
+
+.role-access-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.role-access-group-head strong {
+  color: #5a3521;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.role-access-group-head small {
+  color: #8a5b3d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .role-access-chip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: center;
+  align-items: start;
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid #ead6c5;
   background: #ffffff;
+}
+
+.role-access-chip.enabled {
+  border-color: #d8c1ae;
+  background: linear-gradient(180deg, #fffefc 0%, #fff7ef 100%);
+}
+
+.role-access-chip.disabled {
+  background: #fffdfb;
+  opacity: 0.94;
 }
 
 .role-access-chip-copy {
@@ -3591,6 +3634,88 @@ body.receipt-template-dragging .receipt-template-preview-surface .receipt-previe
 
 .role-access-view-note {
   margin: 0;
+}
+
+.role-access-chip-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.role-access-toggle {
+  min-width: 108px;
+  height: 34px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.role-access-sensitive-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #cf5f35;
+  background: #fff2eb;
+  color: #8b2f13;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.role-access-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.role-access-state.enabled {
+  background: #e8f3e7;
+  color: #305c2a;
+}
+
+.role-access-state.disabled {
+  background: #f2e8df;
+  color: #7b5a47;
+}
+
+.role-access-editor-footer {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed #dcc4af;
+  border-radius: 16px;
+  background: #fffdfa;
+}
+
+.role-access-warning {
+  margin: 0;
+  color: #7b5a47;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.role-access-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.role-access-role-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .role-access-add-form {
@@ -6602,6 +6727,21 @@ body.receipt-template-dragging .receipt-template-preview-surface .receipt-previe
   .role-access-chip,
   .role-access-add-row {
     grid-template-columns: 1fr;
+  }
+
+  .role-access-card-actions,
+  .role-access-role-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .role-access-chip-actions {
+    justify-items: start;
+  }
+
+  .role-access-group-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .admin-stats {

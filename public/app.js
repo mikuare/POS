@@ -18,6 +18,8 @@
   appConfig: {
     enforceKitSpec: true
   },
+  roleAccessDraft: null,
+  roleAccessDraftDirty: false,
   discountManagerProfiles: [],
   discountProfileEditorId: null,
   receiptTemplates: [],
@@ -1607,18 +1609,15 @@ function normalizeRoleChoice(value) {
 }
 
 function isCashierRole(role) {
-  return normalizeRoleChoice(role) === 'encharge';
+  return hasConfiguredRoleAccess('shift_session_access', role);
 }
 
 function isDrawerOperatorRole(role) {
-  const normalizedRole = normalizeRoleChoice(role);
-  return normalizedRole === 'administrations'
-    || normalizedRole === 'supervisor'
-    || normalizedRole === 'encharge';
+  return hasConfiguredRoleAccess('shift_session_access', role);
 }
 
 function canViewShiftMonitorOnPos(role) {
-  return isCashierRole(role);
+  return hasConfiguredRoleAccess('shift_monitor_access', role);
 }
 
 function parseNonNegativeAmount(value) {
@@ -2595,11 +2594,11 @@ function isAdminOrSupervisorRole(role = activeAuthSession?.role) {
 }
 
 function canAccessAdminFeatures() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('control_center_access');
 }
 
 function canManageInventory() {
-  return isAdminRole();
+  return hasRoleAccess('inventory_manage');
 }
 
 function getRoleAccessConfig() {
@@ -2623,55 +2622,99 @@ function hasConfiguredRoleAccess(permissionKey, role = activeAuthSession?.role) 
 }
 
 function canAccessMenuEditor() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('menu_editor_access');
 }
 
 function canAccessCashDrawerControl() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('cash_drawer_access');
 }
 
 function canAccessInventoryPanel() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('inventory_access') || canManageInventory();
 }
 
 function canAccessKitSpecPanel() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('kit_spec_access');
 }
 
 function canViewUserDirectory() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('user_directory_access') || canManageUsers();
 }
 
 function canAccessOperationsPanel() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('operations_access');
 }
 
 function canAccessReceiptTemplatesPanel() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('receipt_templates_access') || canManageReceiptTemplates();
 }
 
 function canAccessReportsPanel() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('reports_access');
 }
 
 function canAccessDiscountManager() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('discounts_access') || canManageDiscounts();
 }
 
 function canManageDiscounts() {
-  return isAdminRole();
+  return hasRoleAccess('discounts_manage');
 }
 
 function canAccessMonthlyClosing() {
-  return isAdminOrSupervisorRole();
+  return hasRoleAccess('monthly_closing_access') || canManageMonthlyExpenses();
 }
 
 function canManageMonthlyExpenses() {
-  return isAdminRole();
+  return hasRoleAccess('monthly_expenses_manage');
 }
 
-function canManageInvoiceActions() {
-  return isCashierRole(activeAuthSession?.role);
+function canManageKitSpecMode() {
+  return hasRoleAccess('kit_spec_mode_manage');
+}
+
+function canReviewInvoicesFromControlCenter(role = activeAuthSession?.role) {
+  return hasRoleAccess('control_center_access', role) && hasRoleAccess('invoice_action_access', role);
+}
+
+function normalizeInvoiceLifecycleStatus(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function isInvoiceAssignedToCurrentActor(invoice = null) {
+  if (!invoice) return false;
+  const invoiceUserId = String(invoice?.cashierUserId || '').trim();
+  const invoiceEmail = normalizeEmail(invoice?.cashierEmail);
+  const actorUserId = String(activeAuthSession?.userId || '').trim();
+  const actorEmail = normalizeEmail(activeAuthSession?.email);
+  return Boolean(
+    (invoiceUserId && actorUserId && invoiceUserId === actorUserId)
+    || (invoiceEmail && actorEmail && invoiceEmail === actorEmail)
+  );
+}
+
+function canManageInvoiceActions(invoice = state.lastPaidInvoice || state.activeInvoice || null, nextStatus = 'HOLD_FOR_VOID', role = activeAuthSession?.role) {
+  const normalizedNextStatus = normalizeInvoiceLifecycleStatus(nextStatus);
+  const normalizedCurrentStatus = normalizeInvoiceLifecycleStatus(invoice?.status);
+  if (!normalizedNextStatus || !normalizedCurrentStatus) return false;
+
+  if (canReviewInvoicesFromControlCenter(role)) {
+    if (normalizedNextStatus === 'CANCELLED') return normalizedCurrentStatus === 'PENDING';
+    if (normalizedNextStatus === 'HOLD_FOR_VOID') return normalizedCurrentStatus === 'PAID';
+    if (normalizedNextStatus === 'VOIDED') {
+      return normalizedCurrentStatus === 'PAID' || normalizedCurrentStatus === 'HOLD_FOR_VOID';
+    }
+    return false;
+  }
+
+  if (!hasRoleAccess('invoice_action_access', role)) return false;
+  if (normalizedNextStatus === 'CANCELLED') {
+    return normalizedCurrentStatus === 'PENDING' && isInvoiceAssignedToCurrentActor(invoice);
+  }
+  if (normalizedNextStatus === 'HOLD_FOR_VOID') {
+    return normalizedCurrentStatus === 'PAID' && isInvoiceAssignedToCurrentActor(invoice);
+  }
+  return false;
 }
 
 const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
@@ -2680,25 +2723,26 @@ const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
   { id: 'pwd', name: 'PWD', type: 'percent', amount: 20 }
 ]);
 const ROLE_ACCESS_CATALOG = Object.freeze([
-  { key: 'control_center_access', label: 'Control Center Dashboard', description: 'Open the Control Center dashboard and overview workspace.' },
-  { key: 'menu_editor_access', label: 'Edit Menu', description: 'Open the menu editor from Settings and update menu items.' },
-  { key: 'cash_drawer_access', label: 'Cash Drawer Control', description: 'Open the cash drawer control workspace from Settings.' },
-  { key: 'inventory_access', label: 'Inventory Snapshot', description: 'View stock overview, ingredient value, and ingredient history.' },
-  { key: 'inventory_manage', label: 'Inventory Management', description: 'Add, edit, delete, and bulk update ingredient records.' },
-  { key: 'kit_spec_access', label: 'Kit Specification', description: 'View and save product ingredient mappings.' },
-  { key: 'user_directory_access', label: 'User Directory', description: 'View the user account directory and role summary.' },
-  { key: 'user_management_manage', label: 'User Management', description: 'Create users, change roles, activate, and reset passwords.' },
-  { key: 'operations_access', label: 'Operations Dashboard', description: 'View cashier monitoring, shifts, discrepancies, and drawer status.' },
-  { key: 'receipt_templates_access', label: 'Receipt Template Studio', description: 'View order slip templates and live previews.' },
-  { key: 'receipt_templates_manage', label: 'Receipt Template Management', description: 'Create, update, activate, and delete order slip templates.' },
-  { key: 'reports_access', label: 'Reports Dashboard', description: 'View reports, sales analytics, and dashboard charts.' },
-  { key: 'discounts_access', label: 'Customer Discounts', description: 'View saved customer discount types.' },
-  { key: 'discounts_manage', label: 'Discount Management', description: 'Create, update, and delete customer discount types.' },
-  { key: 'monthly_closing_access', label: 'Monthly Closing', description: 'View monthly closing and expense summaries.' },
-  { key: 'monthly_expenses_manage', label: 'Expense Management', description: 'Add monthly expense entries.' },
-  { key: 'shift_session_access', label: 'Shift Session', description: 'Start and end drawer shifts and keep cash-on-hand tracking active.' },
-  { key: 'shift_monitor_access', label: 'Shift Monitor', description: 'Open the POS shift monitor button.' },
-  { key: 'invoice_action_access', label: 'Invoice Hold / Void', description: 'Use hold-for-void and related receipt status actions.' }
+  { key: 'control_center_access', group: 'Dashboard & Reports', label: 'Control Center Dashboard', description: 'Open the Control Center dashboard, overview, transaction view, and any admin tabs assigned to this role.' },
+  { key: 'reports_access', group: 'Dashboard & Reports', label: 'Reports Dashboard', description: 'View reports, sales analytics, hourly trends, and weekday charts.' },
+  { key: 'operations_access', group: 'Operations & Cash', label: 'Operations Dashboard', description: 'View cashier monitoring, shifts, discrepancies, and review operations records.' },
+  { key: 'cash_drawer_access', group: 'Operations & Cash', label: 'Cash Drawer Control', description: 'Open cash drawer control, create or edit drawers, and record withdrawals.' },
+  { key: 'menu_editor_access', group: 'Catalog & Templates', label: 'Edit Menu', description: 'Create, update, and delete menu categories and products from Settings.' },
+  { key: 'receipt_templates_access', group: 'Catalog & Templates', label: 'Receipt Template Studio', description: 'View receipt templates and live previews.' },
+  { key: 'receipt_templates_manage', group: 'Catalog & Templates', label: 'Receipt Template Management', description: 'Create, update, activate, and delete receipt templates.' },
+  { key: 'inventory_access', group: 'Inventory & Recipes', label: 'Inventory Snapshot', description: 'View stock overview, ingredient value, and ingredient history.' },
+  { key: 'inventory_manage', group: 'Inventory & Recipes', label: 'Inventory Management', description: 'Add, edit, delete, and bulk update ingredient records.' },
+  { key: 'kit_spec_access', group: 'Inventory & Recipes', label: 'Kit Specification', description: 'View and save product ingredient mappings.' },
+  { key: 'kit_spec_mode_manage', group: 'Inventory & Recipes', label: 'Kit Spec Mode', description: 'Turn Kit Spec Required or Open Ordering Mode on and off from the kit specification workspace.' },
+  { key: 'user_directory_access', group: 'Users & Access', label: 'User Directory', description: 'View the user account directory, activity, and role summary.' },
+  { key: 'user_management_manage', group: 'Users & Access', label: 'User Management', description: 'Create users, change roles, activate users, reset passwords, and edit role access.' },
+  { key: 'discounts_access', group: 'Discounts & Closing', label: 'Customer Discounts', description: 'Open the customer discount manager and review saved discount types.' },
+  { key: 'discounts_manage', group: 'Discounts & Closing', label: 'Discount Management', description: 'Create, update, and delete customer discount types.' },
+  { key: 'monthly_closing_access', group: 'Discounts & Closing', label: 'Monthly Closing', description: 'View monthly closing summaries, expenses, and month-end reports.' },
+  { key: 'monthly_expenses_manage', group: 'Discounts & Closing', label: 'Expense Management', description: 'Add monthly expense entries and save them to the report.' },
+  { key: 'shift_session_access', group: 'POS & Shift Flow', label: 'Shift Session', description: 'Start and end drawer shifts and keep cash-on-hand tracking active.' },
+  { key: 'shift_monitor_access', group: 'POS & Shift Flow', label: 'Shift Monitor', description: 'Open the POS shift monitor button and summary modal.' },
+  { key: 'invoice_action_access', group: 'POS & Shift Flow', label: 'Invoice Lifecycle Actions', description: 'Cancel own pending invoices and request hold-for-void on paid receipts. With Control Center access, this role can also review and void receipts from the dashboard.' }
 ]);
 const ROLE_ACCESS_LABELS = Object.freeze(
   ROLE_ACCESS_CATALOG.reduce((rows, item) => {
@@ -2706,6 +2750,37 @@ const ROLE_ACCESS_LABELS = Object.freeze(
     return rows;
   }, {})
 );
+const ROLE_ACCESS_GROUPS = Object.freeze(
+  ROLE_ACCESS_CATALOG.reduce((rows, entry) => {
+    if (!rows.includes(entry.group)) rows.push(entry.group);
+    return rows;
+  }, [])
+);
+const ROLE_ACCESS_LEVEL_LINKS = Object.freeze({
+  inventory_access: 'inventory_manage',
+  kit_spec_access: 'kit_spec_mode_manage',
+  user_directory_access: 'user_management_manage',
+  receipt_templates_access: 'receipt_templates_manage',
+  discounts_access: 'discounts_manage',
+  monthly_closing_access: 'monthly_expenses_manage'
+});
+const MANAGE_TO_ACCESS_ROLE_LINKS = Object.freeze(
+  Object.entries(ROLE_ACCESS_LEVEL_LINKS).reduce((rows, [accessKey, manageKey]) => {
+    rows[manageKey] = accessKey;
+    return rows;
+  }, {})
+);
+const SENSITIVE_ROLE_ACCESS_KEYS = Object.freeze(new Set([
+  'cash_drawer_access',
+  'menu_editor_access',
+  'invoice_action_access',
+  'inventory_manage',
+  'kit_spec_mode_manage',
+  'user_management_manage',
+  'receipt_templates_manage',
+  'discounts_manage',
+  'monthly_expenses_manage'
+]));
 const DEFAULT_ROLE_ACCESS = Object.freeze({
   encharge: Object.freeze([
     'shift_session_access',
@@ -2728,26 +2803,6 @@ const DEFAULT_ROLE_ACCESS = Object.freeze({
     'invoice_action_access'
   ])
 });
-const ROLE_ACCESS_SUMMARY = Object.freeze({
-  encharge: Object.freeze([
-    'shift_session_access',
-    'shift_monitor_access',
-    'invoice_action_access'
-  ]),
-  supervisor: Object.freeze([
-    'control_center_access',
-    'menu_editor_access',
-    'cash_drawer_access',
-    'inventory_access',
-    'kit_spec_access',
-    'user_directory_access',
-    'operations_access',
-    'receipt_templates_access',
-    'reports_access',
-    'discounts_access',
-    'monthly_closing_access'
-  ])
-});
 
 function normalizeRoleAccessEntries(entries = [], fallback = []) {
   const source = Array.isArray(entries) ? entries : fallback;
@@ -2763,10 +2818,33 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
 
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
+  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
   return {
-    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
-    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+    encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
+    supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
   };
+}
+
+function cloneRoleAccessConfig(roleAccess = getRoleAccessConfig()) {
+  const normalized = normalizeRoleAccessConfig(roleAccess);
+  return {
+    encharge: [...(normalized.encharge || [])],
+    supervisor: [...(normalized.supervisor || [])]
+  };
+}
+
+function syncRoleAccessDraftFromConfig(force = false) {
+  if (!force && state.roleAccessDraftDirty && state.roleAccessDraft) return;
+  state.roleAccessDraft = cloneRoleAccessConfig(getRoleAccessConfig());
+  state.roleAccessDraftDirty = false;
+}
+
+function getRoleAccessDraftConfig() {
+  if (!state.roleAccessDraft) {
+    syncRoleAccessDraftFromConfig(true);
+  }
+  return cloneRoleAccessConfig(state.roleAccessDraft || getRoleAccessConfig());
 }
 
 function normalizeDiscountProfileId(value, fallback = 'discount') {
@@ -3495,13 +3573,21 @@ async function handleDiscountProfileModalDelete() {
   });
 }
 
-function getEditableRoleAccessRoles() {
+function getDisplayRoleAccessRoles() {
   return ['encharge', 'supervisor'];
+}
+
+function getEditableRoleAccessRoles() {
+  return ['supervisor', 'encharge'];
 }
 
 function getRoleAccessEntriesForRole(role) {
   const safeRole = normalizeRoleChoice(role);
-  return Array.isArray(ROLE_ACCESS_SUMMARY?.[safeRole]) ? ROLE_ACCESS_SUMMARY[safeRole] : [];
+  if (safeRole === 'administrations') {
+    return ROLE_ACCESS_CATALOG.map((entry) => entry.key);
+  }
+  const roleAccess = getRoleAccessDraftConfig();
+  return Array.isArray(roleAccess?.[safeRole]) ? roleAccess[safeRole] : [];
 }
 
 function getRoleAccessCatalogEntry(permissionKey) {
@@ -3509,24 +3595,109 @@ function getRoleAccessCatalogEntry(permissionKey) {
   return ROLE_ACCESS_CATALOG.find((entry) => entry.key === safePermissionKey) || null;
 }
 
+function getRoleAccessCatalogGroups() {
+  return ROLE_ACCESS_GROUPS.map((groupName) => ({
+    groupName,
+    entries: ROLE_ACCESS_CATALOG.filter((entry) => entry.group === groupName)
+  })).filter((group) => group.entries.length);
+}
+
+function getRoleAccessDisplayCatalogGroups() {
+  return ROLE_ACCESS_GROUPS.map((groupName) => {
+    const entries = ROLE_ACCESS_CATALOG
+      .filter((entry) => entry.group === groupName)
+      .filter((entry) => !MANAGE_TO_ACCESS_ROLE_LINKS[entry.key])
+      .map((entry) => ({
+        ...entry,
+        linkedManageKey: ROLE_ACCESS_LEVEL_LINKS[entry.key] || null
+      }));
+    return { groupName, entries };
+  }).filter((group) => group.entries.length);
+}
+
+function isSensitiveRoleAccessControl(entry = null) {
+  if (!entry) return false;
+  const accessKey = String(entry.key || '').trim().toLowerCase();
+  const manageKey = String(entry.linkedManageKey || '').trim().toLowerCase();
+  return SENSITIVE_ROLE_ACCESS_KEYS.has(accessKey) || SENSITIVE_ROLE_ACCESS_KEYS.has(manageKey);
+}
+
+function getRoleAccessEntriesSignature(entries = []) {
+  return normalizeRoleAccessEntries(entries, []).slice().sort().join('|');
+}
+
+function hasRoleAccessDraftChanges(roleKey = null) {
+  const current = normalizeRoleAccessConfig(getRoleAccessConfig());
+  const draft = normalizeRoleAccessConfig(state.roleAccessDraft || current);
+  const rolesToCheck = roleKey
+    ? [normalizeRoleChoice(roleKey)]
+    : getEditableRoleAccessRoles();
+  return rolesToCheck.some((role) => getRoleAccessEntriesSignature(draft[role]) !== getRoleAccessEntriesSignature(current[role]));
+}
+
+function syncRoleAccessDraftDirtyFlag() {
+  state.roleAccessDraftDirty = hasRoleAccessDraftChanges();
+}
+
 function renderRoleAccessManager() {
   if (!roleAccessListEl) return;
-  const roleCards = getEditableRoleAccessRoles().map((roleKey) => {
+  const canEdit = canManageUsers();
+  const editableRoles = getEditableRoleAccessRoles();
+  const displayCatalogGroups = getRoleAccessDisplayCatalogGroups();
+  const totalDisplayEntries = displayCatalogGroups.reduce((sum, group) => sum + group.entries.length, 0);
+  const roleCards = getDisplayRoleAccessRoles().map((roleKey) => {
+    const canEditRole = canEdit && editableRoles.includes(roleKey);
+    const isRoleDirty = hasRoleAccessDraftChanges(roleKey);
     const activeKeys = getRoleAccessEntriesForRole(roleKey);
-    const chipsMarkup = activeKeys.length
-      ? activeKeys.map((permissionKey) => {
-        const entry = getRoleAccessCatalogEntry(permissionKey);
-        if (!entry) return '';
+    const accessGroupsMarkup = displayCatalogGroups.map(({ groupName, entries }) => {
+      const enabledCount = entries.filter((entry) => activeKeys.includes(entry.key)).length;
+      const accessRowsMarkup = entries.map((entry) => {
+        const hasAccess = activeKeys.includes(entry.key);
+        const hasManage = entry.linkedManageKey ? activeKeys.includes(entry.linkedManageKey) : false;
+        const level = !hasAccess
+          ? 'disabled'
+          : (entry.linkedManageKey && hasManage ? 'edit' : 'view');
+        const hasLevelControls = Boolean(entry.linkedManageKey);
+        const isSensitive = isSensitiveRoleAccessControl(entry);
         return `
-          <li class="role-access-chip">
+          <li class="role-access-chip ${level === 'disabled' ? 'disabled' : 'enabled'}">
             <div class="role-access-chip-copy">
               <strong>${escapeHtml(entry.label)}</strong>
-              <small>${escapeHtml(entry.description)}</small>
+              <small>${escapeHtml(hasLevelControls
+                ? `${entry.description} Set this to View for read-only access or Edit for full changes.`
+                : entry.description)}</small>
+            </div>
+            <div class="role-access-chip-actions">
+              ${isSensitive ? '<span class="role-access-sensitive-badge">Sensitive</span>' : ''}
+              <select
+                class="role-access-toggle"
+                data-role-access-select="true"
+                data-role-access-role="${escapeHtml(roleKey)}"
+                data-role-access-key="${escapeHtml(entry.key)}"
+                ${entry.linkedManageKey ? `data-role-access-manage-key="${escapeHtml(entry.linkedManageKey)}"` : ''}
+                aria-label="${escapeHtml(`${formatRoleLabel(roleKey)} ${entry.label} access`)}"
+                ${canEditRole ? '' : 'disabled'}
+              >
+                <option value="disabled"${level === 'disabled' ? ' selected' : ''}>Disabled</option>
+                <option value="view"${level === 'view' ? ' selected' : ''}>View</option>
+                ${hasLevelControls
+                  ? `<option value="edit"${level === 'edit' ? ' selected' : ''}>Edit</option>`
+                  : ''}
+              </select>
             </div>
           </li>
         `;
-      }).join('')
-      : '<li class="role-access-empty">No built-in functions listed for this role.</li>';
+      }).join('');
+      return `
+        <section class="role-access-group">
+          <div class="role-access-group-head">
+            <strong>${escapeHtml(groupName)}</strong>
+            <small>${enabledCount}/${entries.length} enabled</small>
+          </div>
+          <ul class="role-access-list">${accessRowsMarkup}</ul>
+        </section>
+      `;
+    }).join('');
 
     return `
       <article class="role-access-card ${escapeHtml(roleKey)}">
@@ -3534,12 +3705,17 @@ function renderRoleAccessManager() {
           <div>
             <span class="role-access-eyebrow">${escapeHtml(formatRoleLabel(roleKey))}</span>
             <h4>${escapeHtml(formatRoleLabel(roleKey))} Functions</h4>
-            <p>${activeKeys.length} built-in function(s) available for this role.</p>
+            <p>${activeKeys.length} enabled permission(s) mapped across ${totalDisplayEntries} access controls in this POS system.</p>
           </div>
           <span class="role-access-count">${activeKeys.length}</span>
         </div>
-        <ul class="role-access-list">${chipsMarkup}</ul>
-        <p class="role-access-view-note">Reference only. This list shows the built-in functions currently available for this role.</p>
+        <div class="role-access-groups">${accessGroupsMarkup}</div>
+        ${canEditRole ? `
+          <div class="role-access-role-actions">
+            <button type="button" class="secondary" data-role-access-reset-role="${escapeHtml(roleKey)}">Restore Default</button>
+            <button type="button" data-role-access-save-role="${escapeHtml(roleKey)}"${isRoleDirty ? '' : ' disabled'}>${isRoleDirty ? 'Save Changes' : 'Saved'}</button>
+          </div>
+        ` : '<p class="role-access-view-note">View only. This shows the live access list for this role.</p>'}
       </article>
     `;
   }).join('');
@@ -3548,10 +3724,11 @@ function renderRoleAccessManager() {
     <div class="role-access-grid">
       ${roleCards}
     </div>
+    ${canEdit ? '<p class="role-access-warning" style="margin-top:12px;">Saving applies live role access changes for the selected role immediately.</p>' : ''}
   `;
 }
 
-async function updateRoleAccessConfig(roleKey, updater) {
+function stageRoleAccessConfig(roleKey, updater) {
   if (!canManageUsers()) {
     setStatus('Current role cannot update role access.');
     return;
@@ -3559,26 +3736,71 @@ async function updateRoleAccessConfig(roleKey, updater) {
   const safeRole = normalizeRoleChoice(roleKey);
   if (!getEditableRoleAccessRoles().includes(safeRole)) return;
 
-  const currentAccess = getRoleAccessConfig();
+  const currentAccess = getRoleAccessDraftConfig();
   const nextEntries = normalizeRoleAccessEntries(
     typeof updater === 'function' ? updater(currentAccess[safeRole] || []) : updater,
     []
   );
+  state.roleAccessDraft = {
+    ...currentAccess,
+    [safeRole]: nextEntries
+  };
+  syncRoleAccessDraftDirtyFlag();
+  renderRoleAccessManager();
+}
 
+async function updateRoleAccessConfig() {
+  if (!canManageUsers()) {
+    setStatus('Current role cannot update role access.');
+    return;
+  }
+  const currentAccess = getRoleAccessDraftConfig();
   const result = await api('/api/admin/role-access', {
     method: 'PUT',
     headers: buildActorHeaders(),
     body: JSON.stringify({
-      roleAccess: {
-        ...currentAccess,
-        [safeRole]: nextEntries
-      }
+      roleAccess: currentAccess
     })
   });
   applyAppConfig(result?.appConfig || state.appConfig);
-  renderRoleAccessManager();
+  syncRoleAccessDraftFromConfig(true);
   await refreshAdminUsers();
-  setStatus(`${formatRoleLabel(safeRole)} access updated.`);
+  setStatus('Role access control saved.');
+  showConfirmationToast({
+    title: 'Role access saved',
+    message: 'Live role access was updated for the selected roles.'
+  });
+}
+
+async function updateRoleAccessConfigForRole(roleKey) {
+  if (!canManageUsers()) {
+    setStatus('Current role cannot update role access.');
+    return;
+  }
+  const safeRole = normalizeRoleChoice(roleKey);
+  if (!getEditableRoleAccessRoles().includes(safeRole)) return;
+
+  const persisted = cloneRoleAccessConfig(getRoleAccessConfig());
+  const draft = getRoleAccessDraftConfig();
+  const payload = {
+    ...persisted,
+    [safeRole]: normalizeRoleAccessEntries(draft[safeRole] || [], DEFAULT_ROLE_ACCESS[safeRole] || [])
+  };
+  const result = await api('/api/admin/role-access', {
+    method: 'PUT',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({
+      roleAccess: payload
+    })
+  });
+  applyAppConfig(result?.appConfig || state.appConfig);
+  syncRoleAccessDraftFromConfig(true);
+  await refreshAdminUsers();
+  setStatus(`${formatRoleLabel(safeRole)} role access saved.`);
+  showConfirmationToast({
+    title: 'Role access saved',
+    message: `${formatRoleLabel(safeRole)} role access was updated.`
+  });
 }
 
 function canAccessAdminPanel(panelName) {
@@ -3610,6 +3832,7 @@ function updateAdminNavVisibility() {
 
 function applyAppConfig(config = {}) {
   state.appConfig = normalizeAppConfig(config?.appConfig || config);
+  syncRoleAccessDraftFromConfig();
   syncDiscountManagerProfilesWithAppConfig();
   ensureValidSelectedDiscountProfile();
   renderDiscountProfileSelect();
@@ -3630,15 +3853,15 @@ function applyAppConfig(config = {}) {
 }
 
 function canManageUsers() {
-  return isAdminRole();
+  return hasRoleAccess('user_management_manage');
 }
 
 function canManageReceiptTemplates() {
-  return isAdminRole();
+  return hasRoleAccess('receipt_templates_manage');
 }
 
 function canManageCashDrawer() {
-  return isAdminRole();
+  return hasRoleAccess('cash_drawer_access');
 }
 
 function buildActorHeaders() {
@@ -5741,8 +5964,7 @@ function updateReceiptActionVisibility() {
   const hasReceipt = Boolean(state.lastPaidInvoice);
   const canHoldForVoid = Boolean(
     hasReceipt
-    && canManageInvoiceActions()
-    && String(state.lastPaidInvoice?.status || '').trim().toUpperCase() === 'PAID'
+    && canManageInvoiceActions(state.lastPaidInvoice, 'HOLD_FOR_VOID')
   );
   if (statusReceiptActionsEl) {
     statusReceiptActionsEl.style.display = hasReceipt ? 'flex' : 'none';
@@ -7844,7 +8066,7 @@ function renderKitSpecModeControl() {
   if (!kitSpecModeControlEl || !kitSpecModeLabelEl || !kitSpecModeHintEl || !kitSpecModeToggleBtnEl) return;
 
   const enforceKitSpec = state.appConfig?.enforceKitSpec !== false;
-  const canToggle = normalizeRoleChoice(activeAuthSession?.role) === 'administrations';
+  const canToggle = canManageKitSpecMode();
 
   kitSpecModeLabelEl.textContent = enforceKitSpec ? 'Kit Spec Required' : 'Open Ordering Mode';
   kitSpecModeHintEl.textContent = enforceKitSpec
@@ -7919,8 +8141,8 @@ async function refreshKitSpecModule() {
 }
 
 async function handleKitSpecModeToggle() {
-  if (normalizeRoleChoice(activeAuthSession?.role) !== 'administrations') {
-    setStatus('Only Administrations can change the Kit Spec requirement.');
+  if (!canManageKitSpecMode()) {
+    setStatus('Current role cannot change the Kit Spec requirement.');
     return;
   }
 
@@ -7931,7 +8153,7 @@ async function handleKitSpecModeToggle() {
       kitSpecModeToggleBtnEl.textContent = 'Saving...';
     }
 
-    const result = await api('/api/admin/app-config', {
+    const result = await api('/api/admin/kit-spec-mode', {
       method: 'PUT',
       headers: buildActorHeaders(),
       body: JSON.stringify({
@@ -8208,7 +8430,7 @@ async function refreshAdminUsers() {
           value: Number(roleCounts.administrations || 0).toLocaleString('en-US'),
           icon: '🛡',
           accent: 'admins',
-          meta: canManage ? 'You can manage roles, account status, and password resets. Built-in role functions are listed below.' : 'View-only mode. Built-in role functions are listed below for review.'
+          meta: canManage ? 'You can manage roles, account status, password resets, and live role access below.' : 'View-only mode. Live role access is listed below for review.'
         }
       ];
 
@@ -8482,52 +8704,120 @@ async function handleAdminUsersAction(event) {
 }
 
 async function handleRoleAccessManagerClick(event) {
-  const removeBtn = event.target.closest('[data-role-access-remove]');
-  if (!removeBtn) return;
-  const roleKey = String(removeBtn.getAttribute('data-role-access-remove') || '').trim().toLowerCase();
-  const permissionKey = String(removeBtn.getAttribute('data-role-access-key') || '').trim().toLowerCase();
+  const resetRoleBtn = event.target.closest('[data-role-access-reset-role]');
+  if (resetRoleBtn) {
+    const roleKey = String(resetRoleBtn.getAttribute('data-role-access-reset-role') || '').trim().toLowerCase();
+    if (!getEditableRoleAccessRoles().includes(roleKey)) return;
+    const confirmed = window.confirm(`Restore default access for ${formatRoleLabel(roleKey)}?`);
+    if (!confirmed) return;
+    stageRoleAccessConfig(roleKey, [...(DEFAULT_ROLE_ACCESS[roleKey] || [])]);
+    setStatus(`${formatRoleLabel(roleKey)} defaults restored. Save changes when ready.`);
+    return;
+  }
+
+  const saveRoleBtn = event.target.closest('[data-role-access-save-role]');
+  if (saveRoleBtn) {
+    const roleKey = String(saveRoleBtn.getAttribute('data-role-access-save-role') || '').trim().toLowerCase();
+    if (!getEditableRoleAccessRoles().includes(roleKey)) return;
+    if (!hasRoleAccessDraftChanges(roleKey)) return;
+    const confirmed = window.confirm(`Save role access changes for ${formatRoleLabel(roleKey)} now?`);
+    if (!confirmed) return;
+    try {
+      saveRoleBtn.disabled = true;
+      saveRoleBtn.textContent = 'Saving...';
+      await updateRoleAccessConfigForRole(roleKey);
+    } catch (error) {
+      setStatus(`Role access update failed: ${error.message}`);
+    } finally {
+      if (saveRoleBtn instanceof HTMLButtonElement && saveRoleBtn.isConnected) {
+        const dirty = hasRoleAccessDraftChanges(roleKey);
+        saveRoleBtn.disabled = !dirty;
+        saveRoleBtn.textContent = dirty ? 'Save Changes' : 'Saved';
+      }
+    }
+    return;
+  }
+
+  const resetBtn = event.target.closest('[data-role-access-reset]');
+  if (resetBtn) {
+    syncRoleAccessDraftFromConfig(true);
+    renderRoleAccessManager();
+    setStatus('Unsaved role access changes cleared.');
+    return;
+  }
+
+  const saveBtn = event.target.closest('[data-role-access-save]');
+  if (!saveBtn || !state.roleAccessDraftDirty) return;
+  const confirmed = window.confirm('Save role access changes now? This will apply the updated functions for Encharge and Supervisor across the POS system.');
+  if (!confirmed) return;
+
+  try {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    await updateRoleAccessConfig();
+  } catch (error) {
+    setStatus(`Role access update failed: ${error.message}`);
+  } finally {
+    if (saveBtn instanceof HTMLButtonElement && saveBtn.isConnected) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = state.roleAccessDraftDirty ? 'Save Changes' : 'Saved';
+    }
+  }
+}
+
+function handleRoleAccessManagerChange(event) {
+  const selectEl = event.target.closest('[data-role-access-select]');
+  if (!(selectEl instanceof HTMLSelectElement)) return;
+  const roleKey = String(selectEl.getAttribute('data-role-access-role') || '').trim().toLowerCase();
+  const permissionKey = String(selectEl.getAttribute('data-role-access-key') || '').trim().toLowerCase();
+  const managePermissionKey = String(selectEl.getAttribute('data-role-access-manage-key') || '').trim().toLowerCase();
   if (!roleKey || !permissionKey) return;
 
   const entry = getRoleAccessCatalogEntry(permissionKey);
   if (!entry) return;
 
-  try {
-    removeBtn.disabled = true;
-    removeBtn.textContent = 'Removing...';
-    await updateRoleAccessConfig(roleKey, (entries) => entries.filter((key) => key !== permissionKey));
-  } catch (error) {
-    setStatus(`Role access update failed: ${error.message}`);
-  } finally {
-    removeBtn.disabled = false;
-    removeBtn.textContent = 'Remove';
+  const nextLevel = String(selectEl.value || 'disabled').trim().toLowerCase();
+  const currentEntries = getRoleAccessEntriesForRole(roleKey);
+  const hasAccess = currentEntries.includes(permissionKey);
+  const hasManage = Boolean(managePermissionKey && currentEntries.includes(managePermissionKey));
+  const currentLevel = !hasAccess
+    ? 'disabled'
+    : (managePermissionKey && hasManage ? 'edit' : 'view');
+  if (currentLevel === nextLevel) return;
+  const isSensitive = isSensitiveRoleAccessControl({
+    key: permissionKey,
+    linkedManageKey: managePermissionKey || null
+  });
+  if (nextLevel === 'edit' && isSensitive) {
+    const confirmed = window.confirm(
+      `Set ${entry.label} to EDIT for ${formatRoleLabel(roleKey)}?\n\n`
+      + 'This is a sensitive permission and allows live changes in the POS system.'
+    );
+    if (!confirmed) {
+      selectEl.value = currentLevel;
+      return;
+    }
   }
+
+  stageRoleAccessConfig(
+    roleKey,
+    (entries) => {
+      const cleaned = entries.filter((key) => key !== permissionKey && key !== managePermissionKey);
+      if (nextLevel === 'disabled') return cleaned;
+      if (nextLevel === 'view') return cleaned.concat(permissionKey);
+      if (nextLevel === 'edit') {
+        return managePermissionKey
+          ? cleaned.concat(permissionKey, managePermissionKey)
+          : cleaned.concat(permissionKey);
+      }
+      return cleaned;
+    }
+  );
+  setStatus(`${entry.label} set to ${nextLevel.toUpperCase()} for ${formatRoleLabel(roleKey)}. Save changes when ready.`);
 }
 
 async function handleRoleAccessManagerSubmit(event) {
-  const formEl = event.target.closest('[data-role-access-form]');
-  if (!formEl) return;
   event.preventDefault();
-
-  const roleKey = String(formEl.getAttribute('data-role-access-form') || '').trim().toLowerCase();
-  const selectEl = formEl.querySelector('[data-role-access-select]');
-  const permissionKey = String(selectEl?.value || '').trim().toLowerCase();
-  if (!roleKey || !permissionKey) return;
-
-  const submitBtn = formEl.querySelector('button[type="submit"]');
-  try {
-    if (submitBtn instanceof HTMLButtonElement) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Adding...';
-    }
-    await updateRoleAccessConfig(roleKey, (entries) => entries.concat(permissionKey));
-  } catch (error) {
-    setStatus(`Role access update failed: ${error.message}`);
-  } finally {
-    if (submitBtn instanceof HTMLButtonElement) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Add';
-    }
-  }
 }
 
 async function handleIngredientSubmit(event) {
@@ -9251,8 +9541,14 @@ async function requestHoldForVoid(invoiceId = null) {
     setStatus('No paid receipt is available to hold for void.');
     return;
   }
+  const targetInvoice = [state.lastPaidInvoice, state.activeInvoice]
+    .find((invoice) => String(invoice?.id || '').trim() === targetInvoiceId) || null;
+  if (!canManageInvoiceActions(targetInvoice, 'HOLD_FOR_VOID')) {
+    setStatus('Current role cannot place this receipt on hold for void.');
+    return;
+  }
 
-  const reason = String(window.prompt('Enter the note for admin review before this receipt is voided:', '') || '').trim();
+  const reason = String(window.prompt('Enter the note before this receipt is sent for void review:', '') || '').trim();
   if (!reason) {
     setStatus('A note is required to place a receipt on hold for void.');
     return;
@@ -9275,7 +9571,7 @@ async function requestHoldForVoid(invoiceId = null) {
     if (state.activeInvoice && String(state.activeInvoice.id || '') === targetInvoiceId) {
       state.activeInvoice = invoice;
     }
-    setStatus('Receipt placed on hold for admin void review.');
+    setStatus('Receipt placed on hold for void review.');
     try {
       const summary = await refreshLatestShiftSummary();
       if (shiftMonitorModalEl?.classList.contains('open') && summary) {
@@ -9385,10 +9681,13 @@ function renderAdminTransactions(transactions) {
     const verifyBtn = (normalizedStatus === 'PENDING' && t.paymentMethod !== 'cash')
       ? `<button class="verify-btn small" data-verify="${t.id}">Verify</button>`
       : '';
+    const cancelBtn = (normalizedStatus === 'PENDING' && canManageInvoiceActions(t, 'CANCELLED'))
+      ? `<button class="secondary small" data-invoice-status="${t.id}" data-next-status="CANCELLED">Cancel</button>`
+      : '';
     const receiptBtn = (normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID' || normalizedStatus === 'VOIDED')
       ? `<button class="secondary small" data-receipt="${t.id}">Receipt</button>`
       : '';
-    const voidBtn = (normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID')
+    const voidBtn = ((normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID') && canManageInvoiceActions(t, 'VOIDED'))
       ? `<button class="secondary small" data-invoice-status="${t.id}" data-next-status="VOIDED">Void</button>`
       : '';
 
@@ -9439,6 +9738,7 @@ function renderAdminTransactions(transactions) {
         </div>
         <div class="txn-actions">
           ${verifyBtn}
+          ${cancelBtn}
           ${receiptBtn}
           ${voidBtn}
         </div>
@@ -11623,8 +11923,8 @@ async function updateInvoiceStatus(invoiceId, nextStatus) {
   const promptLabel = normalizedStatus === 'VOIDED'
     ? 'Enter the reason for voiding this paid invoice:'
     : normalizedStatus === 'HOLD_FOR_VOID'
-      ? 'Enter the note for admin review before this receipt is voided:'
-    : 'Enter the reason for cancelling this pending invoice:';
+      ? 'Enter the note before this receipt is sent for void review:'
+      : 'Enter the reason for cancelling this pending invoice:';
   const reason = String(window.prompt(promptLabel, '') || '').trim();
   if (!reason) {
     setStatus(`A reason is required to ${actionLabel} the invoice.`);
@@ -12390,6 +12690,9 @@ function setupEventListeners() {
     adminUsersListEl.addEventListener('click', handleAdminUsersAction);
   }
   if (roleAccessListEl) {
+    roleAccessListEl.addEventListener('change', (event) => {
+      handleRoleAccessManagerChange(event);
+    });
     roleAccessListEl.addEventListener('click', (event) => {
       handleRoleAccessManagerClick(event).catch((error) => {
         setStatus(`Role access update failed: ${error.message}`);

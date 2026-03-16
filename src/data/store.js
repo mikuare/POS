@@ -93,6 +93,7 @@ const ROLE_ACCESS_KEYS = Object.freeze([
   'inventory_access',
   'inventory_manage',
   'kit_spec_access',
+  'kit_spec_mode_manage',
   'user_directory_access',
   'user_management_manage',
   'operations_access',
@@ -398,9 +399,11 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
 
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
+  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
   return {
-    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
-    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+    encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
+    supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
   };
 }
 

@@ -223,6 +223,7 @@ const ROLE_ACCESS_KEYS = Object.freeze([
   'inventory_access',
   'inventory_manage',
   'kit_spec_access',
+  'kit_spec_mode_manage',
   'user_directory_access',
   'user_management_manage',
   'operations_access',
@@ -288,9 +289,11 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
 
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
+  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
+  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
   return {
-    encharge: normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
-    supervisor: normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor)
+    encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
+    supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
   };
 }
 
@@ -381,11 +384,20 @@ function canManageInvoiceLifecycle({
   actorEmail
 }) {
   if (!invoice) return false;
-  if (!roleHasAccess(role, 'invoice_action_access')) return false;
-  if (role === 'administrations' || role === 'supervisor') return true;
-  if (role !== 'encharge') return false;
   const normalizedNextStatus = String(nextStatus || '').trim().toUpperCase();
   const normalizedCurrentStatus = String(invoice.status || '').trim().toUpperCase();
+  const hasDashboardReviewAccess = roleHasAccess(role, 'control_center_access') && roleHasAccess(role, 'invoice_action_access');
+
+  if (hasDashboardReviewAccess) {
+    if (normalizedNextStatus === 'CANCELLED') return normalizedCurrentStatus === 'PENDING';
+    if (normalizedNextStatus === 'HOLD_FOR_VOID') return normalizedCurrentStatus === 'PAID';
+    if (normalizedNextStatus === 'VOIDED') {
+      return normalizedCurrentStatus === 'PAID' || normalizedCurrentStatus === 'HOLD_FOR_VOID';
+    }
+    return false;
+  }
+
+  if (!roleHasAccess(role, 'invoice_action_access')) return false;
   if (normalizedNextStatus === 'CANCELLED' && normalizedCurrentStatus !== 'PENDING') return false;
   if (normalizedNextStatus === 'HOLD_FOR_VOID' && normalizedCurrentStatus !== 'PAID') return false;
   if (normalizedNextStatus !== 'CANCELLED' && normalizedNextStatus !== 'HOLD_FOR_VOID') return false;
@@ -1113,7 +1125,7 @@ app.post('/api/auth/audit', async (req, res) => {
   }
 });
 
-app.post('/api/admin/users', requireAdminRole, async (req, res) => {
+app.post('/api/admin/users', requireRoleAccess('user_management_manage', 'Current role does not have permission to manage users.'), async (req, res) => {
   try {
     if (!supabaseService) {
       return res.status(503).json({ error: 'Supabase is not configured on server.' });
@@ -1199,7 +1211,7 @@ app.post('/api/admin/users', requireAdminRole, async (req, res) => {
   }
 });
 
-app.get('/api/admin/users', requireMenuManagerRole, async (_req, res) => {
+app.get('/api/admin/users', requireAnyRoleAccess(['user_directory_access', 'user_management_manage'], 'Current role does not have user directory access.'), async (_req, res) => {
   try {
     if (!supabaseService) {
       return res.status(503).json({ error: 'Supabase is not configured on server.' });
@@ -1230,7 +1242,7 @@ app.get('/api/admin/users', requireMenuManagerRole, async (_req, res) => {
   }
 });
 
-app.patch('/api/admin/users/:userId/role', requireAdminRole, async (req, res) => {
+app.patch('/api/admin/users/:userId/role', requireRoleAccess('user_management_manage', 'Current role does not have permission to manage users.'), async (req, res) => {
   try {
     if (!supabaseService) {
       return res.status(503).json({ error: 'Supabase is not configured on server.' });
@@ -1273,7 +1285,7 @@ app.patch('/api/admin/users/:userId/role', requireAdminRole, async (req, res) =>
   }
 });
 
-app.patch('/api/admin/users/:userId/status', requireAdminRole, async (req, res) => {
+app.patch('/api/admin/users/:userId/status', requireRoleAccess('user_management_manage', 'Current role does not have permission to manage users.'), async (req, res) => {
   try {
     if (!supabaseService) {
       return res.status(503).json({ error: 'Supabase is not configured on server.' });
@@ -1321,7 +1333,7 @@ app.patch('/api/admin/users/:userId/status', requireAdminRole, async (req, res) 
   }
 });
 
-app.post('/api/admin/users/:userId/reset-password', requireAdminRole, async (req, res) => {
+app.post('/api/admin/users/:userId/reset-password', requireRoleAccess('user_management_manage', 'Current role does not have permission to manage users.'), async (req, res) => {
   try {
     if (!supabaseService) {
       return res.status(503).json({ error: 'Supabase is not configured on server.' });
@@ -1444,7 +1456,7 @@ app.get('/api/menu/categories', async (_req, res) => {
   }
 });
 
-app.post('/api/menu/categories', requireMenuManagerRole, async (req, res) => {
+app.post('/api/menu/categories', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const category = await createMenuCategory({
       name: req.body?.name,
@@ -1458,7 +1470,7 @@ app.post('/api/menu/categories', requireMenuManagerRole, async (req, res) => {
   }
 });
 
-app.put('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (req, res) => {
+app.put('/api/menu/categories/:categoryKey', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const category = await updateMenuCategory(req.params.categoryKey, {
       name: req.body?.name,
@@ -1471,7 +1483,7 @@ app.put('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (req,
   }
 });
 
-app.delete('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (req, res) => {
+app.delete('/api/menu/categories/:categoryKey', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const category = await deleteMenuCategory(req.params.categoryKey);
     return res.json({ deleted: true, category });
@@ -1480,7 +1492,7 @@ app.delete('/api/menu/categories/:categoryKey', requireMenuManagerRole, async (r
   }
 });
 
-app.post('/api/menu/products', requireMenuManagerRole, async (req, res) => {
+app.post('/api/menu/products', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const product = await createMenuProduct({
       name: req.body?.name,
@@ -1495,7 +1507,7 @@ app.post('/api/menu/products', requireMenuManagerRole, async (req, res) => {
   }
 });
 
-app.put('/api/menu/products/:productId', requireMenuManagerRole, async (req, res) => {
+app.put('/api/menu/products/:productId', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const product = await updateMenuProduct(req.params.productId, {
       name: req.body?.name,
@@ -1510,7 +1522,7 @@ app.put('/api/menu/products/:productId', requireMenuManagerRole, async (req, res
   }
 });
 
-app.delete('/api/menu/products/:productId', requireMenuManagerRole, async (req, res) => {
+app.delete('/api/menu/products/:productId', requireRoleAccess('menu_editor_access', 'Current role does not have menu editor access.'), async (req, res) => {
   try {
     const product = await deleteMenuProduct(req.params.productId);
     return res.json({ deleted: true, product });
@@ -1682,7 +1694,7 @@ app.get('/api/reports/sales/detailed', async (_req, res) => {
   }
 });
 
-app.get('/api/admin/inventory/report', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/inventory/report', requireAnyRoleAccess(['inventory_access', 'inventory_manage'], 'Current role does not have inventory access.'), async (_req, res) => {
   try {
     const report = await getInventoryReport();
     return res.json(report);
@@ -1691,7 +1703,7 @@ app.get('/api/admin/inventory/report', requireAdminOrSupervisorRole, async (_req
   }
 });
 
-app.get('/api/admin/monthly-closing', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/monthly-closing', requireAnyRoleAccess(['monthly_closing_access', 'monthly_expenses_manage'], 'Current role does not have monthly closing access.'), async (req, res) => {
   try {
     const month = String(req.query?.month || '').trim();
     if (!month) {
@@ -1704,7 +1716,7 @@ app.get('/api/admin/monthly-closing', requireAdminOrSupervisorRole, async (req, 
   }
 });
 
-app.get('/api/admin/expenses', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/expenses', requireAnyRoleAccess(['monthly_closing_access', 'monthly_expenses_manage'], 'Current role does not have monthly closing access.'), async (req, res) => {
   try {
     const expenses = await listExpenses({
       month: String(req.query?.month || '').trim() || null
@@ -1715,7 +1727,7 @@ app.get('/api/admin/expenses', requireAdminOrSupervisorRole, async (req, res) =>
   }
 });
 
-app.post('/api/admin/expenses', requireAdminRole, async (req, res) => {
+app.post('/api/admin/expenses', requireRoleAccess('monthly_expenses_manage', 'Current role does not have permission to add monthly expenses.'), async (req, res) => {
   try {
     const expense = await createExpense({
       expenseDate: req.body?.expenseDate,
@@ -1733,7 +1745,7 @@ app.post('/api/admin/expenses', requireAdminRole, async (req, res) => {
   }
 });
 
-app.get('/api/admin/inventory/ingredients/:ingredientId/history', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/inventory/ingredients/:ingredientId/history', requireAnyRoleAccess(['inventory_access', 'inventory_manage'], 'Current role does not have inventory access.'), async (req, res) => {
   try {
     const history = await getInventoryIngredientHistory(req.params.ingredientId, {
       limit: Number(req.query?.limit || 50)
@@ -1744,7 +1756,7 @@ app.get('/api/admin/inventory/ingredients/:ingredientId/history', requireAdminOr
   }
 });
 
-app.post('/api/admin/inventory/ingredients', requireAdminRole, async (req, res) => {
+app.post('/api/admin/inventory/ingredients', requireRoleAccess('inventory_manage', 'Current role does not have permission to manage inventory.'), async (req, res) => {
   try {
     const ingredient = await createInventoryIngredient({
       name: req.body?.name,
@@ -1759,7 +1771,7 @@ app.post('/api/admin/inventory/ingredients', requireAdminRole, async (req, res) 
   }
 });
 
-app.put('/api/admin/inventory/ingredients/:ingredientId', requireAdminRole, async (req, res) => {
+app.put('/api/admin/inventory/ingredients/:ingredientId', requireRoleAccess('inventory_manage', 'Current role does not have permission to manage inventory.'), async (req, res) => {
   try {
     const ingredient = await updateInventoryIngredient(req.params.ingredientId, {
       name: req.body?.name,
@@ -1774,7 +1786,7 @@ app.put('/api/admin/inventory/ingredients/:ingredientId', requireAdminRole, asyn
   }
 });
 
-app.delete('/api/admin/inventory/ingredients/:ingredientId', requireAdminRole, async (req, res) => {
+app.delete('/api/admin/inventory/ingredients/:ingredientId', requireRoleAccess('inventory_manage', 'Current role does not have permission to manage inventory.'), async (req, res) => {
   try {
     const ingredient = await deleteInventoryIngredient(req.params.ingredientId);
     return res.json({ deleted: true, ingredient });
@@ -1783,7 +1795,7 @@ app.delete('/api/admin/inventory/ingredients/:ingredientId', requireAdminRole, a
   }
 });
 
-app.get('/api/admin/kit-spec', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/kit-spec', requireRoleAccess('kit_spec_access', 'Current role does not have kit specification access.'), async (_req, res) => {
   try {
     const appConfig = getAppConfig();
     const [categories, products, ingredients, recipes] = await Promise.all([
@@ -1818,7 +1830,18 @@ app.put('/api/admin/app-config', requireAdminRole, async (req, res) => {
   }
 });
 
-app.put('/api/admin/role-access', requireAdminRole, async (req, res) => {
+app.put('/api/admin/kit-spec-mode', requireRoleAccess('kit_spec_mode_manage', 'Current role does not have permission to change Kit Spec mode.'), async (req, res) => {
+  try {
+    const appConfig = await updateAppConfig({
+      enforceKitSpec: req.body?.enforceKitSpec
+    });
+    return res.json({ appConfig });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/role-access', requireRoleAccess('user_management_manage', 'Current role does not have permission to manage role access.'), async (req, res) => {
   try {
     const appConfig = await updateAppConfig({
       roleAccess: req.body?.roleAccess
@@ -1829,7 +1852,7 @@ app.put('/api/admin/role-access', requireAdminRole, async (req, res) => {
   }
 });
 
-app.get('/api/admin/discount-profiles', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/discount-profiles', requireAnyRoleAccess(['discounts_access', 'discounts_manage'], 'Current role does not have discount manager access.'), async (_req, res) => {
   try {
     const [appConfig, profiles] = await Promise.all([
       Promise.resolve(getAppConfig()),
@@ -1841,7 +1864,7 @@ app.get('/api/admin/discount-profiles', requireAdminOrSupervisorRole, async (_re
   }
 });
 
-app.post('/api/admin/discount-profiles', requireAdminRole, async (req, res) => {
+app.post('/api/admin/discount-profiles', requireRoleAccess('discounts_manage', 'Current role does not have permission to manage discount types.'), async (req, res) => {
   try {
     const result = await createDiscountProfile({
       name: req.body?.name,
@@ -1859,7 +1882,7 @@ app.post('/api/admin/discount-profiles', requireAdminRole, async (req, res) => {
   }
 });
 
-app.put('/api/admin/discount-profiles/:profileId', requireAdminRole, async (req, res) => {
+app.put('/api/admin/discount-profiles/:profileId', requireRoleAccess('discounts_manage', 'Current role does not have permission to manage discount types.'), async (req, res) => {
   try {
     const result = await updateDiscountProfile(req.params.profileId, {
       name: req.body?.name,
@@ -1877,7 +1900,7 @@ app.put('/api/admin/discount-profiles/:profileId', requireAdminRole, async (req,
   }
 });
 
-app.delete('/api/admin/discount-profiles/:profileId', requireAdminRole, async (req, res) => {
+app.delete('/api/admin/discount-profiles/:profileId', requireRoleAccess('discounts_manage', 'Current role does not have permission to manage discount types.'), async (req, res) => {
   try {
     const result = await deleteDiscountProfile(req.params.profileId);
     const profiles = await listDiscountManagerProfiles();
@@ -1892,7 +1915,7 @@ app.delete('/api/admin/discount-profiles/:profileId', requireAdminRole, async (r
   }
 });
 
-app.get('/api/admin/receipt-templates', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/receipt-templates', requireAnyRoleAccess(['receipt_templates_access', 'receipt_templates_manage'], 'Current role does not have receipt template access.'), async (_req, res) => {
   try {
     const templates = await listReceiptTemplates();
     const activeTemplate = templates.find((template) => template.isActive) || templates[0] || null;
@@ -1906,7 +1929,7 @@ app.get('/api/admin/receipt-templates', requireAdminOrSupervisorRole, async (_re
   }
 });
 
-app.post('/api/admin/receipt-templates', requireAdminRole, async (req, res) => {
+app.post('/api/admin/receipt-templates', requireRoleAccess('receipt_templates_manage', 'Current role does not have permission to manage receipt templates.'), async (req, res) => {
   try {
     const template = await createReceiptTemplate({
       name: req.body?.name,
@@ -1918,7 +1941,7 @@ app.post('/api/admin/receipt-templates', requireAdminRole, async (req, res) => {
   }
 });
 
-app.put('/api/admin/receipt-templates/:templateId', requireAdminRole, async (req, res) => {
+app.put('/api/admin/receipt-templates/:templateId', requireRoleAccess('receipt_templates_manage', 'Current role does not have permission to manage receipt templates.'), async (req, res) => {
   try {
     const template = await updateReceiptTemplate(req.params.templateId, {
       name: req.body?.name,
@@ -1930,7 +1953,7 @@ app.put('/api/admin/receipt-templates/:templateId', requireAdminRole, async (req
   }
 });
 
-app.put('/api/admin/receipt-templates/:templateId/activate', requireAdminRole, async (req, res) => {
+app.put('/api/admin/receipt-templates/:templateId/activate', requireRoleAccess('receipt_templates_manage', 'Current role does not have permission to manage receipt templates.'), async (req, res) => {
   try {
     const template = await activateReceiptTemplate(req.params.templateId);
     return res.json({ template });
@@ -1939,7 +1962,7 @@ app.put('/api/admin/receipt-templates/:templateId/activate', requireAdminRole, a
   }
 });
 
-app.delete('/api/admin/receipt-templates/:templateId', requireAdminRole, async (req, res) => {
+app.delete('/api/admin/receipt-templates/:templateId', requireRoleAccess('receipt_templates_manage', 'Current role does not have permission to manage receipt templates.'), async (req, res) => {
   try {
     const template = await deleteReceiptTemplate(req.params.templateId);
     return res.json({ deleted: true, template });
@@ -1948,7 +1971,7 @@ app.delete('/api/admin/receipt-templates/:templateId', requireAdminRole, async (
   }
 });
 
-app.put('/api/admin/kit-spec/:productId', requireMenuManagerRole, async (req, res) => {
+app.put('/api/admin/kit-spec/:productId', requireRoleAccess('kit_spec_access', 'Current role does not have kit specification access.'), async (req, res) => {
   try {
     const productId = String(req.params?.productId || '').trim();
     if (!productId) {
@@ -2109,7 +2132,7 @@ app.post('/api/mock/gcash/pay', async (req, res) => {
 });
 
 // ── Admin: list all transactions (pending + paid) ──
-app.get('/api/admin/transactions', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/transactions', requireRoleAccess('control_center_access', 'Current role does not have Control Center access.'), async (req, res) => {
   try {
     const { status: filterStatus } = req.query;
     const range = buildOptionalRange(req.query, null);
@@ -2130,7 +2153,7 @@ app.get('/api/admin/transactions', requireAdminOrSupervisorRole, async (req, res
   }
 });
 
-app.get('/api/admin/overview', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Current role does not have Control Center access.'), async (req, res) => {
   try {
     const range = buildOptionalRange(req.query, 'daily');
     const previousRange = buildPreviousRange(range);
@@ -2284,7 +2307,7 @@ app.get('/api/cash-drawers', async (_req, res) => {
   }
 });
 
-app.get('/api/shifts/opening-context', async (req, res) => {
+app.get('/api/shifts/opening-context', requireRoleAccess('shift_session_access', 'Current role does not have shift-session access.'), async (req, res) => {
   try {
     const drawerId = String(req.query?.drawerId || '').trim() || null;
     const cashierEmail = String(req.get('x-user-email') || req.query?.cashierEmail || '').trim().toLowerCase();
@@ -2310,7 +2333,7 @@ app.get('/api/shifts/opening-context', async (req, res) => {
   }
 });
 
-app.post('/api/shifts/start', async (req, res) => {
+app.post('/api/shifts/start', requireRoleAccess('shift_session_access', 'Current role does not have shift-session access.'), async (req, res) => {
   try {
     const drawerId = String(req.body?.drawerId || '').trim() || null;
     const cashierEmail = String(req.body?.cashierEmail || req.get('x-user-email') || '').trim().toLowerCase();
@@ -2358,7 +2381,7 @@ app.post('/api/shifts/start', async (req, res) => {
   }
 });
 
-app.get('/api/admin/drawers', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/drawers', requireAnyRoleAccess(['cash_drawer_access', 'operations_access'], 'Current role does not have cash drawer access.'), async (_req, res) => {
   try {
     const drawers = await listCashDrawers();
     const activeShifts = await listCashierShifts({ status: 'active' });
@@ -2384,7 +2407,7 @@ app.get('/api/admin/drawers', requireAdminOrSupervisorRole, async (_req, res) =>
   }
 });
 
-app.post('/api/admin/drawers', requireAdminRole, async (req, res) => {
+app.post('/api/admin/drawers', requireRoleAccess('cash_drawer_access', 'Current role does not have cash drawer access.'), async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     const initialBalance = toMoney(req.body?.initialBalance);
@@ -2401,7 +2424,7 @@ app.post('/api/admin/drawers', requireAdminRole, async (req, res) => {
   }
 });
 
-app.put('/api/admin/drawers/:drawerId', requireAdminRole, async (req, res) => {
+app.put('/api/admin/drawers/:drawerId', requireRoleAccess('cash_drawer_access', 'Current role does not have cash drawer access.'), async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     const initialBalance = toMoney(req.body?.initialBalance);
@@ -2418,7 +2441,7 @@ app.put('/api/admin/drawers/:drawerId', requireAdminRole, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/drawers/:drawerId', requireAdminRole, async (req, res) => {
+app.delete('/api/admin/drawers/:drawerId', requireRoleAccess('cash_drawer_access', 'Current role does not have cash drawer access.'), async (req, res) => {
   try {
     const drawer = await deleteCashDrawer(req.params.drawerId);
     return res.json({ deleted: true, drawer });
@@ -2427,7 +2450,7 @@ app.delete('/api/admin/drawers/:drawerId', requireAdminRole, async (req, res) =>
   }
 });
 
-app.get('/api/shifts/:shiftId/summary', async (req, res) => {
+app.get('/api/shifts/:shiftId/summary', requireAnyRoleAccess(['shift_session_access', 'shift_monitor_access', 'operations_access'], 'Current role does not have shift summary access.'), async (req, res) => {
   try {
     const shift = await getCashierShiftById(req.params.shiftId);
     if (!shift) {
@@ -2463,7 +2486,7 @@ app.get('/api/shifts/:shiftId/summary', async (req, res) => {
   }
 });
 
-app.post('/api/shifts/:shiftId/end', async (req, res) => {
+app.post('/api/shifts/:shiftId/end', requireRoleAccess('shift_session_access', 'Current role does not have shift-session access.'), async (req, res) => {
   try {
     const endingCash = toMoney(req.body?.endingCash);
     if (!Number.isFinite(endingCash) || endingCash < 0) {
@@ -2507,7 +2530,7 @@ app.post('/api/shifts/:shiftId/end', async (req, res) => {
   }
 });
 
-app.get('/api/admin/cashiers/active', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/cashiers/active', requireRoleAccess('operations_access', 'Current role does not have operations access.'), async (_req, res) => {
   try {
     const cashiers = await listActiveCashierMonitoring();
     return res.json({ cashiers });
@@ -2516,7 +2539,7 @@ app.get('/api/admin/cashiers/active', requireAdminOrSupervisorRole, async (_req,
   }
 });
 
-app.get('/api/admin/cash-drawer', requireAdminOrSupervisorRole, async (_req, res) => {
+app.get('/api/admin/cash-drawer', requireAnyRoleAccess(['cash_drawer_access', 'operations_access'], 'Current role does not have cash drawer access.'), async (_req, res) => {
   try {
     const drawers = await listCashDrawers();
     const activeShifts = await listCashierShifts({ status: 'active' });
@@ -2570,7 +2593,7 @@ app.get('/api/admin/cash-drawer', requireAdminOrSupervisorRole, async (_req, res
   }
 });
 
-app.post('/api/admin/drawers/:drawerId/withdraw', requireAdminRole, async (req, res) => {
+app.post('/api/admin/drawers/:drawerId/withdraw', requireRoleAccess('cash_drawer_access', 'Current role does not have cash drawer access.'), async (req, res) => {
   try {
     const drawerId = String(req.params?.drawerId || req.body?.drawerId || '').trim();
     const amount = toMoney(req.body?.amount);
@@ -2619,7 +2642,7 @@ app.post('/api/admin/drawers/:drawerId/withdraw', requireAdminRole, async (req, 
   }
 });
 
-app.get('/api/admin/shifts', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/shifts', requireRoleAccess('operations_access', 'Current role does not have operations access.'), async (req, res) => {
   try {
     const range = buildOptionalRange(req.query, null);
     const status = String(req.query?.status || '').trim().toLowerCase() || null;
@@ -2654,7 +2677,7 @@ app.get('/api/admin/shifts', requireAdminOrSupervisorRole, async (req, res) => {
   }
 });
 
-app.get('/api/admin/discrepancies', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/discrepancies', requireRoleAccess('operations_access', 'Current role does not have operations access.'), async (req, res) => {
   try {
     const range = buildOptionalRange(req.query, null);
     const shifts = await listCashierShifts({
@@ -2702,7 +2725,7 @@ app.get('/api/admin/discrepancies', requireAdminOrSupervisorRole, async (req, re
   }
 });
 
-app.patch('/api/admin/shifts/:shiftId/review', requireAdminOrSupervisorRole, async (req, res) => {
+app.patch('/api/admin/shifts/:shiftId/review', requireRoleAccess('operations_access', 'Current role does not have operations access.'), async (req, res) => {
   try {
     const reviewedShift = await reviewCashierShift({
       shiftId: req.params.shiftId,
@@ -2717,7 +2740,7 @@ app.patch('/api/admin/shifts/:shiftId/review', requireAdminOrSupervisorRole, asy
   }
 });
 
-app.get('/api/admin/sales/dashboard', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/sales/dashboard', requireRoleAccess('reports_access', 'Current role does not have reports access.'), async (req, res) => {
   try {
     const range = buildOptionalRange(req.query, 'daily');
     let resolvedRange = range;
@@ -2797,7 +2820,7 @@ app.get('/api/admin/sales/dashboard', requireAdminOrSupervisorRole, async (req, 
   }
 });
 
-app.get('/api/admin/reports/:reportType', requireAdminOrSupervisorRole, async (req, res) => {
+app.get('/api/admin/reports/:reportType', requireRoleAccess('reports_access', 'Current role does not have reports access.'), async (req, res) => {
   try {
     const reportType = String(req.params?.reportType || '').trim().toLowerCase();
     const range = buildOptionalRange(req.query, 'daily');
