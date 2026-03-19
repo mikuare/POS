@@ -63,14 +63,11 @@
           <span id="cashOnHandBadge" class="cash-on-hand-badge" style="display:none;">Cash On Hand: PHP 0.00</span>
         </div>
         <div id="phDateTime" class="ph-datetime" aria-live="polite">Philippines Time: --</div>
-        <button id="shiftMonitorToggleBtn" class="secondary shift-monitor-toggle-btn" type="button" title="Shift Monitor">
-          <span aria-hidden="true">📊</span>
-          <span>Monitor</span>
-        </button>
         <div class="settings-menu-wrap">
           <button id="settingsToggleBtn" class="secondary" type="button" aria-haspopup="true" aria-expanded="false">Settings</button>
           <div id="settingsMenu" class="settings-menu" aria-hidden="true">
             <button id="settingsAdminDashboardBtn" type="button" style="display:none;">Control Center Dashboard</button>
+            <button id="settingsShiftMonitorBtn" type="button" style="display:none;">Shift Session Monitor</button>
             <button id="settingsEditMenuBtn" type="button" style="display:none;">Edit Menu</button>
             <button id="settingsCashDrawerBtn" type="button" style="display:none;">Cash Drawer Control</button>
             <button id="logoutBtn" type="button">Logout</button>
@@ -110,10 +107,10 @@
                 </div>
                 <div class="order-brand-text">
                   <div class="order-title-row">
-                    <h2>Your Order</h2>
+                    <h2>Customer Order</h2>
                     <div id="yummyOrderEmoji" class="yummy-emoji"></div>
                   </div>
-                  <p>Review your order and complete payment Thankyou!</p>
+                  <p>Review customer order and complete their payment.</p>
                 </div>
               </div>
               <div id="cart"></div>
@@ -124,31 +121,28 @@
                   <strong id="subtotalValue">PHP 0.00</strong>
                 </div>
                 <div class="total-row discount-row">
-                  <label for="discountProfileSelect">Customer Discount</label>
+                  <label for="discountProfileSelect">Discount Type</label>
                   <select id="discountProfileSelect">
-                    <option value="">Regular Customer</option>
+                    <option value="">No Discount</option>
                   </select>
                 </div>
                 <div id="discountSummaryCard" class="discount-summary-card">
                   <div class="discount-summary-row">
-                    <span>Previous Total</span>
+                    <span>Original Total</span>
                     <strong id="discountPreviousTotalValue">PHP 0.00</strong>
                   </div>
                   <div class="discount-summary-row">
-                    <span>Discount Applied</span>
-                    <strong id="discountAppliedLabel">Regular Customer (No discount)</strong>
+                    <span>Selected Discount</span>
+                    <strong id="discountAppliedLabel">No Discount</strong>
                   </div>
                   <div class="discount-summary-row">
-                    <span>Deduction</span>
+                    <span>Discount Amount</span>
                     <strong id="discountDeductionValue">PHP 0.00</strong>
                   </div>
-                  <div class="discount-summary-row grand">
-                    <span>Customer Total</span>
-                    <strong id="discountCurrentTotalValue">PHP 0.00</strong>
-                  </div>
                 </div>
+                <p id="discountSummaryHint" class="discount-summary-hint">No discount selected. Amount to Pay matches Subtotal.</p>
                 <div class="total-row total-due-row">
-                  <span>Total Due</span>
+                  <span>Amount to Pay</span>
                   <strong id="totalDueValue">PHP 0.00</strong>
                 </div>
               </div>
@@ -171,8 +165,18 @@
               <div id="gcashInfo"></div>
               <div id="status" class="status">Ready.</div>
               <div id="statusReceiptActions" class="row status-receipt-actions" style="display:none;">
-                <button id="statusPrintReceiptBtn" class="secondary" type="button" disabled>Print Receipt</button>
-                <button id="statusHoldForVoidBtn" class="secondary" type="button" disabled>Hold for Void</button>
+                <button id="statusPrintReceiptBtn" class="secondary" type="button" disabled>Receipt</button>
+                <button id="statusHoldForVoidBtn" class="secondary" type="button" disabled>Void</button>
+              </div>
+              <div id="paidInvoiceEditBar" class="paid-invoice-edit-bar" style="display:none;">
+                <div class="paid-invoice-edit-copy">
+                  <strong id="paidInvoiceEditTitle">Editing Paid Transaction</strong>
+                  <p id="paidInvoiceEditSummary">Update the products, discount, or order type, then save the revised paid receipt.</p>
+                </div>
+                <div class="paid-invoice-edit-actions">
+                  <button id="paidInvoiceEditSaveBtn" type="button">Save Transaction Changes</button>
+                  <button id="paidInvoiceEditCancelBtn" class="secondary" type="button">Cancel Edit</button>
+                </div>
               </div>
 
               <div class="order-footer">
@@ -205,6 +209,45 @@
 
               <div id="paymentSuccessModal" class="payment-success-modal" aria-hidden="true">
                 <div class="payment-success-card">
+                  <div class="payment-success-hero">
+                    <div class="payment-success-badge" aria-hidden="true">
+                      <span class="payment-success-ring"></span>
+                      <span class="payment-success-checkmark"></span>
+                    </div>
+                    <div class="payment-success-copy">
+                      <p id="paymentSuccessEyebrow" class="payment-success-eyebrow">Payment Completed</p>
+                      <h3 id="paymentSuccessTitle" class="payment-success-title">Paid Successfully</h3>
+                      <p id="paymentSuccessSummary" class="payment-success-summary">Payment received and saved to the order slip.</p>
+                    </div>
+                  </div>
+                  <div class="payment-success-detail-grid">
+                    <div class="payment-success-detail-card">
+                      <span>OR Number</span>
+                      <strong id="paymentSuccessReferenceValue">-</strong>
+                    </div>
+                    <div class="payment-success-detail-card">
+                      <span>Amount</span>
+                      <strong id="paymentSuccessAmountValue">PHP 0.00</strong>
+                    </div>
+                    <div class="payment-success-detail-card">
+                      <span>Method</span>
+                      <strong id="paymentSuccessMethodValue">Cash</strong>
+                    </div>
+                  </div>
+                  <div class="payment-success-actions">
+                    <button id="paymentSuccessViewReceiptBtn" class="secondary" type="button">View Receipt</button>
+                    <button id="paymentSuccessPrintBtn" type="button">Print Receipt</button>
+                    <button id="paymentSuccessDoneBtn" class="secondary">Done</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="paymentReceiptModal" class="admin-receipt-backdrop payment-receipt-backdrop" aria-hidden="true">
+                <div class="admin-receipt-card payment-receipt-card">
+                  <div class="shift-monitor-header">
+                    <h3>Transaction Receipt</h3>
+                    <button id="paymentReceiptCloseBtn" class="secondary" type="button">Close</button>
+                  </div>
                   <div id="receiptPrintArea" class="receipt-print-area">
                     <div class="receipt-header">
                       <img id="receiptLogo" class="receipt-logo" src="/Business Logo/Ruels Logo for business.png" alt="Ruel's Roast Beef Logo" />
@@ -232,10 +275,9 @@
                     <div id="receiptExtraNote" class="receipt-extra-note" style="display:none;"></div>
                   </div>
                   <div class="receipt-actions">
-                    <button id="receiptMinimizeBtn" class="secondary">Minimize</button>
-                    <button id="receiptHoldForVoidBtn" class="secondary" type="button">Hold for Void</button>
-                    <button id="receiptPrintBtn">Print Receipt</button>
-                    <button id="paymentSuccessDoneBtn" class="secondary">Cancel</button>
+                    <button id="receiptHoldForVoidBtn" class="secondary" type="button">Void</button>
+                    <button id="receiptPrintBtn" type="button">Print Receipt</button>
+                    <button id="paymentReceiptDoneBtn" class="secondary" type="button">Done</button>
                   </div>
                 </div>
               </div>
@@ -244,18 +286,22 @@
                 <div class="e-wallet-card">
                   <h3>Choose E-Payment</h3>
                   <p>Select your payment channel.</p>
+                  <div id="eWalletModalStatus" class="status e-wallet-status">Loading e-payment channels...</div>
                   <div class="e-wallet-options">
                     <button id="chooseGcashBtn" class="secondary e-wallet-option-btn">
                       <img src="/Other/GCash.png" alt="GCash" />
                       <span>GCash</span>
+                      <small id="chooseGcashNote" class="e-wallet-option-note">Loading availability...</small>
                     </button>
                     <button id="choosePaymayaBtn" class="secondary e-wallet-option-btn">
                       <img src="/Other/Maya.png" alt="PayMaya" />
                       <span>PayMaya</span>
+                      <small id="choosePaymayaNote" class="e-wallet-option-note">Loading availability...</small>
                     </button>
                     <button id="chooseScanQrBtn" class="secondary e-wallet-option-btn">
                       <img src="/Other/E-Payment.png" alt="Scan QR" />
                       <span>Pay via Scan QR</span>
+                      <small id="chooseScanQrNote" class="e-wallet-option-note">Loading availability...</small>
                     </button>
                   </div>
                   <button id="cancelEwalletBtn" class="secondary">Cancel</button>
@@ -263,9 +309,9 @@
               </div>
 
               <div id="scanQrModal" class="e-wallet-modal" aria-hidden="true">
-                <div class="e-wallet-card">
+                <div class="e-wallet-card scan-qr-modal-card">
                   <h3>Scan QR to Pay</h3>
-                  <p>Show this sample QR. Once customer presents proof of payment, click Finish.</p>
+                  <p>Show the uploaded QR image to the customer. Once customer presents proof of payment, click Finish.</p>
                   <div id="scanQrContent" class="scan-qr-content"></div>
                   <div class="row">
                     <button id="scanQrFinishBtn" type="button">Finish</button>
@@ -370,6 +416,14 @@
                   <small>Discounts, expenses, and monthly closing</small>
                 </button>
               </div>
+              <div id="adminNavEPaymentBtn" class="admin-nav-btn" data-admin-panel="e-payment">
+                <button class="admin-nav-main-btn" type="button">
+                  <span class="admin-nav-btn-head">
+                    <span class="admin-nav-btn-label">E-Payment</span>
+                  </span>
+                  <small>GCash, Maya, and QR setup</small>
+                </button>
+              </div>
             </div>
             <div id="adminNavContextMenu" class="admin-nav-context-menu" hidden>
               <button id="adminNavContextPrevBtn" class="admin-nav-context-btn" type="button">Move Prev</button>
@@ -391,7 +445,6 @@
                   <option value="">All Statuses</option>
                   <option value="PENDING">Pending</option>
                   <option value="PAID">Paid</option>
-                  <option value="HOLD_FOR_VOID">Hold for Void</option>
                   <option value="VOIDED">Voided</option>
                 </select>
                 <label for="adminRange">Range:</label>
@@ -400,7 +453,7 @@
                   <option value="weekly">Last 7 Days</option>
                   <option value="monthly">This Month</option>
                   <option value="custom_month">Specific Month</option>
-                  <option value="">All Time</option>
+                  <option value="all">All Transactions</option>
                 </select>
                 <input type="month" id="adminMonthPicker" style="display:none;" />
                 <button id="adminRefreshBtn">Refresh</button>
@@ -693,7 +746,7 @@
                     </div>
                   </section>
 
-                  <section class="operations-module-card discrepancy">
+                  <section id="operationsDiscrepancyModule" class="operations-module-card discrepancy">
                     <div class="operations-panel-header">
                       <div>
                         <span class="operations-panel-eyebrow">Attention Queue</span>
@@ -722,6 +775,23 @@
                 </div>
               </div>
               <div id="receiptTemplatesStatus" class="status">Loading order slip templates...</div>
+              <section class="receipt-workflow-card">
+                <div class="receipt-template-panel-header compact">
+                  <span class="receipt-template-panel-eyebrow">After Payment</span>
+                  <h3>Receipt Popup Behavior</h3>
+                  <p>Choose whether the order slip popup opens automatically after a successful payment, or keep the cashier on the paid-success screen with direct print only.</p>
+                </div>
+                <div class="receipt-workflow-controls">
+                  <label class="receipt-template-field checkbox receipt-workflow-toggle" for="receiptWorkflowAutoPopupInput">
+                    <span>Open receipt popup automatically after every successful payment</span>
+                    <input id="receiptWorkflowAutoPopupInput" type="checkbox" />
+                  </label>
+                  <p id="receiptWorkflowStatus" class="status">Loading receipt popup behavior...</p>
+                  <div class="receipt-workflow-actions">
+                    <button id="receiptWorkflowSaveBtn" type="button">Save Receipt Popup Behavior</button>
+                  </div>
+                </div>
+              </section>
               <div class="receipt-template-workspace-panel">
                 <div class="receipt-template-workspace-grid">
                   <section class="receipt-template-editor-card">
@@ -1042,7 +1112,7 @@
                 <div class="reports-summary-header">
                   <span class="reports-summary-eyebrow">Other Admin Tools</span>
                   <h3>Discounts and Monthly Closing</h3>
-                  <p>Manage customer discount types for the cashier dashboard, then track monthly expenses and closing summaries.</p>
+                  <p>Manage discount types for the cashier dashboard, then track monthly expenses and closing summaries.</p>
                 </div>
               </div>
               <div class="reports-workspace-panel">
@@ -1064,7 +1134,7 @@
                       <button id="discountProfileAddBtn" type="submit">Add Discount Type</button>
                     </form>
                     <div id="discountProfilesList" class="admin-transactions reports-preview-area">
-                      <p>Loading discount profiles...</p>
+                      <p>No discount profiles loaded yet.</p>
                     </div>
                   </div>
                   <div class="reports-generator-card others-monthly-card">
@@ -1082,6 +1152,7 @@
                         <label for="monthlyClosingMonthInput">Month</label>
                         <input id="monthlyClosingMonthInput" type="month" />
                         <button id="monthlyClosingRefreshBtn" class="secondary" type="button">Refresh Closing</button>
+                        <button id="monthlyClosingSaveBtn" type="button">Save Snapshot</button>
                       </div>
                     </section>
                     <section class="monthly-closing-section">
@@ -1108,12 +1179,122 @@
                       </form>
                     </section>
                     <div id="monthlyClosingAdminNote" class="status monthly-closing-note">Loading monthly closing controls...</div>
+                    <div id="monthlyClosingSnapshotStatus" class="status monthly-closing-note">Loading saved monthly closing snapshots...</div>
                     <div id="monthlyClosingSummary" class="monthly-closing-summary-shell">Loading monthly closing summary...</div>
                     <div id="monthlyExpenseList" class="admin-transactions reports-preview-area monthly-expense-archive">
-                      <p>Loading monthly expenses...</p>
+                      <div class="monthly-closing-grid">
+                        <div class="monthly-closing-block full-width-block">
+                          <div class="monthly-closing-block-head">
+                            <h3>Expense Ledger</h3>
+                            <p>Every recorded monthly expense for the selected closing period.</p>
+                          </div>
+                          <p class="monthly-closing-empty-state">No expenses loaded yet.</p>
+                        </div>
+                      </div>
                     </div>
+                    <section class="monthly-closing-section">
+                      <div class="monthly-closing-section-head">
+                        <h4>Saved Monthly Closings</h4>
+                        <p>Save each month-end closing and review any saved month/year snapshot later.</p>
+                      </div>
+                      <div id="monthlyClosingSnapshotList" class="admin-transactions reports-preview-area monthly-closing-snapshot-archive">
+                        <p>No saved monthly closing snapshots yet.</p>
+                      </div>
+                    </section>
                   </div>
                 </div>
+              </div>
+            </section>
+          </div>
+
+          <div id="adminPanelEPayment" class="admin-panel">
+            <section class="card full-width">
+              <div class="reports-summary-shell">
+                <div class="reports-summary-header">
+                  <span class="reports-summary-eyebrow">E-Payment Setup</span>
+                  <h3>Channel Availability</h3>
+                  <p>Enable or disable GCash, Maya, and QR checkout. Disabled notes are shown to the cashier in the POS e-payment picker.</p>
+                </div>
+              </div>
+              <div class="reports-workspace-panel">
+                <section class="reports-generator-card epayment-setup-panel-card">
+                  <div class="reports-panel-header">
+                    <span class="reports-panel-eyebrow">Payment Channels</span>
+                    <h3>Enable or Disable Methods</h3>
+                    <p>Select a status for each channel and add the note the cashier should see when that method is disabled.</p>
+                  </div>
+                  <div id="ePaymentSetupAdminNote" class="status">Loading e-payment setup...</div>
+                  <form id="ePaymentSetupForm" class="epayment-setup-form">
+                    <section class="epayment-setup-method">
+                      <div class="epayment-setup-method-head">
+                        <div>
+                          <strong>GCash</strong>
+                          <p>Hosted checkout for direct GCash payment.</p>
+                        </div>
+                        <div class="epayment-setup-status-field">
+                          <label for="ePaymentSetupGcashStatus">Status</label>
+                          <select id="ePaymentSetupGcashStatus">
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                        </div>
+                      </div>
+                      <input id="ePaymentSetupGcashReason" type="text" maxlength="160" placeholder="Shown to cashier when GCash is disabled." />
+                    </section>
+
+                    <section class="epayment-setup-method">
+                      <div class="epayment-setup-method-head">
+                        <div>
+                          <strong>Maya</strong>
+                          <p>Hosted checkout for Maya e-wallet payments.</p>
+                        </div>
+                        <div class="epayment-setup-status-field">
+                          <label for="ePaymentSetupPaymayaStatus">Status</label>
+                          <select id="ePaymentSetupPaymayaStatus">
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                        </div>
+                      </div>
+                      <input id="ePaymentSetupPaymayaReason" type="text" maxlength="160" placeholder="Shown to cashier when Maya is disabled." />
+                    </section>
+
+                    <section class="epayment-setup-method">
+                      <div class="epayment-setup-method-head">
+                        <div>
+                          <strong>Scan QR</strong>
+                          <p>Manual scan-to-pay flow using your uploaded GCash or merchant QR image.</p>
+                        </div>
+                        <div class="epayment-setup-status-field">
+                          <label for="ePaymentSetupScanQrStatus">Status</label>
+                          <select id="ePaymentSetupScanQrStatus">
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                        </div>
+                      </div>
+                      <input id="ePaymentSetupScanQrReason" type="text" maxlength="160" placeholder="Shown to cashier when Scan QR is disabled." />
+                      <div class="epayment-setup-upload-panel">
+                        <div class="epayment-setup-upload-copy">
+                          <strong>QR Image</strong>
+                          <p>Upload the GCash or merchant QR image shown in the cashier Scan QR prompt. Uploading a new file replaces the current one.</p>
+                        </div>
+                        <div id="ePaymentSetupScanQrPreview" class="epayment-setup-qr-preview">
+                          <span>No custom QR image uploaded yet.</span>
+                        </div>
+                        <div class="epayment-setup-upload-actions">
+                          <input id="ePaymentSetupScanQrImageInput" type="file" accept="image/*" />
+                          <button id="ePaymentSetupScanQrClearBtn" class="secondary" type="button">Remove Image</button>
+                        </div>
+                        <small class="epayment-setup-upload-hint">Recommended: square PNG or JPG, up to 2 MB.</small>
+                      </div>
+                    </section>
+
+                    <div class="epayment-setup-actions">
+                      <button id="ePaymentSetupSaveBtn" type="submit">Save E-Payment Setup</button>
+                    </div>
+                  </form>
+                </section>
               </div>
             </section>
           </div>
@@ -1157,14 +1338,30 @@
     </div>
 
     <div id="shiftMonitorModal" class="shift-monitor-backdrop" aria-hidden="true">
-      <div class="shift-monitor-card">
+      <div class="shift-monitor-card shift-monitor-session-card">
         <div class="shift-monitor-header">
           <h2>Shift Monitor</h2>
           <button id="shiftMonitorCloseBtn" class="secondary" type="button">Close</button>
         </div>
-        <p>Track sales, payments, transaction count, and cash on hand for the current shift.</p>
-        <div id="shiftMonitorSummary" class="shift-monitor-summary">
-          <p>Loading shift summary...</p>
+        <p>Track sales, payments, cash on hand, and the full transaction list for the current logged-in shift.</p>
+        <div class="shift-monitor-workspace">
+          <div id="shiftMonitorSummary" class="shift-monitor-summary">
+            <p>Loading shift summary...</p>
+          </div>
+          <section class="shift-monitor-transactions-shell">
+            <div class="shift-monitor-transactions-head">
+              <div>
+                <h3>Session Transactions</h3>
+                <p>View receipts, reopen pending orders for editing, or void session receipts directly or with authorized approval based on role access.</p>
+              </div>
+              <div id="shiftMonitorTransactionsMeta" class="shift-monitor-transactions-meta">
+                <span>Loading...</span>
+              </div>
+            </div>
+            <div id="shiftMonitorTransactions" class="admin-transactions shift-monitor-transactions">
+              <p>Loading session transactions...</p>
+            </div>
+          </section>
         </div>
         <div class="row">
           <button id="shiftMonitorRefreshBtn" type="button">Refresh</button>
@@ -1172,11 +1369,41 @@
       </div>
     </div>
 
+    <div id="shiftVoidAuthorizationModal" class="shift-monitor-backdrop" aria-hidden="true">
+      <div class="shift-monitor-card shift-void-authorization-card">
+        <div class="shift-monitor-header">
+          <h2>Voided Order</h2>
+          <button id="shiftVoidAuthorizationCloseBtn" class="secondary" type="button">Cancel</button>
+        </div>
+        <p>Supervisor or admin approval is required before this paid receipt can be voided from the cashier session.</p>
+        <div id="shiftVoidAuthorizationSummary" class="shift-monitor-summary">
+          <div class="shift-summary-line">
+            <span>Receipt</span>
+            <strong>-</strong>
+          </div>
+        </div>
+        <form id="shiftVoidAuthorizationForm" class="auth-form" autocomplete="on">
+          <label for="shiftVoidAuthorizationEmail">Authorized Personnel Email</label>
+          <input id="shiftVoidAuthorizationEmail" type="email" required autocomplete="username" placeholder="supervisor@example.com" />
+          <label for="shiftVoidAuthorizationPassword">Password</label>
+          <input id="shiftVoidAuthorizationPassword" type="password" required autocomplete="current-password" placeholder="Enter password" />
+          <p id="shiftVoidAuthorizationStatus" class="auth-message" aria-live="polite"></p>
+          <div class="row">
+            <button id="shiftVoidAuthorizationSubmitBtn" type="submit">Voided Order</button>
+            <button id="shiftVoidAuthorizationCancelBtn" class="secondary" type="button">Back</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="startShiftModal" class="shift-monitor-backdrop" aria-hidden="true">
       <div class="shift-monitor-card start-shift-card">
         <div class="shift-monitor-header">
           <h2>Start Shift</h2>
-          <button id="startShiftSignOutBtn" class="secondary" type="button">Sign Out</button>
+          <div class="shift-monitor-header-actions">
+            <button id="startShiftBackBtn" class="secondary" type="button" style="display:none;">Back</button>
+            <button id="startShiftSignOutBtn" class="secondary" type="button">Sign Out</button>
+          </div>
         </div>
         <p class="start-shift-reminder">Please count and double-check the cash in the drawer before entering the amount into the system. This cash drawer amount will be used for this shift.</p>
         <div class="row">

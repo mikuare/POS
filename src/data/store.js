@@ -1,4 +1,6 @@
-﻿const { v4: uuidv4, v5: uuidv5 } = require('uuid');
+﻿const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4, v5: uuidv5 } = require('uuid');
 const { getSupabase, isSupabaseEnabled } = require('./supabaseClient');
 const offlineQueue = require('./offlineQueue');
 const { db } = require('./localDb');
@@ -61,10 +63,12 @@ const DEFAULT_MENU_CATEGORIES = [
   { key: 'sauces', name: 'Sauces', image: '/Menu/Sauce.png', sortOrder: 70 }
 ];
 
-// NOTE: Keeping the original in-memory maps for runtime behavior and fallback.
-// SQLite migration currently targets the offline sync queue layer only.
+// NOTE: Runtime state still uses in-memory maps. When SQLite is unavailable,
+// selected modules persist through JSON fallbacks so admin settings and
+// monthly expense data survive reloads.
 const invoices = new Map();
 const gcashSessions = new Map();
+const invoiceAdjustmentLogs = new Map();
 const inventoryIngredients = new Map();
 const inventoryMovements = new Map();
 const productRecipes = new Map();
@@ -73,6 +77,7 @@ const cashierShifts = new Map();
 const cashDrawers = new Map();
 const cashDrawerMovements = new Map();
 const expenseEntries = new Map();
+const monthlyClosingSnapshots = new Map();
 const supabase = getSupabase();
 const PG_INT_MAX = 2147483647;
 const LINE_ITEM_UUID_NAMESPACE = '44f6ebf6-8e53-48a7-bf63-853f4ea6848b';
@@ -81,6 +86,20 @@ const ORDER_SLIP_DIGITS = 13;
 const ORDER_SLIP_REGEX = /^OR-(\d{13})$/;
 const INVOICE_STATUSES = new Set(['PENDING', 'PAID', 'HOLD_FOR_VOID', 'CANCELLED', 'VOIDED']);
 const APP_CONFIG_KEY = 'app_config';
+const APP_SETTINGS_TABLE = 'app_settings';
+const DISCOUNT_PROFILES_TABLE = 'discount_profiles';
+const INVOICE_ADJUSTMENTS_TABLE = 'pos_invoice_adjustments';
+const APP_CONFIG_SYNC_TTL_MS = 15 * 1000;
+const DISCOUNT_PROFILE_SYNC_TTL_MS = 15 * 1000;
+const APP_CONFIG_FALLBACK_FILE = process.env.POS_APP_CONFIG_FILE
+  ? path.resolve(process.env.POS_APP_CONFIG_FILE)
+  : path.join(__dirname, '../../pos-app-config.json');
+const EXPENSES_FALLBACK_FILE = process.env.POS_EXPENSES_FILE
+  ? path.resolve(process.env.POS_EXPENSES_FILE)
+  : path.join(__dirname, '../../pos-expenses.json');
+const MONTHLY_CLOSING_SNAPSHOTS_FALLBACK_FILE = process.env.POS_MONTHLY_CLOSING_SNAPSHOTS_FILE
+  ? path.resolve(process.env.POS_MONTHLY_CLOSING_SNAPSHOTS_FILE)
+  : path.join(__dirname, '../../pos-monthly-closing-snapshots.json');
 const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
   { id: 'student', name: 'Students', type: 'percent', amount: 10 },
   { id: 'senior', name: 'Seniors', type: 'percent', amount: 20 },
@@ -127,13 +146,24 @@ const DEFAULT_ROLE_ACCESS = Object.freeze({
     'discounts_access',
     'monthly_closing_access',
     'shift_session_access',
+    'shift_monitor_access',
     'invoice_action_access'
   ])
+});
+const DEFAULT_EPAYMENT_SETTINGS = Object.freeze({
+  gcash: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  paymaya: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  scanQr: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' })
+});
+const DEFAULT_RECEIPT_WORKFLOW = Object.freeze({
+  autoOpenAfterPayment: false
 });
 const DEFAULT_APP_CONFIG = Object.freeze({
   enforceKitSpec: true,
   discountProfiles: DEFAULT_DISCOUNT_PROFILES,
-  roleAccess: DEFAULT_ROLE_ACCESS
+  roleAccess: DEFAULT_ROLE_ACCESS,
+  ePaymentSettings: DEFAULT_EPAYMENT_SETTINGS,
+  receiptWorkflow: DEFAULT_RECEIPT_WORKFLOW
 });
 const DEFAULT_RECEIPT_TEMPLATE_ID = 'classic-roast-beef';
 const DEFAULT_RECEIPT_TEMPLATE_SETTINGS = Object.freeze({
@@ -184,9 +214,66 @@ const DEFAULT_RECEIPT_TEMPLATE_SETTINGS = Object.freeze({
   extraMessageOffsetX: 0,
   extraMessageOffsetY: 0
 });
+const SUPABASE_READ_COOLDOWN_MS = 2 * 60 * 1000;
+let supabaseReadCircuitUntil = 0;
+let lastSupabaseReadFailureLog = '';
+
+function sanitizeSupabaseErrorMessage(error) {
+  const raw = String(error?.message || error || '').trim();
+  if (!raw) return 'Unknown Supabase error';
+  if (/<html[\s>]/i.test(raw) || /<!DOCTYPE html>/i.test(raw)) {
+    if (/502/i.test(raw) || /bad gateway/i.test(raw)) return 'Supabase gateway returned HTTP 502 Bad Gateway';
+    if (/503/i.test(raw) || /service unavailable/i.test(raw)) return 'Supabase gateway returned HTTP 503 Service Unavailable';
+    if (/504/i.test(raw) || /gateway timeout/i.test(raw)) return 'Supabase gateway returned HTTP 504 Gateway Timeout';
+    return 'Supabase returned an HTML error page instead of JSON';
+  }
+  return raw.replace(/\s+/g, ' ').slice(0, 240);
+}
+
+function canAttemptSupabaseRead() {
+  return isSupabaseEnabled() && Date.now() >= supabaseReadCircuitUntil;
+}
+
+function markSupabaseReadHealthy() {
+  supabaseReadCircuitUntil = 0;
+  lastSupabaseReadFailureLog = '';
+}
+
+function markSupabaseReadFailure(context, error) {
+  const message = sanitizeSupabaseErrorMessage(error);
+  supabaseReadCircuitUntil = Date.now() + SUPABASE_READ_COOLDOWN_MS;
+  const nextLogLine = `${context}:${message}`;
+  if (lastSupabaseReadFailureLog !== nextLogLine) {
+    console.warn(`[Offline] ${context} Supabase failed, using in-memory for ${Math.round(SUPABASE_READ_COOLDOWN_MS / 1000)}s: ${message}`);
+    lastSupabaseReadFailureLog = nextLogLine;
+  }
+}
+
+function isMissingSupabaseTableError(error, tableName) {
+  const message = sanitizeSupabaseErrorMessage(error).toLowerCase();
+  const safeTableName = String(tableName || '').trim().toLowerCase();
+  if (!safeTableName) return false;
+  return (
+    message.includes(`public.${safeTableName}`) &&
+    (message.includes('schema cache') || message.includes('could not find the table'))
+  ) || (
+    message.includes(safeTableName) &&
+    (message.includes('does not exist') || message.includes('42p01'))
+  );
+}
+
 let appConfigMemory = { ...DEFAULT_APP_CONFIG };
 let getAppConfigStmt = null;
 let upsertAppConfigStmt = null;
+let appConfigLoadedFromLocal = false;
+let appConfigSyncPromise = null;
+let appConfigLastSyncedAt = 0;
+let appConfigSupabaseTableMissing = false;
+let appConfigSupabaseMissingLogged = false;
+let discountProfilesSyncPromise = null;
+let discountProfilesLastSyncedAt = 0;
+let discountProfilesSupabaseTableMissing = false;
+let discountProfilesSupabaseMissingLogged = false;
 const receiptTemplates = new Map();
 let listReceiptTemplatesStmt = null;
 let getReceiptTemplateStmt = null;
@@ -195,6 +282,29 @@ let activateReceiptTemplateStmt = null;
 let deleteReceiptTemplateStmt = null;
 let nextOrderSlipSequence = null;
 let initOrderSlipSequencePromise = null;
+let expenseFallbackLoaded = false;
+let monthlyClosingSnapshotsFallbackLoaded = false;
+let monthlyClosingSnapshotsSupabaseUnavailable = false;
+let monthlyClosingSnapshotsSupabaseFallbackLogged = false;
+
+function readJsonFallbackFile(filePath, fallbackValue) {
+  try {
+    if (!fs.existsSync(filePath)) return fallbackValue;
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
+    if (!raw) return fallbackValue;
+    return JSON.parse(raw);
+  } catch (_error) {
+    return fallbackValue;
+  }
+}
+
+function writeJsonFallbackFile(filePath, value, errorLabel) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
+  } catch (error) {
+    console.warn(`${errorLabel}: ${error.message}`);
+  }
+}
 
 if (db) {
   getAppConfigStmt = db.prepare(`
@@ -343,7 +453,7 @@ function inferDiscountProfileFromTotals({ subtotal = 0, total = 0, discount = nu
     return null;
   }
 
-  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const profiles = getCachedDiscountProfiles();
   let bestMatch = null;
 
   profiles.forEach((profile) => {
@@ -385,6 +495,53 @@ function normalizeDiscountProfiles(profiles = []) {
   }, []);
 }
 
+function getCachedDiscountProfiles() {
+  return normalizeDiscountProfiles(appConfigMemory?.discountProfiles);
+}
+
+function persistDiscountProfilesLocally(profiles = []) {
+  const nextProfiles = normalizeDiscountProfiles(profiles);
+  persistAppConfigLocally({
+    ...appConfigMemory,
+    discountProfiles: nextProfiles
+  });
+  return nextProfiles;
+}
+
+function toAppDiscountProfile(row = {}, index = 0) {
+  return normalizeDiscountProfile({
+    id: row?.id,
+    name: row?.name,
+    type: row?.type,
+    amount: row?.amount
+  }, index);
+}
+
+function buildDiscountProfileSupabasePayload(profile = {}, createdAt = null) {
+  const normalized = normalizeDiscountProfile(profile);
+  const now = new Date().toISOString();
+  return {
+    id: normalized.id,
+    name: normalized.name,
+    type: normalized.type,
+    amount: normalized.amount,
+    created_at: createdAt || now,
+    updated_at: now
+  };
+}
+
+function markDiscountProfilesTableMissing() {
+  discountProfilesSupabaseTableMissing = true;
+  if (!discountProfilesSupabaseMissingLogged) {
+    console.warn('[DiscountProfiles] Supabase discount_profiles table is missing. Falling back to local discount storage.');
+    discountProfilesSupabaseMissingLogged = true;
+  }
+}
+
+function getDiscountProfilesTableMissingMessage() {
+  return 'Supabase discount_profiles table is missing. Apply the latest Supabase migration to store discount types in Supabase.';
+}
+
 function normalizeRoleAccessEntries(entries = [], fallback = []) {
   const source = Array.isArray(entries) ? entries : fallback;
   const seenKeys = new Set();
@@ -397,13 +554,65 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
   }, []);
 }
 
+function ensureRequiredRoleAccessEntries(entries = [], requiredEntries = []) {
+  const rows = Array.isArray(entries) ? [...entries] : [];
+  requiredEntries.forEach((entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (ROLE_ACCESS_KEYS.includes(key) && !rows.includes(key)) {
+      rows.push(key);
+    }
+  });
+  return rows;
+}
+
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
-  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
-  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
+  const encharge = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    ['shift_session_access', 'shift_monitor_access']
+  );
+  const supervisor = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor),
+    ['shift_session_access', 'shift_monitor_access']
+  );
   return {
     encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
     supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
+  };
+}
+
+function normalizeEPaymentDisabledReason(reason) {
+  return String(reason || '').trim().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+function normalizeEPaymentImageUrl(value, fallback = '') {
+  const imageUrl = String(value || fallback || '').trim();
+  if (!imageUrl) return '';
+  if (imageUrl.length > 3_000_000) return '';
+  if (/^data:image\//i.test(imageUrl)) return imageUrl;
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  if (imageUrl.startsWith('/')) return imageUrl;
+  return '';
+}
+
+function normalizeEPaymentMethodConfig(entry = {}, fallback = DEFAULT_EPAYMENT_SETTINGS.gcash) {
+  const enabled = entry?.enabled !== false;
+  const disabledReason = enabled
+    ? ''
+    : normalizeEPaymentDisabledReason(entry?.disabledReason || entry?.reason || fallback?.disabledReason || '');
+  return {
+    enabled,
+    disabledReason,
+    qrImageUrl: normalizeEPaymentImageUrl(entry?.qrImageUrl || entry?.imageUrl || fallback?.qrImageUrl || '')
+  };
+}
+
+function normalizeEPaymentSettings(settings = {}) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return {
+    gcash: normalizeEPaymentMethodConfig(source?.gcash, DEFAULT_EPAYMENT_SETTINGS.gcash),
+    paymaya: normalizeEPaymentMethodConfig(source?.paymaya || source?.maya, DEFAULT_EPAYMENT_SETTINGS.paymaya),
+    scanQr: normalizeEPaymentMethodConfig(source?.scanQr || source?.scanqr || source?.qr, DEFAULT_EPAYMENT_SETTINGS.scanQr)
   };
 }
 
@@ -411,8 +620,24 @@ function normalizeAppConfig(config = {}) {
   return {
     enforceKitSpec: config?.enforceKitSpec !== false,
     discountProfiles: normalizeDiscountProfiles(config?.discountProfiles),
-    roleAccess: normalizeRoleAccessConfig(config?.roleAccess)
+    roleAccess: normalizeRoleAccessConfig(config?.roleAccess),
+    ePaymentSettings: normalizeEPaymentSettings(config?.ePaymentSettings),
+    receiptWorkflow: {
+      autoOpenAfterPayment: config?.receiptWorkflow?.autoOpenAfterPayment === true
+    }
   };
+}
+
+function readAppConfigFallback() {
+  return normalizeAppConfig(readJsonFallbackFile(APP_CONFIG_FALLBACK_FILE, DEFAULT_APP_CONFIG));
+}
+
+function writeAppConfigFallback(config = {}) {
+  writeJsonFallbackFile(
+    APP_CONFIG_FALLBACK_FILE,
+    normalizeAppConfig(config),
+    '[Store] Failed to persist app config fallback'
+  );
 }
 
 function clampNumber(value, min, max, fallback) {
@@ -544,19 +769,169 @@ function toAppReceiptTemplate(row) {
   });
 }
 
-function getAppConfig() {
+function parseStoredAppConfigValue(rawValue) {
+  if (!rawValue) return null;
+  let value = rawValue;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch (_error) {
+      return null;
+    }
+  }
+  return value && typeof value === 'object' ? value : null;
+}
+
+function persistAppConfigLocally(config = {}) {
+  const nextConfig = normalizeAppConfig(config);
+  appConfigMemory = { ...nextConfig };
+  appConfigLoadedFromLocal = true;
+
+  if (upsertAppConfigStmt) {
+    try {
+      upsertAppConfigStmt.run({
+        key: APP_CONFIG_KEY,
+        valueJson: JSON.stringify(nextConfig),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.warn('[Store] Failed to persist app config to SQLite:', error.message);
+    }
+  } else {
+    writeAppConfigFallback(nextConfig);
+  }
+
+  return { ...nextConfig };
+}
+
+function loadAppConfigFromLocalCache() {
   if (getAppConfigStmt) {
     try {
       const row = getAppConfigStmt.get(APP_CONFIG_KEY);
       if (row?.value_json) {
-        appConfigMemory = normalizeAppConfig(JSON.parse(row.value_json));
+        const parsedValue = parseStoredAppConfigValue(row.value_json);
+        if (parsedValue) {
+          appConfigMemory = normalizeAppConfig(parsedValue);
+        }
       }
     } catch (error) {
       console.warn('[Store] Failed to read app config from SQLite:', error.message);
     }
+  } else {
+    appConfigMemory = readAppConfigFallback();
   }
 
+  appConfigLoadedFromLocal = true;
   return { ...appConfigMemory };
+}
+
+async function writeAppConfigToSupabase(config = {}) {
+  if (!isSupabaseEnabled() || !supabase || appConfigSupabaseTableMissing) {
+    return false;
+  }
+
+  const nextConfig = normalizeAppConfig(config);
+  const { error } = await supabase
+    .from(APP_SETTINGS_TABLE)
+    .upsert({
+      key: APP_CONFIG_KEY,
+      value_json: nextConfig,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'key'
+    });
+
+  if (error) {
+    if (isMissingSupabaseTableError(error, APP_SETTINGS_TABLE)) {
+      appConfigSupabaseTableMissing = true;
+      if (!appConfigSupabaseMissingLogged) {
+        console.warn('[AppConfig] Supabase app_settings table is missing. Falling back to local app config storage.');
+        appConfigSupabaseMissingLogged = true;
+      }
+      return false;
+    }
+    throw error;
+  }
+
+  markSupabaseReadHealthy();
+  appConfigLastSyncedAt = Date.now();
+  return true;
+}
+
+async function ensureAppConfigLoaded({ force = false } = {}) {
+  if (!appConfigLoadedFromLocal) {
+    loadAppConfigFromLocalCache();
+  }
+
+  if (!isSupabaseEnabled() || !supabase || appConfigSupabaseTableMissing) {
+    return { ...appConfigMemory };
+  }
+
+  if (!force && appConfigLastSyncedAt && (Date.now() - appConfigLastSyncedAt) < APP_CONFIG_SYNC_TTL_MS) {
+    return { ...appConfigMemory };
+  }
+
+  if (appConfigSyncPromise) {
+    return appConfigSyncPromise;
+  }
+
+  appConfigSyncPromise = (async () => {
+    if (!canAttemptSupabaseRead()) {
+      return { ...appConfigMemory };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(APP_SETTINGS_TABLE)
+        .select('value_json,updated_at')
+        .eq('key', APP_CONFIG_KEY)
+        .maybeSingle();
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.value_json) {
+        await writeAppConfigToSupabase(appConfigMemory);
+        return { ...appConfigMemory };
+      }
+
+      const parsedValue = parseStoredAppConfigValue(data.value_json) || DEFAULT_APP_CONFIG;
+      const nextConfig = normalizeAppConfig(parsedValue);
+      persistAppConfigLocally(nextConfig);
+      markSupabaseReadHealthy();
+      appConfigLastSyncedAt = Date.now();
+      return { ...nextConfig };
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, APP_SETTINGS_TABLE)) {
+        appConfigSupabaseTableMissing = true;
+        if (!appConfigSupabaseMissingLogged) {
+          console.warn('[AppConfig] Supabase app_settings table is missing. Falling back to local app config storage.');
+          appConfigSupabaseMissingLogged = true;
+        }
+        return { ...appConfigMemory };
+      }
+      markSupabaseReadFailure('app config sync', error);
+      return { ...appConfigMemory };
+    } finally {
+      appConfigSyncPromise = null;
+    }
+  })();
+
+  return appConfigSyncPromise;
+}
+
+function buildAppConfigSnapshot(config = appConfigMemory, discountProfiles = getCachedDiscountProfiles()) {
+  return normalizeAppConfig({
+    ...(config && typeof config === 'object' ? config : {}),
+    discountProfiles
+  });
+}
+
+function getAppConfig() {
+  if (!appConfigLoadedFromLocal) {
+    loadAppConfigFromLocalCache();
+  }
+  return buildAppConfigSnapshot(appConfigMemory);
 }
 
 function validateDiscountProfileInput({ name, type, amount } = {}) {
@@ -581,26 +956,171 @@ function validateDiscountProfileInput({ name, type, amount } = {}) {
   };
 }
 
-async function updateAppConfig(patch = {}) {
-  const nextConfig = normalizeAppConfig({
-    ...getAppConfig(),
-    ...(patch && typeof patch === 'object' ? patch : {})
-  });
+async function seedDiscountProfilesInSupabase(profiles = getCachedDiscountProfiles()) {
+  const seedProfiles = normalizeDiscountProfiles(profiles);
+  const payload = seedProfiles.map((profile) => buildDiscountProfileSupabasePayload(profile));
+  if (payload.length) {
+    const { error } = await supabase
+      .from(DISCOUNT_PROFILES_TABLE)
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      throw error;
+    }
+  }
+  persistDiscountProfilesLocally(seedProfiles);
+  markSupabaseReadHealthy();
+  discountProfilesLastSyncedAt = Date.now();
+  return seedProfiles;
+}
 
-  appConfigMemory = { ...nextConfig };
-  if (upsertAppConfigStmt) {
+async function ensureDiscountProfilesLoaded({ force = false } = {}) {
+  if (!appConfigLoadedFromLocal) {
+    loadAppConfigFromLocalCache();
+  }
+
+  if (!isSupabaseEnabled() || !supabase || discountProfilesSupabaseTableMissing) {
+    return getCachedDiscountProfiles();
+  }
+
+  if (!force && discountProfilesLastSyncedAt && (Date.now() - discountProfilesLastSyncedAt) < DISCOUNT_PROFILE_SYNC_TTL_MS) {
+    return getCachedDiscountProfiles();
+  }
+
+  if (discountProfilesSyncPromise) {
+    return discountProfilesSyncPromise;
+  }
+
+  discountProfilesSyncPromise = (async () => {
+    if (!canAttemptSupabaseRead()) {
+      return getCachedDiscountProfiles();
+    }
+
     try {
-      upsertAppConfigStmt.run({
-        key: APP_CONFIG_KEY,
-        valueJson: JSON.stringify(nextConfig),
-        updatedAt: new Date().toISOString()
-      });
+      const { data, error } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .select('id,name,type,amount,created_at,updated_at')
+        .order('created_at', { ascending: true })
+        .order('name', { ascending: true });
+      if (error) {
+        throw error;
+      }
+
+      if (!Array.isArray(data) || !data.length) {
+        return seedDiscountProfilesInSupabase(getCachedDiscountProfiles());
+      }
+
+      const profiles = normalizeDiscountProfiles((data || []).map((row, index) => toAppDiscountProfile(row, index)));
+      persistDiscountProfilesLocally(profiles);
+      markSupabaseReadHealthy();
+      discountProfilesLastSyncedAt = Date.now();
+      return profiles;
     } catch (error) {
-      console.warn('[Store] Failed to persist app config to SQLite:', error.message);
+      if (isMissingSupabaseTableError(error, DISCOUNT_PROFILES_TABLE)) {
+        markDiscountProfilesTableMissing();
+        return getCachedDiscountProfiles();
+      }
+      markSupabaseReadFailure('discount profiles sync', error);
+      return getCachedDiscountProfiles();
+    } finally {
+      discountProfilesSyncPromise = null;
+    }
+  })();
+
+  return discountProfilesSyncPromise;
+}
+
+async function replaceDiscountProfiles(profiles = []) {
+  const nextProfiles = normalizeDiscountProfiles(profiles);
+
+  if (!isSupabaseEnabled() || !supabase) {
+    persistDiscountProfilesLocally(nextProfiles);
+    return nextProfiles;
+  }
+
+  if (discountProfilesSupabaseTableMissing) {
+    throw new Error(getDiscountProfilesTableMissingMessage());
+  }
+
+  try {
+    const { data: existingRows, error: existingError } = await supabase
+      .from(DISCOUNT_PROFILES_TABLE)
+      .select('id');
+    if (existingError) {
+      throw existingError;
+    }
+
+    const payload = nextProfiles.map((profile) => buildDiscountProfileSupabasePayload(profile));
+    if (payload.length) {
+      const { error: upsertError } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .upsert(payload, { onConflict: 'id' });
+      if (upsertError) {
+        throw upsertError;
+      }
+    }
+
+    const existingIds = new Set((existingRows || []).map((row) => String(row?.id || '').trim()).filter(Boolean));
+    const nextIds = new Set(nextProfiles.map((profile) => profile.id));
+    const idsToDelete = Array.from(existingIds).filter((id) => !nextIds.has(id));
+    if (idsToDelete.length) {
+      const { error: deleteError } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .delete()
+        .in('id', idsToDelete);
+      if (deleteError) {
+        throw deleteError;
+      }
+    }
+
+    persistDiscountProfilesLocally(nextProfiles);
+    markSupabaseReadHealthy();
+    discountProfilesLastSyncedAt = Date.now();
+    return nextProfiles;
+  } catch (error) {
+    if (isMissingSupabaseTableError(error, DISCOUNT_PROFILES_TABLE)) {
+      markDiscountProfilesTableMissing();
+      throw new Error(getDiscountProfilesTableMissingMessage());
+    }
+    throw error;
+  }
+}
+
+async function updateAppConfig(patch = {}, { ensureFresh = true } = {}) {
+  if (ensureFresh) {
+    await ensureAppConfigLoaded({ force: true });
+  }
+
+  const safePatch = patch && typeof patch === 'object' ? { ...patch } : {};
+  const requestedDiscountProfiles = safePatch.discountProfiles !== undefined
+    ? normalizeDiscountProfiles(safePatch.discountProfiles)
+    : null;
+  delete safePatch.discountProfiles;
+
+  const activeDiscountProfiles = requestedDiscountProfiles || await ensureDiscountProfilesLoaded({ force: ensureFresh });
+  const nextConfig = buildAppConfigSnapshot({
+    ...appConfigMemory,
+    ...safePatch
+  }, activeDiscountProfiles);
+
+  persistAppConfigLocally(nextConfig);
+
+  if (isSupabaseEnabled() && !appConfigSupabaseTableMissing) {
+    try {
+      await writeAppConfigToSupabase(nextConfig);
+    } catch (error) {
+      throw new Error(`Supabase app config update failed: ${sanitizeSupabaseErrorMessage(error)}`);
     }
   }
 
-  return { ...nextConfig };
+  if (requestedDiscountProfiles) {
+    try {
+      await replaceDiscountProfiles(requestedDiscountProfiles);
+    } catch (error) {
+      throw new Error(`Supabase discount profile update failed: ${sanitizeSupabaseErrorMessage(error)}`);
+    }
+  }
+
+  return getAppConfig();
 }
 
 function buildDiscountProfileUsageMap(rows = []) {
@@ -637,7 +1157,7 @@ function buildDiscountProfileUsageMap(rows = []) {
 }
 
 async function getDiscountProfileUsageMap() {
-  if (isSupabaseEnabled()) {
+  if (canAttemptSupabaseRead()) {
     try {
       const { data, error } = await supabase
         .from('pos_invoices')
@@ -655,7 +1175,7 @@ async function getDiscountProfileUsageMap() {
 }
 
 async function listDiscountManagerProfiles() {
-  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  const profiles = await ensureDiscountProfilesLoaded();
   const usageById = await getDiscountProfileUsageMap();
 
   return profiles.map((profile) => {
@@ -671,19 +1191,46 @@ async function listDiscountManagerProfiles() {
 }
 
 async function createDiscountProfile({ name, type, amount }) {
-  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  await ensureAppConfigLoaded({ force: true });
+  const profiles = await ensureDiscountProfilesLoaded({ force: true });
   const input = validateDiscountProfileInput({ name, type, amount });
   const profile = normalizeDiscountProfile({
     id: `${normalizeDiscountProfileId(input.name)}-${Date.now()}`,
     ...input
   }, profiles.length);
-  const appConfig = await updateAppConfig({
-    discountProfiles: [...profiles, profile]
-  });
+  let savedProfile = profile;
+
+  if (isSupabaseEnabled() && supabase && !discountProfilesSupabaseTableMissing) {
+    try {
+      const { data, error } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .insert(buildDiscountProfileSupabasePayload(profile))
+        .select('id,name,type,amount,created_at,updated_at')
+        .single();
+      if (error) {
+        throw error;
+      }
+      savedProfile = toAppDiscountProfile(data, profiles.length);
+      persistDiscountProfilesLocally([...profiles, savedProfile]);
+      markSupabaseReadHealthy();
+      discountProfilesLastSyncedAt = Date.now();
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, DISCOUNT_PROFILES_TABLE)) {
+        markDiscountProfilesTableMissing();
+        throw new Error(getDiscountProfilesTableMissingMessage());
+      } else {
+        throw new Error(`Supabase discount profile create failed: ${sanitizeSupabaseErrorMessage(error)}`);
+      }
+    }
+  } else if (isSupabaseEnabled() && discountProfilesSupabaseTableMissing) {
+    throw new Error(getDiscountProfilesTableMissingMessage());
+  } else {
+    persistDiscountProfilesLocally([...profiles, profile]);
+  }
 
   return {
-    profile,
-    appConfig
+    profile: savedProfile,
+    appConfig: getAppConfig()
   };
 }
 
@@ -693,7 +1240,8 @@ async function updateDiscountProfile(profileId, { name, type, amount }) {
     throw new Error('Discount profile id is required.');
   }
 
-  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  await ensureAppConfigLoaded({ force: true });
+  const profiles = await ensureDiscountProfilesLoaded({ force: true });
   const existing = profiles.find((profile) => profile.id === safeProfileId);
   if (!existing) {
     throw new Error('Discount profile not found.');
@@ -704,13 +1252,45 @@ async function updateDiscountProfile(profileId, { name, type, amount }) {
     ...existing,
     ...input
   });
-  const appConfig = await updateAppConfig({
-    discountProfiles: profiles.map((row) => (row.id === safeProfileId ? profile : row))
-  });
+  let savedProfile = profile;
+
+  if (isSupabaseEnabled() && supabase && !discountProfilesSupabaseTableMissing) {
+    try {
+      const { data, error } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .update({
+          name: profile.name,
+          type: profile.type,
+          amount: profile.amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', safeProfileId)
+        .select('id,name,type,amount,created_at,updated_at')
+        .single();
+      if (error) {
+        throw error;
+      }
+      savedProfile = toAppDiscountProfile(data, profiles.findIndex((row) => row.id === safeProfileId));
+      persistDiscountProfilesLocally(profiles.map((row) => (row.id === safeProfileId ? savedProfile : row)));
+      markSupabaseReadHealthy();
+      discountProfilesLastSyncedAt = Date.now();
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, DISCOUNT_PROFILES_TABLE)) {
+        markDiscountProfilesTableMissing();
+        throw new Error(getDiscountProfilesTableMissingMessage());
+      } else {
+        throw new Error(`Supabase discount profile update failed: ${sanitizeSupabaseErrorMessage(error)}`);
+      }
+    }
+  } else if (isSupabaseEnabled() && discountProfilesSupabaseTableMissing) {
+    throw new Error(getDiscountProfilesTableMissingMessage());
+  } else {
+    persistDiscountProfilesLocally(profiles.map((row) => (row.id === safeProfileId ? profile : row)));
+  }
 
   return {
-    profile,
-    appConfig
+    profile: savedProfile,
+    appConfig: getAppConfig()
   };
 }
 
@@ -720,7 +1300,8 @@ async function deleteDiscountProfile(profileId) {
     throw new Error('Discount profile id is required.');
   }
 
-  const profiles = normalizeDiscountProfiles(getAppConfig().discountProfiles);
+  await ensureAppConfigLoaded({ force: true });
+  const profiles = await ensureDiscountProfilesLoaded({ force: true });
   const existing = profiles.find((profile) => profile.id === safeProfileId);
   if (!existing) {
     throw new Error('Discount profile not found.');
@@ -732,13 +1313,34 @@ async function deleteDiscountProfile(profileId) {
     throw new Error('This discount type cannot be deleted because it is already used in transaction history.');
   }
 
-  const appConfig = await updateAppConfig({
-    discountProfiles: profiles.filter((profile) => profile.id !== safeProfileId)
-  });
+  if (isSupabaseEnabled() && supabase && !discountProfilesSupabaseTableMissing) {
+    try {
+      const { error } = await supabase
+        .from(DISCOUNT_PROFILES_TABLE)
+        .delete()
+        .eq('id', safeProfileId);
+      if (error) {
+        throw error;
+      }
+      markSupabaseReadHealthy();
+      discountProfilesLastSyncedAt = Date.now();
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, DISCOUNT_PROFILES_TABLE)) {
+        markDiscountProfilesTableMissing();
+        throw new Error(getDiscountProfilesTableMissingMessage());
+      } else {
+        throw new Error(`Supabase discount profile delete failed: ${sanitizeSupabaseErrorMessage(error)}`);
+      }
+    }
+  } else if (isSupabaseEnabled() && discountProfilesSupabaseTableMissing) {
+    throw new Error(getDiscountProfilesTableMissingMessage());
+  }
+
+  persistDiscountProfilesLocally(profiles.filter((profile) => profile.id !== safeProfileId));
 
   return {
     profile: existing,
-    appConfig
+    appConfig: getAppConfig()
   };
 }
 
@@ -1985,6 +2587,129 @@ function buildProductAvailabilityMap(products = [], ingredients = [], recipes = 
   return availabilityByProductId;
 }
 
+function normalizeInvoiceOrderType(orderType = null) {
+  const normalized = String(orderType || '').trim().toLowerCase();
+  if (normalized === 'dine-in' || normalized === 'take-out') return normalized;
+  return null;
+}
+
+async function buildInvoiceLineItemsAndTotals({
+  items,
+  discountAmount = 0,
+  discountProfile = null
+}) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('Invoice must contain at least one item');
+  }
+
+  const appConfig = getAppConfig();
+  const [productCatalog, ingredients, recipes] = await Promise.all([
+    listProducts(),
+    listInventoryIngredients(),
+    listProductRecipes()
+  ]);
+  const availabilityByProductId = buildProductAvailabilityMap(productCatalog, ingredients, recipes, {
+    enforceKitSpec: appConfig.enforceKitSpec
+  });
+
+  const lineItems = items.map((item) => {
+    const product = productCatalog.find((row) => row.id === item.productId);
+    if (!product) {
+      throw new Error(`Unknown product: ${item.productId}`);
+    }
+    const qty = Number(item.qty || 0);
+    if (qty <= 0) {
+      throw new Error(`Invalid qty for product: ${item.productId}`);
+    }
+    const availability = availabilityByProductId.get(String(product.id || '').trim());
+    if (!availability?.isAvailable) {
+      throw new Error(availability?.reason || `${product.name} is not available for ordering right now.`);
+    }
+    if (appConfig.enforceKitSpec && qty > Number(availability.availableUnits || 0)) {
+      throw new Error(`${product.name} only has ${Number(availability.availableUnits || 0)} serving(s) available based on current ingredient stock.`);
+    }
+    return {
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      qty,
+      subtotal: product.price * qty
+    };
+  });
+
+  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const requestedDiscount = Number(discountAmount || 0);
+  const discount = Number.isFinite(requestedDiscount) && requestedDiscount > 0
+    ? Math.min(requestedDiscount, subtotal)
+    : 0;
+  const total = Math.max(0, subtotal - discount);
+
+  return {
+    lineItems,
+    subtotal,
+    discount,
+    total,
+    discountProfile: normalizeInvoiceDiscountProfile(discountProfile)
+  };
+}
+
+function buildInvoiceAdjustmentSnapshot(invoice = null) {
+  if (!invoice) return null;
+  return {
+    id: invoice.id,
+    reference: invoice.reference,
+    status: normalizeInvoiceStatus(invoice.status),
+    orderType: invoice.orderType || null,
+    paymentMethod: invoice.paymentMethod || null,
+    subtotal: Number(invoice.subtotal ?? invoice.total ?? 0),
+    discount: Number(invoice.discount || 0),
+    discountProfile: normalizeInvoiceDiscountProfile(invoice.discountProfile),
+    total: Number(invoice.total || 0),
+    lineItems: Array.isArray(invoice.lineItems)
+      ? invoice.lineItems.map((item) => ({
+        lineId: item.lineId || null,
+        productId: item.productId,
+        name: item.name,
+        price: Number(item.price || 0),
+        qty: Number(item.qty || 0),
+        subtotal: Number(item.subtotal || 0)
+      }))
+      : [],
+    payment: invoice.payment ? {
+      method: invoice.payment.method,
+      provider: invoice.payment.provider || null,
+      providerReference: invoice.payment.providerReference || null,
+      recipientGcashNumber: invoice.payment.recipientGcashNumber || null,
+      paidAt: invoice.payment.paidAt || null,
+      amountPaid: Number(invoice.payment.amountPaid || 0),
+      change: Number(invoice.payment.change || 0),
+      success: Boolean(invoice.payment.success),
+      successMessage: invoice.payment.successMessage || null,
+      customerName: invoice.payment.customerName || null,
+      customerEmail: invoice.payment.customerEmail || null,
+      customerPhone: invoice.payment.customerPhone || null
+    } : null
+  };
+}
+
+function toDbPayment(invoiceId, paymentData = {}) {
+  return {
+    invoice_id: invoiceId,
+    method: paymentData.method,
+    provider: paymentData.provider || null,
+    provider_reference: paymentData.providerReference || null,
+    recipient_gcash_number: paymentData.recipientGcashNumber || null,
+    paid_at: paymentData.paidAt,
+    amount_paid: Number(paymentData.amountPaid || 0),
+    change_amount: Number(paymentData.change || 0),
+    success: Boolean(paymentData.success),
+    success_message: paymentData.successMessage || null,
+    customer_name: paymentData.customerName || null,
+    customer_email: paymentData.customerEmail || null,
+    customer_phone: paymentData.customerPhone || null
+  };
+}
+
 async function createInvoice({
   items,
   paymentMethod,
@@ -1998,53 +2723,18 @@ async function createInvoice({
   cashierName = null,
   cashierRole = null
 }) {
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new Error('Invoice must contain at least one item');
-  }
-
-  const appConfig = getAppConfig();
-
-  const [productCatalog, ingredients, recipes] = await Promise.all([
-    listProducts(),
-    listInventoryIngredients(),
-    listProductRecipes()
-  ]);
-  const availabilityByProductId = buildProductAvailabilityMap(productCatalog, ingredients, recipes, {
-    enforceKitSpec: appConfig.enforceKitSpec
+  const {
+    lineItems,
+    subtotal,
+    discount,
+    total,
+    discountProfile: normalizedDiscountProfile
+  } = await buildInvoiceLineItemsAndTotals({
+    items,
+    discountAmount,
+    discountProfile
   });
   const now = new Date().toISOString();
-  const lineItems = items
-    .map((item) => {
-      const product = productCatalog.find((p) => p.id === item.productId);
-      if (!product) {
-        throw new Error(`Unknown product: ${item.productId}`);
-      }
-      const qty = Number(item.qty || 0);
-      if (qty <= 0) {
-        throw new Error(`Invalid qty for product: ${item.productId}`);
-      }
-      const availability = availabilityByProductId.get(String(product.id || '').trim());
-      if (!availability?.isAvailable) {
-        throw new Error(availability?.reason || `${product.name} is not available for ordering right now.`);
-      }
-      if (appConfig.enforceKitSpec && qty > Number(availability.availableUnits || 0)) {
-        throw new Error(`${product.name} only has ${Number(availability.availableUnits || 0)} serving(s) available based on current ingredient stock.`);
-      }
-      return {
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        qty,
-        subtotal: product.price * qty
-      };
-    });
-
-  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const requestedDiscount = Number(discountAmount || 0);
-  const discount = Number.isFinite(requestedDiscount) && requestedDiscount > 0
-    ? Math.min(requestedDiscount, subtotal)
-    : 0;
-  const total = Math.max(0, subtotal - discount);
   const providedInvoiceId = String(requestedInvoiceId || '').trim();
   const invoiceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(providedInvoiceId)
     ? providedInvoiceId
@@ -2060,7 +2750,7 @@ async function createInvoice({
     statusChangedAt: null,
     statusChangedByUserId: null,
     statusChangedByEmail: null,
-    orderType: orderType || null,
+    orderType: normalizeInvoiceOrderType(orderType),
     paymentMethod,
     cashierUserId: cashierUserId || null,
     cashierEmail: cashierEmail || null,
@@ -2068,7 +2758,7 @@ async function createInvoice({
     cashierRole: cashierRole || null,
     subtotal,
     discount,
-    discountProfile: normalizeInvoiceDiscountProfile(discountProfile),
+    discountProfile: normalizedDiscountProfile,
     total,
     lineItems: lineItems.map((item, index) => ({
       ...item,
@@ -2150,11 +2840,12 @@ async function setInvoicePaid(invoiceId, paymentData) {
   invoice.statusChangedAt = paymentData?.paidAt || new Date().toISOString();
   invoice.statusChangedByUserId = null;
   invoice.statusChangedByEmail = null;
+  invoice.paymentMethod = String(paymentData?.method || invoice.paymentMethod || '').trim() || invoice.paymentMethod;
   invoice.payment = paymentData;
   invoice.updatedAt = new Date().toISOString();
   invoices.set(invoiceId, invoice);
 
-  if (isSupabaseEnabled()) {
+  if (canAttemptSupabaseRead()) {
     try {
       await upsertInvoiceToSupabase(invoice);
 
@@ -2401,6 +3092,114 @@ function toAppExpense(row) {
   };
 }
 
+function toAppMonthlyClosingSnapshot(row) {
+  if (!row) return null;
+  let report = row.report_json ?? row.reportJson ?? row.report ?? null;
+  if (typeof report === 'string') {
+    try {
+      report = JSON.parse(report);
+    } catch (_error) {
+      report = null;
+    }
+  }
+
+  const rawMonth = String(row.month || report?.month || '').trim();
+  if (!rawMonth) return null;
+
+  let month = rawMonth;
+  try {
+    month = buildMonthRange(rawMonth).month;
+  } catch (_error) {
+    month = rawMonth;
+  }
+
+  return {
+    month,
+    report: report && typeof report === 'object' ? report : null,
+    savedByUserId: row.saved_by_user_id || row.savedByUserId || null,
+    savedByEmail: row.saved_by_email || row.savedByEmail || null,
+    savedByName: row.saved_by_name || row.savedByName || null,
+    savedAt: row.saved_at || row.savedAt || null,
+    updatedAt: row.updated_at || row.updatedAt || row.saved_at || row.savedAt || null
+  };
+}
+
+function hydrateExpenseFallbackEntries() {
+  if (db || expenseFallbackLoaded) return;
+  expenseFallbackLoaded = true;
+  expenseEntries.clear();
+
+  const rows = readJsonFallbackFile(EXPENSES_FALLBACK_FILE, []);
+  if (!Array.isArray(rows)) return;
+
+  rows.forEach((row) => {
+    const expense = toAppExpense(row);
+    if (expense?.id) {
+      expenseEntries.set(expense.id, expense);
+    }
+  });
+}
+
+function persistExpenseFallbackEntries() {
+  if (db) return;
+  writeJsonFallbackFile(
+    EXPENSES_FALLBACK_FILE,
+    Array.from(expenseEntries.values()),
+    '[Expenses] Failed to persist fallback expense entries'
+  );
+}
+
+function hydrateMonthlyClosingSnapshotsFallback() {
+  if (monthlyClosingSnapshotsFallbackLoaded) return;
+  monthlyClosingSnapshotsFallbackLoaded = true;
+  monthlyClosingSnapshots.clear();
+
+  const rows = readJsonFallbackFile(MONTHLY_CLOSING_SNAPSHOTS_FALLBACK_FILE, []);
+  if (!Array.isArray(rows)) return;
+
+  rows.forEach((row) => {
+    const snapshot = toAppMonthlyClosingSnapshot(row);
+    if (snapshot?.month) {
+      monthlyClosingSnapshots.set(snapshot.month, snapshot);
+    }
+  });
+}
+
+function persistMonthlyClosingSnapshotsFallback() {
+  const rows = Array.from(monthlyClosingSnapshots.values())
+    .sort((a, b) => String(b.month || '').localeCompare(String(a.month || '')));
+  writeJsonFallbackFile(
+    MONTHLY_CLOSING_SNAPSHOTS_FALLBACK_FILE,
+    rows,
+    '[MonthlyClosing] Failed to persist fallback monthly closing snapshots'
+  );
+}
+
+function canUseMonthlyClosingSnapshotsSupabase() {
+  return canAttemptSupabaseRead() && !monthlyClosingSnapshotsSupabaseUnavailable;
+}
+
+function markMonthlyClosingSnapshotsSupabaseUnavailable(error) {
+  monthlyClosingSnapshotsSupabaseUnavailable = true;
+  if (monthlyClosingSnapshotsSupabaseFallbackLogged) return;
+  monthlyClosingSnapshotsSupabaseFallbackLogged = true;
+  console.warn(`[MonthlyClosing] Snapshot table unavailable in Supabase. Using fallback storage for this runtime: ${sanitizeSupabaseErrorMessage(error)}`);
+}
+
+function hasMonthlyClosingReportData(report = null) {
+  const summary = report?.summary || {};
+  return Boolean(
+    Number(summary.totalSales || 0)
+    || Number(summary.totalExpenses || 0)
+    || Number(summary.totalTransactions || 0)
+    || Number(summary.drawerWithdrawals || 0)
+    || Number(summary.totalDiscrepancy || 0)
+    || (Array.isArray(report?.expenses) && report.expenses.length)
+    || (Array.isArray(report?.expenseByCategory) && report.expenseByCategory.length)
+    || (Array.isArray(report?.topProducts) && report.topProducts.length)
+  );
+}
+
 function summarizeSalesRows(rows) {
   const byMethod = {};
   let totalSales = 0;
@@ -2533,19 +3332,24 @@ async function listInventoryMovements({ ingredientId = null, referenceType = nul
   const ingredients = await listInventoryIngredients();
   const ingredientById = new Map(ingredients.map((row) => [row.id, row]));
 
-  if (isSupabaseEnabled()) {
-    let query = supabase
-      .from('inventory_movements')
-      .select('id,ingredient_id,movement_type,quantity,unit_cost,reference_type,reference_id,notes,created_at')
-      .order('created_at', { ascending: false });
-    if (safeIngredientId) query = query.eq('ingredient_id', safeIngredientId);
-    if (safeReferenceType) query = query.eq('reference_type', safeReferenceType);
-    if (safeMovementType) query = query.eq('movement_type', safeMovementType);
-    if (since) query = query.gte('created_at', since);
-    if (safeLimit) query = query.limit(safeLimit);
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase inventory movement list failed: ${error.message}`);
-    return (data || []).map((row) => toAppInventoryMovement(row, ingredientById));
+  if (canAttemptSupabaseRead()) {
+    try {
+      let query = supabase
+        .from('inventory_movements')
+        .select('id,ingredient_id,movement_type,quantity,unit_cost,reference_type,reference_id,notes,created_at')
+        .order('created_at', { ascending: false });
+      if (safeIngredientId) query = query.eq('ingredient_id', safeIngredientId);
+      if (safeReferenceType) query = query.eq('reference_type', safeReferenceType);
+      if (safeMovementType) query = query.eq('movement_type', safeMovementType);
+      if (since) query = query.gte('created_at', since);
+      if (safeLimit) query = query.limit(safeLimit);
+      const { data, error } = await query;
+      if (error) throw new Error(`Supabase inventory movement list failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || []).map((row) => toAppInventoryMovement(row, ingredientById));
+    } catch (error) {
+      markSupabaseReadFailure('listInventoryMovements', error);
+    }
   }
 
   let rows = Array.from(inventoryMovements.values()).map((row) => toAppInventoryMovement(row, ingredientById));
@@ -2692,14 +3496,19 @@ function buildInventoryMonitorPayload({ ingredients = [], movements = [] }) {
 }
 
 async function listInventoryIngredients() {
-  if (isSupabaseEnabled()) {
-    const { data, error } = await supabase
-      .from('inventory_ingredients')
-      .select('id,name,qty_on_hand,unit_price,reorder_level,unit,is_active,created_at,updated_at')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
-    if (error) throw new Error(`Supabase inventory ingredients fetch failed: ${error.message}`);
-    return (data || []).map((row) => toAppInventoryIngredient(row));
+  if (canAttemptSupabaseRead()) {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_ingredients')
+        .select('id,name,qty_on_hand,unit_price,reorder_level,unit,is_active,created_at,updated_at')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (error) throw new Error(`Supabase inventory ingredients fetch failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || []).map((row) => toAppInventoryIngredient(row));
+    } catch (error) {
+      markSupabaseReadFailure('listInventoryIngredients', error);
+    }
   }
 
   return Array.from(inventoryIngredients.values())
@@ -3096,6 +3905,304 @@ async function reverseInventoryUsageForVoidedInvoice(invoice) {
   return restored;
 }
 
+async function buildIngredientUsageMapForInvoiceLineItems(lineItems = []) {
+  const recipes = await listProductRecipes();
+  const recipesByProductId = new Map();
+  recipes.forEach((recipe) => {
+    const key = String(recipe.productId || '').trim();
+    if (!key) return;
+    if (!recipesByProductId.has(key)) recipesByProductId.set(key, []);
+    recipesByProductId.get(key).push(recipe);
+  });
+
+  const usageByIngredientId = new Map();
+  (lineItems || []).forEach((item) => {
+    const productId = String(item?.productId || '').trim();
+    const qtySold = Number(item?.qty || 0);
+    if (!productId || !Number.isFinite(qtySold) || qtySold <= 0) return;
+    const productRecipes = recipesByProductId.get(productId) || [];
+    productRecipes.forEach((recipe) => {
+      const usageQty = qtySold * Number(recipe.qtyPerProduct || 0);
+      if (!usageByIngredientId.has(recipe.ingredientId)) {
+        usageByIngredientId.set(recipe.ingredientId, {
+          ingredientId: recipe.ingredientId,
+          ingredientName: recipe.ingredientName || 'Ingredient',
+          ingredientUnit: recipe.ingredientUnit || 'pcs',
+          quantity: 0
+        });
+      }
+      const bucket = usageByIngredientId.get(recipe.ingredientId);
+      bucket.quantity += usageQty;
+    });
+  });
+
+  return usageByIngredientId;
+}
+
+async function applyInventoryAdjustmentForEditedPaidInvoice(previousInvoice, nextInvoice, reason = '') {
+  const safeInvoiceId = String(nextInvoice?.id || '').trim();
+  if (!safeInvoiceId) return [];
+
+  const appConfig = getAppConfig();
+  if (!appConfig.enforceKitSpec) {
+    return [];
+  }
+
+  const [previousUsage, nextUsage, ingredients] = await Promise.all([
+    buildIngredientUsageMapForInvoiceLineItems(previousInvoice?.lineItems || []),
+    buildIngredientUsageMapForInvoiceLineItems(nextInvoice?.lineItems || []),
+    listInventoryIngredients()
+  ]);
+  const ingredientById = new Map((ingredients || []).map((row) => [row.id, row]));
+  const ingredientIds = new Set([
+    ...Array.from(previousUsage.keys()),
+    ...Array.from(nextUsage.keys())
+  ]);
+  const note = `Paid invoice edit ${nextInvoice?.reference || safeInvoiceId}: ${String(reason || 'Items updated').trim() || 'Items updated'}`;
+  const applied = [];
+
+  if (isSupabaseEnabled()) {
+    const movementRows = [];
+    for (const ingredientId of ingredientIds) {
+      const previousQty = Number(previousUsage.get(ingredientId)?.quantity || 0);
+      const nextQty = Number(nextUsage.get(ingredientId)?.quantity || 0);
+      const delta = nextQty - previousQty;
+      if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) continue;
+
+      const ingredient = ingredientById.get(ingredientId);
+      if (!ingredient) continue;
+      const nextQtyOnHand = Number(ingredient.qtyOnHand || 0) - delta;
+      const { error: updateError } = await supabase
+        .from('inventory_ingredients')
+        .update({ qty_on_hand: nextQtyOnHand })
+        .eq('id', ingredientId);
+      if (updateError) throw new Error(`Supabase inventory edit adjustment failed: ${updateError.message}`);
+
+      movementRows.push({
+        id: uuidv4(),
+        ingredient_id: ingredientId,
+        movement_type: delta > 0 ? 'OUT' : 'IN',
+        quantity: Math.abs(delta),
+        unit_cost: Number(ingredient.unitPrice || 0),
+        reference_type: 'invoice_edit',
+        reference_id: safeInvoiceId,
+        notes: note
+      });
+      applied.push({
+        ingredientId,
+        ingredientName: ingredient.name,
+        ingredientUnit: ingredient.unit,
+        adjustedQty: Math.abs(delta),
+        movementType: delta > 0 ? 'OUT' : 'IN',
+        remainingQty: nextQtyOnHand
+      });
+    }
+
+    if (movementRows.length) {
+      const { error: movementError } = await supabase
+        .from('inventory_movements')
+        .insert(movementRows);
+      if (movementError) throw new Error(`Supabase inventory edit movement create failed: ${movementError.message}`);
+    }
+    return applied;
+  }
+
+  for (const ingredientId of ingredientIds) {
+    const previousQty = Number(previousUsage.get(ingredientId)?.quantity || 0);
+    const nextQty = Number(nextUsage.get(ingredientId)?.quantity || 0);
+    const delta = nextQty - previousQty;
+    if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) continue;
+
+    const ingredient = inventoryIngredients.get(ingredientId);
+    if (!ingredient) continue;
+    const nextQtyOnHand = Number(ingredient.qtyOnHand || 0) - delta;
+    const movementId = uuidv4();
+    const movementCreatedAt = new Date().toISOString();
+    inventoryIngredients.set(ingredientId, {
+      ...ingredient,
+      qtyOnHand: nextQtyOnHand,
+      updatedAt: movementCreatedAt
+    });
+    inventoryMovements.set(movementId, toAppInventoryMovement({
+      id: movementId,
+      ingredient_id: ingredientId,
+      ingredient_name: ingredient.name,
+      ingredient_unit: ingredient.unit,
+      movement_type: delta > 0 ? 'OUT' : 'IN',
+      quantity: Math.abs(delta),
+      unit_cost: Number(ingredient.unitPrice || 0),
+      reference_type: 'invoice_edit',
+      reference_id: safeInvoiceId,
+      notes: note,
+      created_at: movementCreatedAt
+    }));
+    applied.push({
+      ingredientId,
+      ingredientName: ingredient.name,
+      ingredientUnit: ingredient.unit,
+      adjustedQty: Math.abs(delta),
+      movementType: delta > 0 ? 'OUT' : 'IN',
+      remainingQty: nextQtyOnHand
+    });
+  }
+
+  return applied;
+}
+
+async function recordPaidInvoiceAdjustment({
+  invoiceId,
+  reason,
+  adjustedByUserId = null,
+  adjustedByEmail = null,
+  previousSnapshot = null,
+  nextSnapshot = null
+}) {
+  const createdAt = new Date().toISOString();
+  const log = {
+    id: uuidv4(),
+    invoiceId: String(invoiceId || '').trim() || null,
+    reason: String(reason || '').trim() || null,
+    adjustedByUserId: String(adjustedByUserId || '').trim() || null,
+    adjustedByEmail: String(adjustedByEmail || '').trim().toLowerCase() || null,
+    previousSnapshot,
+    nextSnapshot,
+    createdAt
+  };
+  if (!log.invoiceId || !log.reason) return null;
+
+  invoiceAdjustmentLogs.set(log.id, log);
+  if (!isSupabaseEnabled()) {
+    return log;
+  }
+
+  const { error } = await supabase
+    .from(INVOICE_ADJUSTMENTS_TABLE)
+    .insert({
+      id: log.id,
+      invoice_id: log.invoiceId,
+      reason: log.reason,
+      adjusted_by_user_id: log.adjustedByUserId,
+      adjusted_by_email: log.adjustedByEmail,
+      previous_snapshot: log.previousSnapshot || {},
+      next_snapshot: log.nextSnapshot || {},
+      created_at: createdAt
+    });
+
+  if (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (/pos_invoice_adjustments/.test(message) && /(does not exist|relation)/.test(message)) {
+      console.warn('[InvoiceAdjustments] Audit table missing, skipping adjustment log insert.');
+      return log;
+    }
+    throw new Error(`Supabase invoice adjustment log failed: ${error.message}`);
+  }
+
+  return log;
+}
+
+async function editPaidInvoice({
+  invoiceId,
+  items,
+  discountAmount = 0,
+  discountProfile = null,
+  orderType = null,
+  reason,
+  actedByUserId = null,
+  actedByEmail = null,
+  finalAmountPaid = null
+}) {
+  const invoice = await getInvoice(invoiceId);
+  if (!invoice) throw new Error('Invoice not found');
+  if (normalizeInvoiceStatus(invoice.status) !== 'PAID') {
+    throw new Error('Only paid invoices can be edited.');
+  }
+  if (!invoice.payment) {
+    throw new Error('A paid invoice must have a payment record before it can be edited.');
+  }
+
+  const safeReason = String(reason || '').trim();
+  if (!safeReason) {
+    throw new Error('A reason is required before editing a paid invoice.');
+  }
+
+  const previousInvoice = JSON.parse(JSON.stringify(invoice));
+  const {
+    lineItems,
+    subtotal,
+    discount,
+    total,
+    discountProfile: normalizedDiscountProfile
+  } = await buildInvoiceLineItemsAndTotals({
+    items,
+    discountAmount,
+    discountProfile
+  });
+
+  const originalPaymentMethod = String(invoice.payment?.method || invoice.paymentMethod || 'cash').trim().toLowerCase() || 'cash';
+  const providedAmountPaid = Number(finalAmountPaid);
+  let amountPaid = Number(invoice.payment?.amountPaid || total);
+  let change = Number(invoice.payment?.change || 0);
+  if (originalPaymentMethod === 'cash') {
+    if (!Number.isFinite(providedAmountPaid) || providedAmountPaid < total) {
+      throw new Error('Final cash received must be a valid number that covers the updated total.');
+    }
+    amountPaid = Math.round(providedAmountPaid * 100) / 100;
+    change = Math.max(0, Math.round((amountPaid - total) * 100) / 100);
+  } else {
+    amountPaid = Number.isFinite(providedAmountPaid) && providedAmountPaid >= total
+      ? Math.round(providedAmountPaid * 100) / 100
+      : Math.round(total * 100) / 100;
+    change = 0;
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextPayment = {
+    ...invoice.payment,
+    method: originalPaymentMethod,
+    amountPaid,
+    change,
+    paidAt: invoice.payment?.paidAt || nowIso,
+    success: invoice.payment?.success !== false,
+    successMessage: invoice.payment?.successMessage || 'Paid transaction updated from Shift Monitor'
+  };
+
+  invoice.orderType = normalizeInvoiceOrderType(orderType) || invoice.orderType || null;
+  invoice.paymentMethod = originalPaymentMethod;
+  invoice.subtotal = subtotal;
+  invoice.discount = discount;
+  invoice.discountProfile = normalizedDiscountProfile;
+  invoice.total = total;
+  invoice.lineItems = lineItems.map((item, index) => ({
+    ...item,
+    lineId: item.lineId || uuidv5(`${invoice.id}:${item.productId}:${index}`, LINE_ITEM_UUID_NAMESPACE)
+  }));
+  invoice.payment = nextPayment;
+  invoice.updatedAt = nowIso;
+  invoices.set(invoice.id, invoice);
+
+  if (isSupabaseEnabled()) {
+    await _persistInvoiceToSupabase(invoice);
+    const { error: paymentError } = await supabase
+      .from('pos_payments')
+      .upsert(toDbPayment(invoice.id, nextPayment), { onConflict: 'invoice_id' });
+    if (paymentError) {
+      throw new Error(`Supabase paid invoice payment update failed: ${paymentError.message}`);
+    }
+  }
+
+  await applyInventoryAdjustmentForEditedPaidInvoice(previousInvoice, invoice, safeReason);
+  await recordPaidInvoiceAdjustment({
+    invoiceId: invoice.id,
+    reason: safeReason,
+    adjustedByUserId: actedByUserId,
+    adjustedByEmail: actedByEmail,
+    previousSnapshot: buildInvoiceAdjustmentSnapshot(previousInvoice),
+    nextSnapshot: buildInvoiceAdjustmentSnapshot(invoice)
+  });
+
+  return invoice;
+}
+
 async function updateInvoiceLifecycleStatus({
   invoiceId,
   status,
@@ -3469,7 +4576,7 @@ async function getInventoryReport() {
   startOfDay.setHours(0, 0, 0, 0);
   const startOfDayIso = startOfDay.toISOString();
 
-  if (isSupabaseEnabled()) {
+  if (canAttemptSupabaseRead()) {
     try {
       const [
         { data: ingredients, error: ingredientErr },
@@ -3565,9 +4672,10 @@ async function getInventoryReport() {
           .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
       });
 
+      markSupabaseReadHealthy();
       return { ingredients: rows, totals, monitor };
     } catch (error) {
-      console.warn('[Offline] getInventoryReport Supabase failed, using in-memory:', error.message);
+      markSupabaseReadFailure('getInventoryReport', error);
     }
   }
 
@@ -3697,20 +4805,26 @@ async function listExpenses({ month = null, dateFrom = null, dateTo = null, limi
     toIso = range.toIso;
   }
 
-  if (isSupabaseEnabled()) {
-    let query = supabase
-      .from('pos_expenses')
-      .select('*')
-      .order('expense_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(safeLimit);
-    if (fromIso) query = query.gte('expense_date', fromIso.slice(0, 10));
-    if (toIso) query = query.lte('expense_date', toIso.slice(0, 10));
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase expense list failed: ${error.message}`);
-    return (data || []).map((row) => toAppExpense(row));
+  if (canAttemptSupabaseRead()) {
+    try {
+      let query = supabase
+        .from('pos_expenses')
+        .select('*')
+        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(safeLimit);
+      if (fromIso) query = query.gte('expense_date', fromIso.slice(0, 10));
+      if (toIso) query = query.lte('expense_date', toIso.slice(0, 10));
+      const { data, error } = await query;
+      if (error) throw new Error(`Supabase expense list failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || []).map((row) => toAppExpense(row));
+    } catch (error) {
+      markSupabaseReadFailure('listExpenses', error);
+    }
   }
 
+  hydrateExpenseFallbackEntries();
   let rows = Array.from(expenseEntries.values()).map((row) => toAppExpense(row));
   if (fromIso) rows = rows.filter((row) => String(row.expenseDate || '') >= fromIso.slice(0, 10));
   if (toIso) rows = rows.filter((row) => String(row.expenseDate || '') <= toIso.slice(0, 10));
@@ -3749,6 +4863,7 @@ async function createExpense({
     throw new Error('amount must be greater than 0');
   }
 
+  hydrateExpenseFallbackEntries();
   const payload = {
     id: uuidv4(),
     expense_date: safeExpenseDate,
@@ -3775,6 +4890,7 @@ async function createExpense({
 
   const expense = toAppExpense(payload);
   expenseEntries.set(expense.id, expense);
+  persistExpenseFallbackEntries();
   return { ...expense };
 }
 
@@ -3837,6 +4953,119 @@ async function getMonthlyClosingReport({ month }) {
   };
 }
 
+async function getMonthlyClosingSnapshot(month) {
+  const safeMonth = buildMonthRange(month).month;
+
+  if (canUseMonthlyClosingSnapshotsSupabase()) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_closing_snapshots')
+        .select('*')
+        .eq('month', safeMonth)
+        .maybeSingle();
+      if (error) throw new Error(`Supabase monthly closing snapshot fetch failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return data ? toAppMonthlyClosingSnapshot(data) : null;
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, 'monthly_closing_snapshots')) {
+        markMonthlyClosingSnapshotsSupabaseUnavailable(error);
+      } else {
+        markSupabaseReadFailure('getMonthlyClosingSnapshot', error);
+      }
+    }
+  }
+
+  hydrateMonthlyClosingSnapshotsFallback();
+  const snapshot = monthlyClosingSnapshots.get(safeMonth);
+  return snapshot ? { ...snapshot } : null;
+}
+
+async function listMonthlyClosingSnapshots({ limit = 60 } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 60, 240));
+
+  if (canUseMonthlyClosingSnapshotsSupabase()) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_closing_snapshots')
+        .select('*')
+        .order('month', { ascending: false })
+        .limit(safeLimit);
+      if (error) throw new Error(`Supabase monthly closing snapshot list failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || [])
+        .map((row) => toAppMonthlyClosingSnapshot(row))
+        .filter(Boolean);
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, 'monthly_closing_snapshots')) {
+        markMonthlyClosingSnapshotsSupabaseUnavailable(error);
+      } else {
+        markSupabaseReadFailure('listMonthlyClosingSnapshots', error);
+      }
+    }
+  }
+
+  hydrateMonthlyClosingSnapshotsFallback();
+  return Array.from(monthlyClosingSnapshots.values())
+    .sort((a, b) => String(b.month || '').localeCompare(String(a.month || '')))
+    .slice(0, safeLimit)
+    .map((snapshot) => ({ ...snapshot }));
+}
+
+async function saveMonthlyClosingSnapshot({
+  month,
+  report = null,
+  savedByUserId = null,
+  savedByEmail = null,
+  savedByName = null
+}) {
+  const safeMonth = buildMonthRange(month).month;
+  const snapshotReport = report && typeof report === 'object'
+    ? { ...report, month: safeMonth }
+    : await getMonthlyClosingReport({ month: safeMonth });
+  const nowIso = new Date().toISOString();
+
+  if (canUseMonthlyClosingSnapshotsSupabase()) {
+    try {
+      const payload = {
+        month: safeMonth,
+        report_json: snapshotReport,
+        saved_by_user_id: String(savedByUserId || '').trim() || null,
+        saved_by_email: String(savedByEmail || '').trim().toLowerCase() || null,
+        saved_by_name: String(savedByName || '').trim() || null,
+        saved_at: nowIso,
+        updated_at: nowIso
+      };
+      const { data, error } = await supabase
+        .from('monthly_closing_snapshots')
+        .upsert(payload, { onConflict: 'month' })
+        .select('*')
+        .single();
+      if (error) throw new Error(`Supabase monthly closing snapshot save failed: ${error.message}`);
+      return toAppMonthlyClosingSnapshot(data);
+    } catch (error) {
+      if (isMissingSupabaseTableError(error, 'monthly_closing_snapshots')) {
+        markMonthlyClosingSnapshotsSupabaseUnavailable(error);
+      } else {
+        console.warn('[MonthlyClosing] Supabase snapshot save failed, using fallback:', sanitizeSupabaseErrorMessage(error));
+      }
+    }
+  }
+
+  hydrateMonthlyClosingSnapshotsFallback();
+  const snapshot = toAppMonthlyClosingSnapshot({
+    month: safeMonth,
+    report: snapshotReport,
+    savedByUserId,
+    savedByEmail,
+    savedByName,
+    savedAt: nowIso,
+    updatedAt: nowIso
+  });
+  monthlyClosingSnapshots.set(safeMonth, snapshot);
+  persistMonthlyClosingSnapshotsFallback();
+  return { ...snapshot };
+}
+
 
 async function getSalesReport({ dateFrom, dateTo }) {
   const { fromIso, toIso } = normalizeDateRange({ dateFrom, dateTo });
@@ -3882,13 +5111,14 @@ async function getSalesReport({ dateFrom, dateTo }) {
       });
 
       const summary = summarizeSalesRows(salesRows);
+      markSupabaseReadHealthy();
       return {
         range: { dateFrom: fromIso, dateTo: toIso },
         ...summary,
         transactions: salesRows
       };
     } catch (error) {
-      console.warn('[Offline] getSalesReport Supabase failed, using in-memory:', error.message);
+      markSupabaseReadFailure('getSalesReport', error);
     }
   }
 
@@ -4044,6 +5274,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
         subtotalByInvoiceId.set(invoiceId, toMoney((subtotalByInvoiceId.get(invoiceId) || 0) + subtotal));
       });
 
+      markSupabaseReadHealthy();
       return (invoicesData || []).map((inv) => {
         const payment = paymentByInvoiceId.get(inv.id);
         const session = sessionByInvoiceId.get(inv.id);
@@ -4101,7 +5332,7 @@ async function listAllInvoices({ dateFrom, dateTo, status } = {}) {
         };
       });
     } catch (error) {
-      console.warn('[Offline] listAllInvoices Supabase failed, using in-memory:', error.message);
+      markSupabaseReadFailure('listAllInvoices', error);
     }
   }
 
@@ -4695,20 +5926,25 @@ async function listCashierShifts({ status = null, dateFrom = null, dateTo = null
   const toIso = dateTo ? new Date(dateTo).toISOString() : null;
   const safeStatus = status ? String(status).trim().toLowerCase() : null;
 
-  if (isSupabaseEnabled()) {
-    let query = supabase
-      .from('cashier_shifts')
-      .select('*')
-      .order('shift_start_at', { ascending: false });
+  if (canAttemptSupabaseRead()) {
+    try {
+      let query = supabase
+        .from('cashier_shifts')
+        .select('*')
+        .order('shift_start_at', { ascending: false });
 
-    if (safeStatus) query = query.eq('status', safeStatus);
-    if (fromIso) query = query.gte('shift_start_at', fromIso);
-    if (toIso) query = query.lte('shift_start_at', toIso);
-    if (discrepancyOnly) query = query.neq('discrepancy', 0);
+      if (safeStatus) query = query.eq('status', safeStatus);
+      if (fromIso) query = query.gte('shift_start_at', fromIso);
+      if (toIso) query = query.lte('shift_start_at', toIso);
+      if (discrepancyOnly) query = query.neq('discrepancy', 0);
 
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase shifts list failed: ${error.message}`);
-    return (data || []).map((x) => toAppCashierShift(x));
+      const { data, error } = await query;
+      if (error) throw new Error(`Supabase shifts list failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || []).map((x) => toAppCashierShift(x));
+    } catch (error) {
+      markSupabaseReadFailure('listCashierShifts', error);
+    }
   }
 
   let rows = Array.from(cashierShifts.values());
@@ -4792,19 +6028,24 @@ async function listCashDrawerMovements({ drawerId = null, shiftId = null, dateFr
   const hasDateRange = Boolean(dateFrom && dateTo);
   const range = hasDateRange ? normalizeDateRange({ dateFrom, dateTo }) : null;
 
-  if (isSupabaseEnabled()) {
-    let query = supabase
-      .from('cash_drawer_movements')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(safeLimit);
-    if (safeDrawerId) query = query.eq('drawer_id', safeDrawerId);
-    if (safeShiftId) query = query.eq('shift_id', safeShiftId);
-    if (range?.fromIso) query = query.gte('created_at', range.fromIso);
-    if (range?.toIso) query = query.lte('created_at', range.toIso);
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase cash drawer movement list failed: ${error.message}`);
-    return (data || []).map((row) => toAppCashDrawerMovement(row));
+  if (canAttemptSupabaseRead()) {
+    try {
+      let query = supabase
+        .from('cash_drawer_movements')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(safeLimit);
+      if (safeDrawerId) query = query.eq('drawer_id', safeDrawerId);
+      if (safeShiftId) query = query.eq('shift_id', safeShiftId);
+      if (range?.fromIso) query = query.gte('created_at', range.fromIso);
+      if (range?.toIso) query = query.lte('created_at', range.toIso);
+      const { data, error } = await query;
+      if (error) throw new Error(`Supabase cash drawer movement list failed: ${error.message}`);
+      markSupabaseReadHealthy();
+      return (data || []).map((row) => toAppCashDrawerMovement(row));
+    } catch (error) {
+      markSupabaseReadFailure('listCashDrawerMovements', error);
+    }
   }
 
   let rows = Array.from(cashDrawerMovements.values());
@@ -4921,10 +6162,11 @@ async function getCashierShiftSummary(shiftIdOrRow) {
   let holdForVoidCashAmount = 0;
   let voidedAmount = 0;
   let voidedCashAmount = 0;
+  const getTrackedPaymentMethod = (txn, fallback = 'other') => String(txn?.payment?.method || txn?.paymentMethod || fallback).toLowerCase();
   holdForVoidTransactions.forEach((txn) => {
     const amount = getInvoiceSaleAmount(txn);
     holdForVoidAmount += amount;
-    const method = String(txn.paymentMethod || txn.payment?.method || 'other').toLowerCase();
+    const method = getTrackedPaymentMethod(txn);
     if (method === 'cash') {
       const tendered = Number(txn?.payment?.amountPaid ?? amount);
       const change = Number(txn?.payment?.change ?? 0);
@@ -4934,7 +6176,7 @@ async function getCashierShiftSummary(shiftIdOrRow) {
   voidedTransactions.forEach((txn) => {
     const amount = getInvoiceSaleAmount(txn);
     voidedAmount += amount;
-    const method = String(txn.paymentMethod || txn.payment?.method || 'other').toLowerCase();
+    const method = getTrackedPaymentMethod(txn);
     if (method === 'cash') {
       const tendered = Number(txn?.payment?.amountPaid ?? amount);
       const change = Number(txn?.payment?.change ?? 0);
@@ -4942,7 +6184,7 @@ async function getCashierShiftSummary(shiftIdOrRow) {
     }
   });
   paidTransactions.forEach((txn) => {
-    const method = String(txn.paymentMethod || txn.payment?.method || 'other').toLowerCase();
+    const method = getTrackedPaymentMethod(txn);
     const amount = getInvoiceSaleAmount(txn);
     totalSales += amount;
     paymentMethods[method] = (paymentMethods[method] || 0) + amount;
@@ -5175,36 +6417,41 @@ async function getTopSalesPerProductByRange({ dateFrom, dateTo, limit = 10 }) {
   const { fromIso, toIso } = normalizeDateRange({ dateFrom, dateTo });
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
 
-  if (isSupabaseEnabled()) {
-    const { data: paidInvoices, error: invoiceError } = await supabase
-      .from('pos_invoices')
-      .select('id')
-      .eq('status', 'PAID')
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso);
-    if (invoiceError) throw new Error(`Supabase top-products by range invoice query failed: ${invoiceError.message}`);
+  if (canAttemptSupabaseRead()) {
+    try {
+      const { data: paidInvoices, error: invoiceError } = await supabase
+        .from('pos_invoices')
+        .select('id')
+        .eq('status', 'PAID')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso);
+      if (invoiceError) throw new Error(`Supabase top-products by range invoice query failed: ${invoiceError.message}`);
 
-    const invoiceIds = (paidInvoices || []).map((x) => x.id);
-    if (!invoiceIds.length) return [];
+      const invoiceIds = (paidInvoices || []).map((x) => x.id);
+      if (!invoiceIds.length) return [];
 
-    const { data: itemRows, error: itemsError } = await supabase
-      .from('pos_invoice_items')
-      .select('product_name,qty,subtotal')
-      .in('invoice_id', invoiceIds);
-    if (itemsError) throw new Error(`Supabase top-products by range items query failed: ${itemsError.message}`);
+      const { data: itemRows, error: itemsError } = await supabase
+        .from('pos_invoice_items')
+        .select('product_name,qty,subtotal')
+        .in('invoice_id', invoiceIds);
+      if (itemsError) throw new Error(`Supabase top-products by range items query failed: ${itemsError.message}`);
 
-    const grouped = new Map();
-    (itemRows || []).forEach((row) => {
-      const key = row.product_name || 'Unknown Product';
-      const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
-      current.qtySold += Number(row.qty || 0);
-      current.totalSales += Number(row.subtotal || 0);
-      grouped.set(key, current);
-    });
+      const grouped = new Map();
+      (itemRows || []).forEach((row) => {
+        const key = row.product_name || 'Unknown Product';
+        const current = grouped.get(key) || { productName: key, qtySold: 0, totalSales: 0 };
+        current.qtySold += Number(row.qty || 0);
+        current.totalSales += Number(row.subtotal || 0);
+        grouped.set(key, current);
+      });
 
-    return Array.from(grouped.values())
-      .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
-      .slice(0, cappedLimit);
+      markSupabaseReadHealthy();
+      return Array.from(grouped.values())
+        .sort((a, b) => (b.totalSales - a.totalSales) || (b.qtySold - a.qtySold))
+        .slice(0, cappedLimit);
+    } catch (error) {
+      markSupabaseReadFailure('getTopSalesPerProductByRange', error);
+    }
   }
 
   const grouped = new Map();
@@ -5367,6 +6614,8 @@ function getOfflineQueueSummary() {
 
 module.exports = {
   getAppConfig,
+  ensureAppConfigLoaded,
+  ensureDiscountProfilesLoaded,
   updateAppConfig,
   listDiscountManagerProfiles,
   createDiscountProfile,
@@ -5390,6 +6639,7 @@ module.exports = {
   createInvoice,
   getInvoice,
   setInvoicePaid,
+  editPaidInvoice,
   updateInvoiceLifecycleStatus,
   saveGcashSession,
   getGcashSessionByReference,
@@ -5406,6 +6656,10 @@ module.exports = {
   getInventoryReport,
   getInventoryIngredientHistory,
   getMonthlyClosingReport,
+  hasMonthlyClosingReportData,
+  getMonthlyClosingSnapshot,
+  listMonthlyClosingSnapshots,
+  saveMonthlyClosingSnapshot,
   listProductRecipes,
   replaceProductRecipes,
   listAllInvoices,

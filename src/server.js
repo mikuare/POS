@@ -8,6 +8,8 @@ const { createClient } = require('@supabase/supabase-js');
 
 const {
   getAppConfig,
+  ensureAppConfigLoaded,
+  ensureDiscountProfilesLoaded,
   updateAppConfig,
   listDiscountManagerProfiles,
   createDiscountProfile,
@@ -30,6 +32,7 @@ const {
   createInvoice,
   getInvoice,
   setInvoicePaid,
+  editPaidInvoice,
   updateInvoiceLifecycleStatus,
   saveGcashSession,
   getGcashSessionByReference,
@@ -46,6 +49,10 @@ const {
   getInventoryReport,
   getInventoryIngredientHistory,
   getMonthlyClosingReport,
+  hasMonthlyClosingReportData,
+  getMonthlyClosingSnapshot,
+  listMonthlyClosingSnapshots,
+  saveMonthlyClosingSnapshot,
   listProductRecipes,
   replaceProductRecipes,
   listAllInvoices,
@@ -203,7 +210,33 @@ app.use(express.json({
   limit: '15mb',
   verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); }
 }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const publicDir = path.join(__dirname, '..', 'public');
+const NON_CACHED_PUBLIC_FILES = new Set([
+  'index.html',
+  'app.js',
+  'styles.css',
+  'offline-outbox.js',
+  'manifest.webmanifest',
+  'sw.js'
+]);
+app.use(express.static(publicDir, {
+  setHeaders: (res, filePath) => {
+    const relativePath = path.relative(publicDir, filePath).replace(/\\/g, '/');
+    if (!NON_CACHED_PUBLIC_FILES.has(relativePath)) return;
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+}));
+app.use((req, res, next) => {
+  Promise.all([
+    ensureAppConfigLoaded(),
+    ensureDiscountProfilesLoaded()
+  ])
+    .then(() => next())
+    .catch(next);
+});
 app.get('/assets/confetti', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'Confetti.json'));
 });
@@ -257,8 +290,14 @@ const DEFAULT_ROLE_ACCESS = Object.freeze({
     'discounts_access',
     'monthly_closing_access',
     'shift_session_access',
+    'shift_monitor_access',
     'invoice_action_access'
   ])
+});
+const DEFAULT_EPAYMENT_SETTINGS = Object.freeze({
+  gcash: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  paymaya: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  scanQr: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' })
 });
 const AUDIT_EVENTS = new Set([
   'login_success',
@@ -287,13 +326,64 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
   }, []);
 }
 
+function ensureRequiredRoleAccessEntries(entries = [], requiredEntries = []) {
+  const rows = Array.isArray(entries) ? [...entries] : [];
+  requiredEntries.forEach((entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (ROLE_ACCESS_KEYS.includes(key) && !rows.includes(key)) {
+      rows.push(key);
+    }
+  });
+  return rows;
+}
+
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
-  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
-  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
+  const encharge = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    ['shift_session_access', 'shift_monitor_access']
+  );
+  const supervisor = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor),
+    ['shift_session_access', 'shift_monitor_access']
+  );
   return {
     encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
     supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
+  };
+}
+
+function normalizeEPaymentDisabledReason(reason) {
+  return String(reason || '').trim().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+function normalizeEPaymentImageUrl(value, fallback = '') {
+  const imageUrl = String(value || fallback || '').trim();
+  if (!imageUrl) return '';
+  if (imageUrl.length > 3_000_000) return '';
+  if (/^data:image\//i.test(imageUrl)) return imageUrl;
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  if (imageUrl.startsWith('/')) return imageUrl;
+  return '';
+}
+
+function normalizeEPaymentMethodConfig(entry = {}, fallback = DEFAULT_EPAYMENT_SETTINGS.gcash) {
+  const enabled = entry?.enabled !== false;
+  return {
+    enabled,
+    disabledReason: enabled
+      ? ''
+      : normalizeEPaymentDisabledReason(entry?.disabledReason || entry?.reason || fallback?.disabledReason || ''),
+    qrImageUrl: normalizeEPaymentImageUrl(entry?.qrImageUrl || entry?.imageUrl || fallback?.qrImageUrl || '')
+  };
+}
+
+function normalizeEPaymentSettings(settings = {}) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return {
+    gcash: normalizeEPaymentMethodConfig(source?.gcash, DEFAULT_EPAYMENT_SETTINGS.gcash),
+    paymaya: normalizeEPaymentMethodConfig(source?.paymaya || source?.maya, DEFAULT_EPAYMENT_SETTINGS.paymaya),
+    scanQr: normalizeEPaymentMethodConfig(source?.scanQr || source?.scanqr || source?.qr, DEFAULT_EPAYMENT_SETTINGS.scanQr)
   };
 }
 
@@ -390,7 +480,6 @@ function canManageInvoiceLifecycle({
 
   if (hasDashboardReviewAccess) {
     if (normalizedNextStatus === 'CANCELLED') return normalizedCurrentStatus === 'PENDING';
-    if (normalizedNextStatus === 'HOLD_FOR_VOID') return normalizedCurrentStatus === 'PAID';
     if (normalizedNextStatus === 'VOIDED') {
       return normalizedCurrentStatus === 'PAID' || normalizedCurrentStatus === 'HOLD_FOR_VOID';
     }
@@ -399,8 +488,7 @@ function canManageInvoiceLifecycle({
 
   if (!roleHasAccess(role, 'invoice_action_access')) return false;
   if (normalizedNextStatus === 'CANCELLED' && normalizedCurrentStatus !== 'PENDING') return false;
-  if (normalizedNextStatus === 'HOLD_FOR_VOID' && normalizedCurrentStatus !== 'PAID') return false;
-  if (normalizedNextStatus !== 'CANCELLED' && normalizedNextStatus !== 'HOLD_FOR_VOID') return false;
+  if (normalizedNextStatus !== 'CANCELLED') return false;
 
   const invoiceUserId = String(invoice.cashierUserId || '').trim();
   const invoiceEmail = String(invoice.cashierEmail || '').trim().toLowerCase();
@@ -411,6 +499,56 @@ function canManageInvoiceLifecycle({
     (invoiceUserId && safeActorUserId && invoiceUserId === safeActorUserId)
     || (invoiceEmail && safeActorEmail && invoiceEmail === safeActorEmail)
   );
+}
+
+function isShiftAssignedToActor(shift, actorUserId, actorEmail) {
+  if (!shift) return false;
+  const shiftUserId = String(shift.cashierUserId || '').trim();
+  const shiftEmail = String(shift.cashierEmail || '').trim().toLowerCase();
+  const safeActorUserId = String(actorUserId || '').trim();
+  const safeActorEmail = String(actorEmail || '').trim().toLowerCase();
+  return Boolean(
+    (shiftUserId && safeActorUserId && shiftUserId === safeActorUserId)
+    || (shiftEmail && safeActorEmail && shiftEmail === safeActorEmail)
+  );
+}
+
+function isInvoiceAssignedToActor(invoice, actorUserId, actorEmail) {
+  if (!invoice) return false;
+  const invoiceUserId = String(invoice.cashierUserId || '').trim();
+  const invoiceEmail = String(invoice.cashierEmail || '').trim().toLowerCase();
+  const safeActorUserId = String(actorUserId || '').trim();
+  const safeActorEmail = String(actorEmail || '').trim().toLowerCase();
+  return Boolean(
+    (invoiceUserId && safeActorUserId && invoiceUserId === safeActorUserId)
+    || (invoiceEmail && safeActorEmail && invoiceEmail === safeActorEmail)
+  );
+}
+
+function canEditPaidInvoice({
+  invoice,
+  role,
+  actorUserId,
+  actorEmail
+}) {
+  if (!invoice) return false;
+  if (String(invoice.status || '').trim().toUpperCase() !== 'PAID') return false;
+  const hasDashboardReviewAccess = roleHasAccess(role, 'control_center_access') && roleHasAccess(role, 'invoice_action_access');
+  if (hasDashboardReviewAccess) return true;
+  if (!roleHasAccess(role, 'shift_monitor_access')) return false;
+  return isInvoiceAssignedToActor(invoice, actorUserId, actorEmail);
+}
+
+function canRequestAuthorizedVoid({
+  invoice,
+  role,
+  actorUserId,
+  actorEmail
+}) {
+  if (!invoice) return false;
+  if (String(invoice.status || '').trim().toUpperCase() !== 'PAID') return false;
+  if (!roleHasAccess(role, 'shift_monitor_access')) return false;
+  return isInvoiceAssignedToActor(invoice, actorUserId, actorEmail);
 }
 
 function getRequestIp(req) {
@@ -476,6 +614,45 @@ async function getAppUserById(userId) {
 function isEWalletMethod(method) {
   const m = String(method || '').toLowerCase();
   return m === 'gcash' || m === 'paymaya';
+}
+
+function normalizeEPaymentChannel(channel, fallback = 'gcash') {
+  const normalized = String(channel || '').trim().toLowerCase();
+  if (normalized === 'paymaya' || normalized === 'maya') return 'paymaya';
+  if (normalized === 'scanqr' || normalized === 'scan_qr' || normalized === 'scan-qr' || normalized === 'qr') return 'scanQr';
+  if (normalized === 'gcash') return 'gcash';
+  return normalizeEPaymentChannel(fallback || 'gcash', 'gcash');
+}
+
+function getEPaymentChannelLabel(channel) {
+  const normalized = normalizeEPaymentChannel(channel);
+  if (normalized === 'paymaya') return 'Maya';
+  if (normalized === 'scanQr') return 'Scan QR';
+  return 'GCash';
+}
+
+function getEPaymentChannelConfig(channel, appConfig = getAppConfig()) {
+  const normalized = normalizeEPaymentChannel(channel);
+  const settings = normalizeEPaymentSettings(appConfig?.ePaymentSettings);
+  return {
+    key: normalized,
+    label: getEPaymentChannelLabel(normalized),
+    ...(settings[normalized] || DEFAULT_EPAYMENT_SETTINGS.gcash)
+  };
+}
+
+function buildEPaymentChannelDisabledMessage(channelConfig = {}) {
+  return channelConfig?.disabledReason
+    ? `E-payment channel unavailable: ${channelConfig.disabledReason}`
+    : `E-payment channel unavailable: ${channelConfig?.label || 'This e-payment option'} is currently disabled in Control Center.`;
+}
+
+function assertEnabledEPaymentChannel(channel, appConfig = getAppConfig()) {
+  const channelConfig = getEPaymentChannelConfig(channel, appConfig);
+  if (!channelConfig.enabled) {
+    throw new Error(buildEPaymentChannelDisabledMessage(channelConfig));
+  }
+  return channelConfig;
 }
 
 function buildSalesRange(query) {
@@ -547,10 +724,53 @@ function buildOptionalRange(query, defaultRange = null) {
   };
 }
 
+function normalizeMonthValue(monthValue) {
+  const normalized = String(monthValue || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(normalized)) return '';
+  const [yearValue, monthValueRaw] = normalized.split('-');
+  const year = Number(yearValue);
+  const month = Number(monthValueRaw);
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) return '';
+  if (!Number.isInteger(month) || month < 1 || month > 12) return '';
+  return `${yearValue}-${String(month).padStart(2, '0')}`;
+}
+
+function getCurrentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getOverviewMonthlySalesMonth(query, range) {
+  const explicitMonth = normalizeMonthValue(query?.month);
+  if (explicitMonth) return explicitMonth;
+
+  const rangeEnd = new Date(range?.dateTo || '');
+  if (!Number.isNaN(rangeEnd.getTime())) {
+    return `${rangeEnd.getUTCFullYear()}-${String(rangeEnd.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+
+  return getCurrentMonthValue();
+}
+
 function toMoney(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * 100) / 100;
+}
+
+function getTrackedPaymentMethod(txn, fallback = 'other') {
+  return String(txn?.payment?.method || txn?.paymentMethod || fallback).trim().toLowerCase() || fallback;
+}
+
+function sumPaymentMethodBuckets(rows = []) {
+  return (Array.isArray(rows) ? rows : []).reduce((bucket, row) => {
+    const paymentMethods = row?.paymentMethods && typeof row.paymentMethods === 'object' ? row.paymentMethods : {};
+    Object.entries(paymentMethods).forEach(([method, amount]) => {
+      const key = String(method || 'other').trim().toLowerCase() || 'other';
+      bucket[key] = toMoney((bucket[key] || 0) + Number(amount || 0));
+    });
+    return bucket;
+  }, {});
 }
 
 async function enrichShiftWithSummary(shift) {
@@ -565,7 +785,9 @@ async function enrichShiftWithSummary(shift) {
     holdForVoidAmount: Number(summary.holdForVoidAmount || 0),
     cashTendered: Number(summary.cashTendered || shift?.cashTendered || 0),
     changeGiven: Number(summary.changeGiven || shift?.changeGiven || 0),
-    netCashRetained: Number(summary.netCashRetained || shift?.netCashRetained || 0)
+    netCashRetained: Number(summary.netCashRetained || shift?.netCashRetained || 0),
+    otherPayments: Number(summary.digitalSales || shift?.digitalSales || 0),
+    paymentMethods: summary.paymentMethods || {}
   };
 }
 
@@ -764,7 +986,7 @@ function summarizePaymentMix(transactions = []) {
   const totalSales = toMoney((transactions || []).reduce((sum, txn) => sum + Number(txn?.total || 0), 0));
   const buckets = new Map();
   (transactions || []).forEach((txn) => {
-    const method = String(txn?.paymentMethod || txn?.payment?.method || 'other').trim().toLowerCase() || 'other';
+    const method = getTrackedPaymentMethod(txn);
     if (!buckets.has(method)) {
       buckets.set(method, { method, count: 0, amount: 0, share: 0 });
     }
@@ -1599,11 +1821,11 @@ app.patch('/api/admin/invoices/:invoiceId/status', async (req, res) => {
     if (!invoiceId) {
       return res.status(400).json({ error: 'invoiceId is required.' });
     }
-    if (!['CANCELLED', 'VOIDED', 'HOLD_FOR_VOID'].includes(status)) {
-      return res.status(400).json({ error: 'status must be CANCELLED, HOLD_FOR_VOID, or VOIDED.' });
+    if (!['CANCELLED', 'VOIDED'].includes(status)) {
+      return res.status(400).json({ error: 'status must be CANCELLED or VOIDED.' });
     }
     if (!reason) {
-      return res.status(400).json({ error: 'A reason is required for invoice cancellation, hold for void, or voiding.' });
+      return res.status(400).json({ error: 'A reason is required for invoice cancellation or voiding.' });
     }
 
     const existingInvoice = await getInvoice(invoiceId);
@@ -1626,6 +1848,142 @@ app.patch('/api/admin/invoices/:invoiceId/status', async (req, res) => {
       reason,
       actedByUserId: actorUserId,
       actedByEmail: actorEmail
+    });
+
+    return res.json({ invoice });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/invoices/:invoiceId/authorized-void', async (req, res) => {
+  try {
+    if (!supabaseService || !supabaseAuthClient) {
+      return res.status(503).json({ error: 'Supabase auth is not configured on server.' });
+    }
+
+    const invoiceId = String(req.params?.invoiceId || '').trim();
+    const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+    const actorUserId = String(req.get('x-user-id') || '').trim() || null;
+    const actorEmail = String(req.get('x-user-email') || '').trim().toLowerCase() || null;
+    const authorizerEmail = String(req.body?.authorizerEmail || '').trim().toLowerCase();
+    const authorizerPassword = String(req.body?.authorizerPassword || '');
+
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'invoiceId is required.' });
+    }
+    if (!authorizerEmail || !authorizerPassword) {
+      return res.status(400).json({ error: 'authorizerEmail and authorizerPassword are required.' });
+    }
+    if (actorEmail && actorEmail === authorizerEmail) {
+      return res.status(400).json({ error: 'Authorized personnel must use a different account from the current cashier session.' });
+    }
+
+    const existingInvoice = await getInvoice(invoiceId);
+    if (!existingInvoice) {
+      return res.status(404).json({ error: 'Invoice not found.' });
+    }
+    if (!canRequestAuthorizedVoid({
+      invoice: existingInvoice,
+      role,
+      actorUserId,
+      actorEmail
+    })) {
+      return res.status(403).json({ error: 'You are not allowed to request an authorized void for this receipt.' });
+    }
+
+    const { data, error } = await supabaseAuthClient.auth.signInWithPassword({
+      email: authorizerEmail,
+      password: authorizerPassword
+    });
+    if (error || !data?.user) {
+      return res.status(401).json({ error: error?.message || 'Invalid authorized personnel credentials.' });
+    }
+
+    let authorizerUser = await getAppUserById(data.user.id);
+    if (!authorizerUser) {
+      authorizerUser = await getAppUserByEmail(authorizerEmail);
+    }
+    if (!authorizerUser) {
+      return res.status(403).json({ error: 'Authorized personnel account is not configured for POS access.' });
+    }
+    if (!authorizerUser.is_active) {
+      return res.status(403).json({ error: 'Authorized personnel account is inactive.' });
+    }
+    if (!canManageInvoiceLifecycle({
+      invoice: existingInvoice,
+      nextStatus: 'VOIDED',
+      role: authorizerUser.role,
+      actorUserId: authorizerUser.id,
+      actorEmail: authorizerUser.email
+    })) {
+      return res.status(403).json({ error: 'Authorized personnel account does not have permission to void paid receipts.' });
+    }
+
+    const requesterLabel = actorEmail || actorUserId || 'current cashier';
+    const invoice = await updateInvoiceLifecycleStatus({
+      invoiceId,
+      status: 'VOIDED',
+      reason: `Authorized void requested by ${requesterLabel} and approved by ${authorizerUser.email}.`,
+      actedByUserId: authorizerUser.id,
+      actedByEmail: authorizerUser.email
+    });
+
+    return res.json({
+      invoice,
+      authorizedBy: {
+        id: authorizerUser.id,
+        fullName: authorizerUser.full_name,
+        email: authorizerUser.email,
+        role: authorizerUser.role
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch('/api/admin/invoices/:invoiceId/paid-edit', async (req, res) => {
+  try {
+    const invoiceId = String(req.params?.invoiceId || '').trim();
+    const role = normalizeRole(req.get('x-user-role') || req.body?.role || req.query?.role);
+    const actorUserId = String(req.get('x-user-id') || '').trim() || null;
+    const actorEmail = String(req.get('x-user-email') || '').trim().toLowerCase() || null;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const reason = String(req.body?.reason || '').trim();
+    const orderType = String(req.body?.orderType || '').trim().toLowerCase() || null;
+    const finalAmountPaid = req.body?.finalAmountPaid;
+
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'invoiceId is required.' });
+    }
+    if (!reason) {
+      return res.status(400).json({ error: 'A reason is required before editing a paid invoice.' });
+    }
+
+    const existingInvoice = await getInvoice(invoiceId);
+    if (!existingInvoice) {
+      return res.status(404).json({ error: 'Invoice not found.' });
+    }
+    if (!canEditPaidInvoice({
+      invoice: existingInvoice,
+      role,
+      actorUserId,
+      actorEmail
+    })) {
+      return res.status(403).json({ error: 'You are not allowed to edit this paid invoice.' });
+    }
+
+    const invoice = await editPaidInvoice({
+      invoiceId,
+      items,
+      discountAmount: Number(req.body?.discountAmount || 0),
+      discountProfile: req.body?.discountProfile || null,
+      orderType,
+      reason,
+      actedByUserId: actorUserId,
+      actedByEmail: actorEmail,
+      finalAmountPaid
     });
 
     return res.json({ invoice });
@@ -1711,6 +2069,56 @@ app.get('/api/admin/monthly-closing', requireAnyRoleAccess(['monthly_closing_acc
     }
     const report = await getMonthlyClosingReport({ month });
     return res.json(report);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/monthly-closing/snapshots', requireAnyRoleAccess(['monthly_closing_access', 'monthly_expenses_manage'], 'Current role does not have monthly closing access.'), async (req, res) => {
+  try {
+    const snapshots = await listMonthlyClosingSnapshots({
+      limit: Number(req.query?.limit || 60)
+    });
+    return res.json({ snapshots });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/monthly-closing/snapshots/:month', requireAnyRoleAccess(['monthly_closing_access', 'monthly_expenses_manage'], 'Current role does not have monthly closing access.'), async (req, res) => {
+  try {
+    const month = String(req.params?.month || '').trim();
+    if (!month) {
+      return res.status(400).json({ error: 'month is required in YYYY-MM format.' });
+    }
+    const snapshot = await getMonthlyClosingSnapshot(month);
+    if (!snapshot) {
+      return res.status(404).json({ error: 'Monthly closing snapshot not found for the selected month.' });
+    }
+    return res.json({ snapshot });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/monthly-closing/snapshots', requireAnyRoleAccess(['monthly_closing_access', 'monthly_expenses_manage'], 'Current role does not have monthly closing access.'), async (req, res) => {
+  try {
+    const month = String(req.body?.month || '').trim();
+    if (!month) {
+      return res.status(400).json({ error: 'month is required in YYYY-MM format.' });
+    }
+    const report = await getMonthlyClosingReport({ month });
+    if (!hasMonthlyClosingReportData(report)) {
+      return res.status(400).json({ error: 'No monthly closing data found for the selected month yet.' });
+    }
+    const snapshot = await saveMonthlyClosingSnapshot({
+      month,
+      report,
+      savedByUserId: String(req.get('x-user-id') || '').trim() || null,
+      savedByEmail: String(req.get('x-user-email') || '').trim().toLowerCase() || null,
+      savedByName: req.body?.savedByName || null
+    });
+    return res.status(201).json({ snapshot });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
@@ -1822,7 +2230,9 @@ app.put('/api/admin/app-config', requireAdminRole, async (req, res) => {
     const appConfig = await updateAppConfig({
       enforceKitSpec: req.body?.enforceKitSpec,
       discountProfiles: req.body?.discountProfiles,
-      roleAccess: req.body?.roleAccess
+      roleAccess: req.body?.roleAccess,
+      ePaymentSettings: req.body?.ePaymentSettings,
+      receiptWorkflow: req.body?.receiptWorkflow
     });
     return res.json({ appConfig });
   } catch (error) {
@@ -2058,15 +2468,20 @@ async function createEwalletCheckoutHandler(req, res) {
       return res.status(400).json({ error: 'Invoice already paid' });
     }
 
+    const appConfig = getAppConfig();
+    const checkoutChannel = normalizeEPaymentChannel(req.body?.checkoutChannel || invoice.paymentMethod, invoice.paymentMethod);
+    assertEnabledEPaymentChannel(checkoutChannel, appConfig);
+
     // Pass customer info to provider for pre-filling PayMongo checkout
     const session = await provider.createEwalletCheckout({
       invoice,
       paymentMethod: invoice.paymentMethod,
-      customerInfo: customerInfo || {}
+      customerInfo: customerInfo || {},
+      checkoutChannel
     });
-    await saveGcashSession({ ...session, invoiceId: invoice.id, status: 'PENDING' });
+    await saveGcashSession({ ...session, invoiceId: invoice.id, status: 'PENDING', checkoutChannel });
 
-    return res.status(201).json({ checkout: session });
+    return res.status(201).json({ checkout: { ...session, checkoutChannel } });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
@@ -2137,15 +2552,11 @@ app.get('/api/admin/transactions', requireRoleAccess('control_center_access', 'C
     const { status: filterStatus } = req.query;
     const range = buildOptionalRange(req.query, null);
 
-    let transactions = await listAllInvoices({
+    const transactions = await listAllInvoices({
       dateFrom: range.dateFrom || undefined,
       dateTo: range.dateTo || undefined,
       status: filterStatus || undefined
     });
-
-    if (!String(filterStatus || '').trim()) {
-      transactions = transactions.filter((txn) => String(txn.status || '').toUpperCase() !== 'CANCELLED');
-    }
 
     return res.json({ transactions });
   } catch (error) {
@@ -2157,7 +2568,7 @@ app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Curre
   try {
     const range = buildOptionalRange(req.query, 'daily');
     const previousRange = buildPreviousRange(range);
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthlySalesMonth = getOverviewMonthlySalesMonth(req.query, range);
 
     const [
       transactions,
@@ -2186,11 +2597,13 @@ app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Curre
         dateTo: range.dateTo || undefined,
         discrepancyOnly: true
       }),
-      getTopSalesPerProductByRange({
-        dateFrom: range.dateFrom || undefined,
-        dateTo: range.dateTo || undefined,
-        limit: 100
-      }),
+      range.dateFrom && range.dateTo
+        ? getTopSalesPerProductByRange({
+          dateFrom: range.dateFrom,
+          dateTo: range.dateTo,
+          limit: 100
+        })
+        : getTopSalesPerProduct(100),
       previousRange.dateFrom && previousRange.dateTo
         ? getTopSalesPerProductByRange({
           dateFrom: previousRange.dateFrom,
@@ -2199,7 +2612,7 @@ app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Curre
         })
         : Promise.resolve([]),
       getInventoryReport(),
-      getMonthlyClosingReport({ month: currentMonth }),
+      getMonthlyClosingReport({ month: monthlySalesMonth }),
       Promise.resolve(getOfflineQueueSummary())
     ]);
 
@@ -2217,10 +2630,10 @@ app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Curre
       ? toMoney(previousTotalSales / previousPaidTransactions.length)
       : 0;
     const cashTendered = toMoney(paidTransactions
-      .filter((txn) => String(txn.paymentMethod || txn.payment?.method || '').toLowerCase() === 'cash')
+      .filter((txn) => getTrackedPaymentMethod(txn, '') === 'cash')
       .reduce((sum, txn) => sum + Number(txn?.payment?.amountPaid ?? txn.total ?? 0), 0));
     const changeGiven = toMoney(paidTransactions
-      .filter((txn) => String(txn.paymentMethod || txn.payment?.method || '').toLowerCase() === 'cash')
+      .filter((txn) => getTrackedPaymentMethod(txn, '') === 'cash')
       .reduce((sum, txn) => sum + Number(txn?.payment?.change ?? 0), 0));
     const netCash = toMoney(cashTendered - changeGiven);
     const itemsSold = topProducts.reduce((sum, row) => sum + Number(row.qtySold || 0), 0);
@@ -2254,7 +2667,8 @@ app.get('/api/admin/overview', requireRoleAccess('control_center_access', 'Curre
         activeCashiers: activeCashiers.length,
         lowStockIngredients,
         discrepancyAlerts,
-        monthlyNetAfterExpenses: Number(monthlyClosing?.summary?.netSalesAfterExpenses || 0),
+        monthlySales: Number(monthlyClosing?.summary?.totalSales || 0),
+        monthlySalesMonth,
         monthlyExpenses: Number(monthlyClosing?.summary?.totalExpenses || 0),
         unsyncedOperations: Number(offlineQueueSummary?.operations || 0)
       },
@@ -2486,6 +2900,46 @@ app.get('/api/shifts/:shiftId/summary', requireAnyRoleAccess(['shift_session_acc
   }
 });
 
+app.get('/api/shifts/:shiftId/transactions', requireAnyRoleAccess(['shift_session_access', 'shift_monitor_access', 'operations_access'], 'Current role does not have shift transaction access.'), async (req, res) => {
+  try {
+    const shift = await getCashierShiftById(req.params.shiftId);
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found.' });
+    }
+
+    const role = normalizeRole(req.get('x-user-role') || req.query?.role);
+    const actorUserId = String(req.get('x-user-id') || '').trim() || null;
+    const actorEmail = String(req.get('x-user-email') || '').trim().toLowerCase() || null;
+    const canReviewFromDashboard = roleHasAccess(role, 'control_center_access') && roleHasAccess(role, 'invoice_action_access');
+
+    if (!canReviewFromDashboard && !isShiftAssignedToActor(shift, actorUserId, actorEmail)) {
+      return res.status(403).json({ error: 'You are not allowed to view transactions for this shift.' });
+    }
+
+    const transactions = await listAllInvoices({
+      dateFrom: shift.shiftStartAt,
+      dateTo: shift.shiftEndAt || new Date().toISOString()
+    });
+
+    const filteredTransactions = (transactions || []).filter((invoice) => {
+      if (shift.cashierUserId) {
+        return String(invoice?.cashierUserId || '').trim() === String(shift.cashierUserId || '').trim();
+      }
+      if (shift.cashierEmail) {
+        return String(invoice?.cashierEmail || '').trim().toLowerCase() === String(shift.cashierEmail || '').trim().toLowerCase();
+      }
+      return isInvoiceAssignedToActor(invoice, actorUserId, actorEmail);
+    });
+
+    return res.json({
+      shift,
+      transactions: filteredTransactions
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
 app.post('/api/shifts/:shiftId/end', requireRoleAccess('shift_session_access', 'Current role does not have shift-session access.'), async (req, res) => {
   try {
     const endingCash = toMoney(req.body?.endingCash);
@@ -2655,6 +3109,7 @@ app.get('/api/admin/shifts', requireRoleAccess('operations_access', 'Current rol
       discrepancyOnly
     });
     const rows = await Promise.all(shifts.map((shift) => enrichShiftWithSummary(shift)));
+    const paymentMethods = sumPaymentMethodBuckets(rows);
 
     const summary = {
       total: rows.length,
@@ -2668,7 +3123,9 @@ app.get('/api/admin/shifts', requireRoleAccess('operations_access', 'Current rol
       cashWithdrawals: toMoney(rows.reduce((sum, x) => sum + Number(x.cashWithdrawals || 0), 0)),
       cashTendered: toMoney(rows.reduce((sum, x) => sum + Number(x.cashTendered || 0), 0)),
       changeGiven: toMoney(rows.reduce((sum, x) => sum + Number(x.changeGiven || 0), 0)),
-      netCashRetained: toMoney(rows.reduce((sum, x) => sum + Number(x.netCashRetained || 0), 0))
+      netCashRetained: toMoney(rows.reduce((sum, x) => sum + Number(x.netCashRetained || 0), 0)),
+      otherPayments: toMoney(rows.reduce((sum, x) => sum + Number(x.otherPayments || 0), 0)),
+      paymentMethods
     };
 
     return res.json({ range, summary, shifts: rows });
@@ -2774,7 +3231,7 @@ app.get('/api/admin/sales/dashboard', requireRoleAccess('reports_access', 'Curre
     const paymentMethods = {};
 
     transactions.forEach((txn) => {
-      const method = String(txn.paymentMethod || txn.payment?.method || 'other').toLowerCase();
+      const method = getTrackedPaymentMethod(txn);
       const amount = toMoney(txn.total ?? 0);
       totals.totalSales += amount;
       paymentMethods[method] = toMoney((paymentMethods[method] || 0) + amount);
@@ -2902,11 +3359,13 @@ app.get('/api/admin/reports/:reportType', requireRoleAccess('reports_access', 'C
     }
 
     if (reportType === 'product-sales') {
-      const rows = await getTopSalesPerProductByRange({
-        dateFrom: range.dateFrom || undefined,
-        dateTo: range.dateTo || undefined,
-        limit: Number(req.query?.limit || 50)
-      });
+      const rows = range.dateFrom && range.dateTo
+        ? await getTopSalesPerProductByRange({
+          dateFrom: range.dateFrom,
+          dateTo: range.dateTo,
+          limit: Number(req.query?.limit || 50)
+        })
+        : await getTopSalesPerProduct(Number(req.query?.limit || 50));
       return res.json({
         reportType,
         generatedAt,
@@ -3005,11 +3464,12 @@ async function verifyEwalletPaymentHandler(req, res) {
       // Payment confirmed! Update invoice to PAID
       const paymentDetails = statusResult.paymentDetails || {};
       const customerInfo = statusResult.customerInfo || {};
+      const paidMethod = normalizeEPaymentChannel(session?.checkoutChannel || invoice.paymentMethod, invoice.paymentMethod);
       const paidInvoice = await setInvoicePaid(invoiceId, {
-        method: invoice.paymentMethod,
+        method: paidMethod,
         provider: 'paymongo',
         providerReference: paymentDetails.paymentId || paymongoSessionId,
-        recipientGcashNumber: invoice.paymentMethod === 'gcash' ? (customerInfo.phone || '') : '',
+        recipientGcashNumber: paidMethod === 'gcash' ? (customerInfo.phone || '') : '',
         paidAt: paymentDetails.paidAt || new Date().toISOString(),
         amountPaid: paymentDetails.amount || invoice.total,
         change: 0,
@@ -3060,11 +3520,12 @@ app.post('/api/payments/ewallet/manual-complete/:invoiceId', async (req, res) =>
     }
 
     const session = await getGcashSessionByInvoiceId(invoiceId);
+    const paidMethod = normalizeEPaymentChannel(req.body?.checkoutChannel || session?.checkoutChannel || invoice.paymentMethod, invoice.paymentMethod);
     const paidInvoice = await setInvoicePaid(invoiceId, {
-      method: invoice.paymentMethod,
+      method: paidMethod,
       provider: session?.provider || providerName || 'manual',
       providerReference: session?.reference || `MANUAL-${Date.now()}`,
-      recipientGcashNumber: invoice.paymentMethod === 'gcash' ? (session?.merchant?.gcashNumber || '') : '',
+      recipientGcashNumber: paidMethod === 'gcash' ? (session?.merchant?.gcashNumber || '') : '',
       paidAt: new Date().toISOString(),
       amountPaid: invoice.total,
       change: 0,
@@ -3095,21 +3556,30 @@ app.use((error, _req, res, next) => {
 });
 
 if (require.main === module && process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`POS server running on ${baseUrl}`);
-    console.log(`Provider: ${providerName}`);
-    console.log(`Supabase: ${isSupabaseEnabled() ? `enabled (${getSupabaseMode()})` : 'disabled'}`);
+  Promise.all([
+    ensureAppConfigLoaded({ force: true }),
+    ensureDiscountProfilesLoaded({ force: true })
+  ])
+    .catch((error) => {
+      console.warn('[AppConfig] Initial load failed:', error.message);
+    })
+    .finally(() => {
+      app.listen(PORT, () => {
+        console.log(`POS server running on ${baseUrl}`);
+        console.log(`Provider: ${providerName}`);
+        console.log(`Supabase: ${isSupabaseEnabled() ? `enabled (${getSupabaseMode()})` : 'disabled'}`);
 
-    // Start periodic sync for offline queue (every 60 seconds)
-    if (isSupabaseEnabled()) {
-      setInterval(() => {
-        syncOfflineQueue().catch((err) => {
-          console.warn('[PeriodicSync] Failed:', err.message);
-        });
-      }, 60000);
-      console.log('Periodic sync: enabled (60s interval)');
-    }
-  });
+        // Start periodic sync for offline queue (every 60 seconds)
+        if (isSupabaseEnabled()) {
+          setInterval(() => {
+            syncOfflineQueue().catch((err) => {
+              console.warn('[PeriodicSync] Failed:', err.message);
+            });
+          }, 60000);
+          console.log('Periodic sync: enabled (60s interval)');
+        }
+      });
+    });
 }
 
 module.exports = app;

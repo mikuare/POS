@@ -4,6 +4,7 @@
   cart: {},
   activeInvoice: null,
   lastPaidInvoice: null,
+  paidInvoiceEditSession: null,
   scanQrContext: null,
   poller: null,
   activeCategory: 'main-dish',
@@ -16,7 +17,10 @@
   logoutBusy: false,
   startShiftBusy: false,
   appConfig: {
-    enforceKitSpec: true
+    enforceKitSpec: true,
+    receiptWorkflow: {
+      autoOpenAfterPayment: false
+    }
   },
   roleAccessDraft: null,
   roleAccessDraftDirty: false,
@@ -42,10 +46,11 @@ const addToCartConfettiEl = document.getElementById('addToCartConfetti');
 const yummyOrderEmojiEl = document.getElementById('yummyOrderEmoji');
 const subtotalValueEl = document.getElementById('subtotalValue');
 const discountProfileSelectEl = document.getElementById('discountProfileSelect');
+const discountSummaryCardEl = document.getElementById('discountSummaryCard');
 const discountPreviousTotalValueEl = document.getElementById('discountPreviousTotalValue');
 const discountAppliedLabelEl = document.getElementById('discountAppliedLabel');
 const discountDeductionValueEl = document.getElementById('discountDeductionValue');
-const discountCurrentTotalValueEl = document.getElementById('discountCurrentTotalValue');
+const discountSummaryHintEl = document.getElementById('discountSummaryHint');
 const totalDueValueEl = document.getElementById('totalDueValue');
 const statusEl = document.getElementById('status');
 const paymentMethodEl = document.getElementById('paymentMethod');
@@ -61,6 +66,11 @@ const gcashInfoEl = document.getElementById('gcashInfo');
 const statusReceiptActionsEl = document.getElementById('statusReceiptActions');
 const statusPrintReceiptBtn = document.getElementById('statusPrintReceiptBtn');
 const statusHoldForVoidBtn = document.getElementById('statusHoldForVoidBtn');
+const paidInvoiceEditBarEl = document.getElementById('paidInvoiceEditBar');
+const paidInvoiceEditTitleEl = document.getElementById('paidInvoiceEditTitle');
+const paidInvoiceEditSummaryEl = document.getElementById('paidInvoiceEditSummary');
+const paidInvoiceEditSaveBtn = document.getElementById('paidInvoiceEditSaveBtn');
+const paidInvoiceEditCancelBtn = document.getElementById('paidInvoiceEditCancelBtn');
 const salesSummaryEl = document.getElementById('salesSummary');
 const salesListEl = document.getElementById('salesList');
 const salesDetailedGridEl = document.getElementById('salesDetailedGrid');
@@ -74,6 +84,11 @@ const salesWeeklyBtn = document.getElementById('salesWeeklyBtn');
 const salesRefreshBtn = document.getElementById('salesRefreshBtn');
 const categoryTitleEl = document.getElementById('categoryTitle');
 const paymentSuccessModalEl = document.getElementById('paymentSuccessModal');
+const paymentSuccessReferenceValueEl = document.getElementById('paymentSuccessReferenceValue');
+const paymentSuccessAmountValueEl = document.getElementById('paymentSuccessAmountValue');
+const paymentSuccessMethodValueEl = document.getElementById('paymentSuccessMethodValue');
+const paymentSuccessViewReceiptBtn = document.getElementById('paymentSuccessViewReceiptBtn');
+const paymentSuccessPrintBtn = document.getElementById('paymentSuccessPrintBtn');
 const receiptLogoEl = document.getElementById('receiptLogo');
 const receiptOrderSlipTitleEl = document.getElementById('receiptOrderSlipTitle');
 const receiptStoreNameEl = document.getElementById('receiptStoreName');
@@ -97,8 +112,13 @@ const receiptExtraNoteEl = document.getElementById('receiptExtraNote');
 const receiptPrintBtn = document.getElementById('receiptPrintBtn');
 const receiptHoldForVoidBtn = document.getElementById('receiptHoldForVoidBtn');
 const receiptPrintAreaEl = document.getElementById('receiptPrintArea');
+const paymentReceiptModalEl = document.getElementById('paymentReceiptModal');
+const paymentReceiptCloseBtn = document.getElementById('paymentReceiptCloseBtn');
+const paymentReceiptDoneBtn = document.getElementById('paymentReceiptDoneBtn');
 const paymentSuccessDoneBtn = document.getElementById('paymentSuccessDoneBtn');
-const receiptMinimizeBtn = document.getElementById('receiptMinimizeBtn');
+const paymentSuccessEyebrowEl = document.getElementById('paymentSuccessEyebrow');
+const paymentSuccessTitleEl = document.getElementById('paymentSuccessTitle');
+const paymentSuccessSummaryEl = document.getElementById('paymentSuccessSummary');
 const adminReceiptModalEl = document.getElementById('adminReceiptModal');
 const adminReceiptPrintAreaEl = document.getElementById('adminReceiptPrintArea');
 const adminReceiptLogoEl = document.getElementById('adminReceiptLogo');
@@ -124,9 +144,13 @@ const adminReceiptExtraNoteEl = document.getElementById('adminReceiptExtraNote')
 const adminReceiptPrintBtn = document.getElementById('adminReceiptPrintBtn');
 const adminReceiptCloseBtn = document.getElementById('adminReceiptCloseBtn');
 const eWalletModalEl = document.getElementById('eWalletModal');
+const eWalletModalStatusEl = document.getElementById('eWalletModalStatus');
 const chooseGcashBtn = document.getElementById('chooseGcashBtn');
+const chooseGcashNoteEl = document.getElementById('chooseGcashNote');
 const choosePaymayaBtn = document.getElementById('choosePaymayaBtn');
+const choosePaymayaNoteEl = document.getElementById('choosePaymayaNote');
 const chooseScanQrBtn = document.getElementById('chooseScanQrBtn');
+const chooseScanQrNoteEl = document.getElementById('chooseScanQrNote');
 const cancelEwalletBtn = document.getElementById('cancelEwalletBtn');
 const scanQrModalEl = document.getElementById('scanQrModal');
 const scanQrContentEl = document.getElementById('scanQrContent');
@@ -144,14 +168,25 @@ const cashOnHandBadgeEl = document.getElementById('cashOnHandBadge');
 const settingsToggleBtn = document.getElementById('settingsToggleBtn');
 const settingsMenuEl = document.getElementById('settingsMenu');
 const settingsAdminDashboardBtn = document.getElementById('settingsAdminDashboardBtn');
+const settingsShiftMonitorBtn = document.getElementById('settingsShiftMonitorBtn');
 const settingsEditMenuBtn = document.getElementById('settingsEditMenuBtn');
 const settingsCashDrawerBtn = document.getElementById('settingsCashDrawerBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-const shiftMonitorToggleBtn = document.getElementById('shiftMonitorToggleBtn');
 const shiftMonitorModalEl = document.getElementById('shiftMonitorModal');
 const shiftMonitorCloseBtn = document.getElementById('shiftMonitorCloseBtn');
 const shiftMonitorRefreshBtn = document.getElementById('shiftMonitorRefreshBtn');
 const shiftMonitorSummaryEl = document.getElementById('shiftMonitorSummary');
+const shiftMonitorTransactionsMetaEl = document.getElementById('shiftMonitorTransactionsMeta');
+const shiftMonitorTransactionsEl = document.getElementById('shiftMonitorTransactions');
+const shiftVoidAuthorizationModalEl = document.getElementById('shiftVoidAuthorizationModal');
+const shiftVoidAuthorizationCloseBtn = document.getElementById('shiftVoidAuthorizationCloseBtn');
+const shiftVoidAuthorizationSummaryEl = document.getElementById('shiftVoidAuthorizationSummary');
+const shiftVoidAuthorizationFormEl = document.getElementById('shiftVoidAuthorizationForm');
+const shiftVoidAuthorizationEmailEl = document.getElementById('shiftVoidAuthorizationEmail');
+const shiftVoidAuthorizationPasswordEl = document.getElementById('shiftVoidAuthorizationPassword');
+const shiftVoidAuthorizationStatusEl = document.getElementById('shiftVoidAuthorizationStatus');
+const shiftVoidAuthorizationSubmitBtn = document.getElementById('shiftVoidAuthorizationSubmitBtn');
+const shiftVoidAuthorizationCancelBtn = document.getElementById('shiftVoidAuthorizationCancelBtn');
 const startShiftModalEl = document.getElementById('startShiftModal');
 const startShiftDrawerSelectEl = document.getElementById('startShiftDrawerSelect');
 const startShiftDrawerNameEl = document.getElementById('startShiftDrawerName');
@@ -164,6 +199,7 @@ const startShiftAdjustmentStatusEl = document.getElementById('startShiftAdjustme
 const startShiftUsePreviousBtn = document.getElementById('startShiftUsePreviousBtn');
 const startShiftApplyAdjustmentBtn = document.getElementById('startShiftApplyAdjustmentBtn');
 const startShiftConfirmBtn = document.getElementById('startShiftConfirmBtn');
+const startShiftBackBtn = document.getElementById('startShiftBackBtn');
 const startShiftSignOutBtn = document.getElementById('startShiftSignOutBtn');
 const cashoutSummaryModalEl = document.getElementById('cashoutSummaryModal');
 const cashoutSummaryEl = document.getElementById('cashoutSummary');
@@ -220,6 +256,7 @@ const adminNavOperationsBtn = document.getElementById('adminNavOperationsBtn');
 const adminNavReceiptTemplatesBtn = document.getElementById('adminNavReceiptTemplatesBtn');
 const adminNavReportsBtn = document.getElementById('adminNavReportsBtn');
 const adminNavOthersBtn = document.getElementById('adminNavOthersBtn');
+const adminNavEPaymentBtn = document.getElementById('adminNavEPaymentBtn');
 const adminPanelOverviewEl = document.getElementById('adminPanelOverview');
 const adminPanelInventoryEl = document.getElementById('adminPanelInventory');
 const adminPanelKitSpecEl = document.getElementById('adminPanelKitSpec');
@@ -228,6 +265,7 @@ const adminPanelOperationsEl = document.getElementById('adminPanelOperations');
 const adminPanelReceiptTemplatesEl = document.getElementById('adminPanelReceiptTemplates');
 const adminPanelReportsEl = document.getElementById('adminPanelReports');
 const adminPanelOthersEl = document.getElementById('adminPanelOthers');
+const adminPanelEPaymentEl = document.getElementById('adminPanelEPayment');
 const adminNavContextMenuEl = document.getElementById('adminNavContextMenu');
 const adminNavContextPrevBtn = document.getElementById('adminNavContextPrevBtn');
 const adminNavContextNextBtn = document.getElementById('adminNavContextNextBtn');
@@ -239,7 +277,8 @@ const ADMIN_PANEL_ORDER = Object.freeze([
   'operations',
   'receipt-templates',
   'reports',
-  'others'
+  'others',
+  'e-payment'
 ]);
 const ADMIN_NAV_BUTTONS = {
   overview: adminNavOverviewBtn,
@@ -249,7 +288,8 @@ const ADMIN_NAV_BUTTONS = {
   operations: adminNavOperationsBtn,
   'receipt-templates': adminNavReceiptTemplatesBtn,
   reports: adminNavReportsBtn,
-  others: adminNavOthersBtn
+  others: adminNavOthersBtn,
+  'e-payment': adminNavEPaymentBtn
 };
 const ADMIN_NAV_ENTRIES = ADMIN_PANEL_ORDER
   .map((panelName) => ({ panelName, button: ADMIN_NAV_BUTTONS[panelName] }))
@@ -279,10 +319,14 @@ const cashDrawerMovementsListEl = document.getElementById('cashDrawerMovementsLi
 const shiftManagementRefreshBtn = document.getElementById('shiftManagementRefreshBtn');
 const shiftManagementSummaryEl = document.getElementById('shiftManagementSummary');
 const shiftManagementListEl = document.getElementById('shiftManagementList');
+const operationsDiscrepancyModuleEl = document.getElementById('operationsDiscrepancyModule');
 const discrepancyRefreshBtn = document.getElementById('discrepancyRefreshBtn');
 const discrepancySummaryEl = document.getElementById('discrepancySummary');
 const discrepancyAlertsListEl = document.getElementById('discrepancyAlertsList');
 const receiptTemplatesStatusEl = document.getElementById('receiptTemplatesStatus');
+const receiptWorkflowAutoPopupInputEl = document.getElementById('receiptWorkflowAutoPopupInput');
+const receiptWorkflowStatusEl = document.getElementById('receiptWorkflowStatus');
+const receiptWorkflowSaveBtnEl = document.getElementById('receiptWorkflowSaveBtn');
 const receiptTemplateAdminNoteEl = document.getElementById('receiptTemplateAdminNote');
 const receiptTemplateFormEl = document.getElementById('receiptTemplateForm');
 const receiptTemplateNameInputEl = document.getElementById('receiptTemplateNameInput');
@@ -345,9 +389,12 @@ const salesOpsRangeEl = document.getElementById('salesOpsRange');
 const salesOpsMonthPickerEl = document.getElementById('salesOpsMonthPicker');
 const salesOpsRefreshBtn = document.getElementById('salesOpsRefreshBtn');
 const salesOpsSummaryEl = document.getElementById('salesOpsSummary');
+
+let operationsDiscrepancyHighlightTimer = null;
 const hourlySalesGraphEl = document.getElementById('hourlySalesGraph');
 const monthlyClosingMonthInputEl = document.getElementById('monthlyClosingMonthInput');
 const monthlyClosingRefreshBtnEl = document.getElementById('monthlyClosingRefreshBtn');
+const monthlyClosingSaveBtnEl = document.getElementById('monthlyClosingSaveBtn');
 const monthlyExpenseFormEl = document.getElementById('monthlyExpenseForm');
 const monthlyExpenseDateInputEl = document.getElementById('monthlyExpenseDateInput');
 const monthlyExpenseCategoryInputEl = document.getElementById('monthlyExpenseCategoryInput');
@@ -355,6 +402,18 @@ const monthlyExpenseDescriptionInputEl = document.getElementById('monthlyExpense
 const monthlyExpenseAmountInputEl = document.getElementById('monthlyExpenseAmountInput');
 const monthlyExpenseNoteInputEl = document.getElementById('monthlyExpenseNoteInput');
 const monthlyExpenseSaveBtnEl = document.getElementById('monthlyExpenseSaveBtn');
+const ePaymentSetupAdminNoteEl = document.getElementById('ePaymentSetupAdminNote');
+const ePaymentSetupFormEl = document.getElementById('ePaymentSetupForm');
+const ePaymentSetupGcashStatusEl = document.getElementById('ePaymentSetupGcashStatus');
+const ePaymentSetupGcashReasonEl = document.getElementById('ePaymentSetupGcashReason');
+const ePaymentSetupPaymayaStatusEl = document.getElementById('ePaymentSetupPaymayaStatus');
+const ePaymentSetupPaymayaReasonEl = document.getElementById('ePaymentSetupPaymayaReason');
+const ePaymentSetupScanQrStatusEl = document.getElementById('ePaymentSetupScanQrStatus');
+const ePaymentSetupScanQrReasonEl = document.getElementById('ePaymentSetupScanQrReason');
+const ePaymentSetupScanQrPreviewEl = document.getElementById('ePaymentSetupScanQrPreview');
+const ePaymentSetupScanQrImageInputEl = document.getElementById('ePaymentSetupScanQrImageInput');
+const ePaymentSetupScanQrClearBtnEl = document.getElementById('ePaymentSetupScanQrClearBtn');
+const ePaymentSetupSaveBtnEl = document.getElementById('ePaymentSetupSaveBtn');
 const discountConfigAdminNoteEl = document.getElementById('discountConfigAdminNote');
 const discountProfileFormEl = document.getElementById('discountProfileForm');
 const discountProfileNameInputEl = document.getElementById('discountProfileNameInput');
@@ -372,8 +431,10 @@ const discountProfileModalAmountLabelEl = document.getElementById('discountProfi
 const discountProfileModalAmountInputEl = document.getElementById('discountProfileModalAmountInput');
 const discountProfileModalDeleteBtnEl = document.getElementById('discountProfileModalDeleteBtn');
 const monthlyClosingAdminNoteEl = document.getElementById('monthlyClosingAdminNote');
+const monthlyClosingSnapshotStatusEl = document.getElementById('monthlyClosingSnapshotStatus');
 const monthlyClosingSummaryEl = document.getElementById('monthlyClosingSummary');
 const monthlyExpenseListEl = document.getElementById('monthlyExpenseList');
+const monthlyClosingSnapshotListEl = document.getElementById('monthlyClosingSnapshotList');
 const reportDailySalesBtn = document.getElementById('reportDailySalesBtn');
 const reportMonthlyClosingBtn = document.getElementById('reportMonthlyClosingBtn');
 const reportShiftBtn = document.getElementById('reportShiftBtn');
@@ -384,6 +445,14 @@ const reportDownloadBtn = document.getElementById('reportDownloadBtn');
 const reportPrintBtn = document.getElementById('reportPrintBtn');
 const reportsStatusEl = document.getElementById('reportsStatus');
 const reportsPreviewEl = document.getElementById('reportsPreview');
+let monthlyClosingRefreshToken = 0;
+let monthlyClosingLoadedMonth = '';
+let monthlyClosingSerializedSnapshot = '';
+let monthlyClosingCurrentResult = null;
+let monthlyClosingCurrentViewMode = 'live';
+let monthlyClosingActiveSnapshotMonth = '';
+let monthlyClosingSavedSnapshots = [];
+let discountManagerLoaded = false;
 const inventoryIngredientFormEl = document.getElementById('inventoryIngredientForm');
 const ingredientNameInputEl = document.getElementById('ingredientNameInput');
 const ingredientQtyInputEl = document.getElementById('ingredientQtyInput');
@@ -454,6 +523,7 @@ let activeSalesOpsRange = 'daily';
 let isAdminMixPanelOpen = false;
 const AUTH_SESSION_KEY = 'pos_active_user_v1';
 const AUTH_TOKEN_KEY = 'pos_auth_token_v1';
+const AUTH_TOKEN_EXPIRY_KEY = 'pos_auth_token_expiry_v1';
 const AUTH_OFFLINE_CACHE_KEY = 'pos_offline_auth_cache_v1';
 const UI_STATE_KEY_PREFIX = 'pos_ui_state_v1_';
 const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
@@ -463,6 +533,9 @@ const OFFLINE_SYNC_INTERVAL_MS = 15000;
 const offlineOutbox = window.POSOfflineOutbox || null;
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
+let paymentSuccessAnimationTimer = null;
+let paymentReceiptAutoOpenTimer = null;
+let isRestoringPosDraft = false;
 let appInitialized = false;
 let authLogoRenderStarted = false;
 let activeAuthSession = null;
@@ -479,6 +552,7 @@ let latestAdminReport = null;
 let latestInventoryReportData = null;
 let activeInventoryView = 'ingredients';
 let inventoryBulkEditorOpen = false;
+let shiftVoidAuthorizationContext = null;
 let kitSpecIngredients = [];
 let kitSpecRecipes = [];
 let kitSpecDraftRows = [];
@@ -932,7 +1006,8 @@ function getPaymentMethodLabel(method) {
   const map = {
     cash: 'Cash',
     gcash: 'GCash',
-    paymaya: 'PayMaya'
+    paymaya: 'PayMaya',
+    scanqr: 'Scan QR'
   };
   return map[String(method || '').toLowerCase()] || String(method || '').toUpperCase();
 }
@@ -941,6 +1016,7 @@ function getPaymentMethodIcon(method) {
   const normalized = String(method || '').toLowerCase();
   if (normalized === 'cash') return '/Other/Cash.png';
   if (normalized === 'paymaya') return '/Other/Maya.png';
+  if (normalized === 'scanqr') return '/Other/E-Payment.png';
   return '/Other/GCash.png';
 }
 
@@ -953,17 +1029,69 @@ function isEwalletAvailable() {
   return state.connectivity.mode === 'online' || state.connectivity.mode === 'pending' || state.connectivity.mode === 'checking';
 }
 
+function renderEPaymentOptionAvailability() {
+  const methodRows = [
+    { key: 'gcash', button: chooseGcashBtn, noteEl: chooseGcashNoteEl },
+    { key: 'paymaya', button: choosePaymayaBtn, noteEl: choosePaymayaNoteEl },
+    { key: 'scanQr', button: chooseScanQrBtn, noteEl: chooseScanQrNoteEl }
+  ];
+
+  const availableCount = getAvailableEPaymentMethodCount();
+  methodRows.forEach(({ key, button, noteEl }) => {
+    const availability = getEPaymentMethodAvailability(key);
+    if (button) {
+      button.disabled = !availability.available;
+      button.classList.toggle('is-disabled', !availability.available);
+      button.title = availability.statusNote;
+    }
+    if (noteEl) {
+      noteEl.textContent = availability.statusNote;
+    }
+  });
+
+  if (eWalletModalStatusEl) {
+    if (!isEwalletAvailable()) {
+      eWalletModalStatusEl.textContent = 'Offline mode active. E-payment checkout is unavailable right now.';
+      eWalletModalStatusEl.classList.remove('status-success');
+      eWalletModalStatusEl.classList.add('status-error');
+    } else if (availableCount === 0) {
+      eWalletModalStatusEl.textContent = 'All e-payment channels are currently disabled. Review the notes below before continuing.';
+      eWalletModalStatusEl.classList.remove('status-success');
+      eWalletModalStatusEl.classList.add('status-error');
+    } else if (availableCount < EPAYMENT_CHANNEL_KEYS.length) {
+      eWalletModalStatusEl.textContent = `${availableCount} e-payment channel(s) available. Disabled channels show the admin note below.`;
+      eWalletModalStatusEl.classList.remove('status-error');
+      eWalletModalStatusEl.classList.add('status-success');
+    } else {
+      eWalletModalStatusEl.textContent = 'Select your payment channel.';
+      eWalletModalStatusEl.classList.remove('status-success', 'status-error');
+    }
+  }
+}
+
 function updatePaymentActionAvailability() {
   const hasOrderType = Boolean(state.orderType);
+  const paidEditActive = isPaidInvoiceEditActive();
   const ewalletAvailable = isEwalletAvailable();
+  const currentMethod = String(paymentMethodEl?.value || 'cash').trim().toLowerCase();
+  const currentMethodAvailability = currentMethod === 'cash'
+    ? { available: true }
+    : getEPaymentMethodAvailability(currentMethod);
 
-  if (cashPaymentBtn) cashPaymentBtn.disabled = !hasOrderType;
-  if (ePaymentBtn) ePaymentBtn.disabled = !hasOrderType || !ewalletAvailable;
-  if (chooseGcashBtn) chooseGcashBtn.disabled = !ewalletAvailable;
-  if (choosePaymayaBtn) choosePaymayaBtn.disabled = !ewalletAvailable;
-  if (chooseScanQrBtn) chooseScanQrBtn.disabled = !ewalletAvailable;
+  if (cashPaymentBtn) cashPaymentBtn.disabled = paidEditActive || !hasOrderType;
+  if (ePaymentBtn) ePaymentBtn.disabled = paidEditActive || !hasOrderType || !ewalletAvailable;
+  renderEPaymentOptionAvailability();
+  renderPaidInvoiceEditBar();
 
-  if (!ewalletAvailable && paymentMethodEl?.value !== 'cash') {
+  if (paidEditActive) {
+    closeEwalletModal();
+    closeScanQrModal();
+    state.cashPromptActive = false;
+    if (cashRowEl) cashRowEl.style.display = 'none';
+    return;
+  }
+
+  if ((!ewalletAvailable || !currentMethodAvailability.available) && paymentMethodEl?.value !== 'cash') {
     closeEwalletModal();
     closeScanQrModal();
     state.cashPromptActive = false;
@@ -977,11 +1105,11 @@ function renderConnectivityStatus() {
   const mode = String(state.connectivity.mode || 'checking');
   const queuedOps = Math.max(0, Number(state.connectivity.queuedOperations || 0));
   const queuedInvoices = Math.max(0, Number(state.connectivity.queuedInvoices || 0));
-  const modeClass = ['checking', 'offline', 'pending', 'online', 'server-offline'].includes(mode)
+  const modeClass = ['checking', 'offline', 'pending', 'online', 'server-offline', 'degraded'].includes(mode)
     ? mode
     : 'checking';
 
-  offlineStatusBarEl.classList.remove('checking', 'offline', 'pending', 'online', 'server-offline');
+  offlineStatusBarEl.classList.remove('checking', 'offline', 'pending', 'online', 'server-offline', 'degraded');
   offlineStatusBarEl.classList.add(modeClass);
 
   let statusText = 'Checking cloud sync status...';
@@ -989,6 +1117,8 @@ function renderConnectivityStatus() {
     statusText = navigator.onLine
       ? 'Cannot reach POS cloud server right now. Keep this tab open and retry sync shortly.'
       : 'No internet connection. Sales are saved on this device and will sync when internet returns.';
+  } else if (mode === 'degraded') {
+    statusText = 'Cloud sync degraded: app server is online, but Supabase is failing. Using fallback data temporarily.';
   } else if (mode === 'offline') {
     statusText = 'Offline mode: sales continue locally and will sync when internet returns.';
   } else if (mode === 'pending') {
@@ -1026,6 +1156,8 @@ function applyConnectivitySnapshot(snapshot, { showTransitionToast = true } = {}
     mode = 'server-offline';
   } else if (!snapshot.supabaseEnabled) {
     mode = queuedOps > 0 ? 'pending' : 'online';
+  } else if (browserOnline && snapshot.serverReachable && !snapshot.supabaseReachable) {
+    mode = 'degraded';
   } else if (!browserOnline || !snapshot.supabaseReachable) {
     mode = 'offline';
   } else if (queuedOps > 0) {
@@ -1048,10 +1180,12 @@ function applyConnectivitySnapshot(snapshot, { showTransitionToast = true } = {}
 
   if (!showTransitionToast || previousMode === mode) return;
 
-  if (mode === 'offline' || mode === 'server-offline') {
+  if (mode === 'offline' || mode === 'server-offline' || mode === 'degraded') {
     showConfirmationToast({
-      title: 'Offline mode',
-      message: 'Sales are saved locally and will sync automatically.',
+      title: mode === 'degraded' ? 'Cloud degraded' : 'Offline mode',
+      message: mode === 'degraded'
+        ? 'App server is reachable, but Supabase is failing. Fallback data is active temporarily.'
+        : 'Sales are saved locally and will sync automatically.',
       tone: 'warning',
       duration: 3200
     });
@@ -1213,12 +1347,17 @@ function setOrderType(type) {
   state.cashPromptActive = false;
   updatePaymentActionAvailability();
   if (amountTenderedEl) amountTenderedEl.value = '';
-  setPaymentMethod('cash');
-  if (isEwalletAvailable()) {
+  if (!isPaidInvoiceEditActive()) {
+    setPaymentMethod('cash');
+  }
+  if (isPaidInvoiceEditActive()) {
+    setStatus(`${getOrderTypeLabel(type)} selected. Continue editing the paid transaction, then click Save Transaction Changes.`);
+  } else if (isEwalletAvailable()) {
     setStatus(`${getOrderTypeLabel(type)} selected. Choose Cash or E-Payment.`);
   } else {
     setStatus(`${getOrderTypeLabel(type)} selected. Offline mode active: Cash only until internet is back.`);
   }
+  persistPosDraftState();
 }
 
 function getOrderTypeLabel(type) {
@@ -1254,6 +1393,51 @@ function formatMonthLabel(monthValue) {
     year: 'numeric',
     month: 'long'
   });
+}
+
+function buildMonthDateValue(monthValue, day = 1) {
+  const normalized = String(monthValue || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(normalized)) return '';
+  const safeDay = Math.max(1, Math.min(28, Number(day) || 1));
+  return `${normalized}-${String(safeDay).padStart(2, '0')}`;
+}
+
+function syncMonthlyExpenseDateToSelectedMonth({ force = false } = {}) {
+  if (!monthlyExpenseDateInputEl) return;
+  const selectedMonth = getMonthlyClosingSelectedMonth();
+  if (!selectedMonth) return;
+  const currentValue = String(monthlyExpenseDateInputEl.value || '').trim();
+  const currentMonth = currentValue.slice(0, 7);
+  if (!force && currentValue && currentMonth === selectedMonth) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  monthlyExpenseDateInputEl.value = today.slice(0, 7) === selectedMonth
+    ? today
+    : buildMonthDateValue(selectedMonth, 1);
+}
+
+function isDateWithinMonth(dateValue, monthValue = getMonthlyClosingSelectedMonth()) {
+  return String(dateValue || '').slice(0, 7) === String(monthValue || '').trim();
+}
+
+function hasMonthlyClosingData(result = null) {
+  const summary = result?.summary || {};
+  return Boolean(
+    Number(summary.totalSales || 0)
+    || Number(summary.totalExpenses || 0)
+    || Number(summary.totalTransactions || 0)
+    || Number(summary.drawerWithdrawals || 0)
+    || Number(summary.totalDiscrepancy || 0)
+    || (Array.isArray(result?.expenses) && result.expenses.length)
+    || (Array.isArray(result?.expenseByCategory) && result.expenseByCategory.length)
+    || (Array.isArray(result?.topProducts) && result.topProducts.length)
+  );
+}
+
+function getMonthlyClosingSavedSnapshot(monthValue = getMonthlyClosingSelectedMonth()) {
+  const safeMonth = String(monthValue || '').trim();
+  if (!safeMonth) return null;
+  return monthlyClosingSavedSnapshots.find((snapshot) => snapshot.month === safeMonth) || null;
 }
 
 function toClientProduct(product) {
@@ -1588,7 +1772,31 @@ async function syncClientOfflineOutbox() {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  let hasReloadedForServiceWorker = false;
+  navigator.serviceWorker.register('/sw.js', {
+    updateViaCache: 'none'
+  })
+    .then((registration) => {
+      registration.update().catch(() => {});
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            worker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hasReloadedForServiceWorker) return;
+        hasReloadedForServiceWorker = true;
+        window.location.reload();
+      });
+    })
+    .catch(() => {});
 }
 
 function normalizeEmail(value) {
@@ -1609,15 +1817,15 @@ function normalizeRoleChoice(value) {
 }
 
 function isCashierRole(role) {
-  return hasConfiguredRoleAccess('shift_session_access', role);
+  return hasRoleAccess('shift_session_access', role);
 }
 
 function isDrawerOperatorRole(role) {
-  return hasConfiguredRoleAccess('shift_session_access', role);
+  return hasRoleAccess('shift_session_access', role);
 }
 
 function canViewShiftMonitorOnPos(role) {
-  return hasConfiguredRoleAccess('shift_monitor_access', role);
+  return hasRoleAccess('shift_session_access', role) || hasRoleAccess('shift_monitor_access', role);
 }
 
 function parseNonNegativeAmount(value) {
@@ -1694,8 +1902,8 @@ function needsCashierShiftStart() {
 }
 
 function updateShiftMonitorVisibility() {
-  if (shiftMonitorToggleBtn) {
-    shiftMonitorToggleBtn.style.display = (activeAuthSession?.email && canViewShiftMonitorOnPos(activeAuthSession?.role)) ? 'inline-flex' : 'none';
+  if (settingsShiftMonitorBtn) {
+    settingsShiftMonitorBtn.style.display = (activeAuthSession?.email && canViewShiftMonitorOnPos(activeAuthSession?.role)) ? 'block' : 'none';
   }
   updateCashOnHandBadge();
 }
@@ -1816,6 +2024,21 @@ function normalizePaymentMethod(method) {
   return String(method || '').trim().toLowerCase() || 'other';
 }
 
+function getTrackedPaymentMethod(txn, fallback = 'other') {
+  return normalizePaymentMethod(txn?.payment?.method || txn?.paymentMethod || fallback);
+}
+
+function formatPaymentMethodBreakdownText(paymentMethods = {}, { excludeCash = false } = {}) {
+  const entries = Object.entries(paymentMethods || {})
+    .map(([method, amount]) => [normalizePaymentMethod(method), Number(amount || 0)])
+    .filter(([method, amount]) => Number.isFinite(amount) && amount > 0)
+    .filter(([method]) => !excludeCash || method !== 'cash');
+  if (!entries.length) return excludeCash ? 'No e-payments recorded.' : 'No payment breakdown recorded.';
+  return entries
+    .map(([method, amount]) => `${getPaymentMethodLabel(method)}: ${money(amount)}`)
+    .join(' | ');
+}
+
 function buildShiftSummary(transactions = [], {
   drawerId = null,
   drawerName = null,
@@ -1835,7 +2058,7 @@ function buildShiftSummary(transactions = [], {
   paidTransactions.forEach((txn) => {
     const amount = Number(txn?.total ?? 0);
     const safeAmount = Number.isFinite(amount) ? amount : 0;
-    const method = normalizePaymentMethod(txn?.paymentMethod || txn?.payment?.method);
+    const method = getTrackedPaymentMethod(txn);
 
     totalSales += safeAmount;
     paymentMethods[method] = (paymentMethods[method] || 0) + safeAmount;
@@ -1956,7 +2179,6 @@ function renderShiftSummary(containerEl, summary, { endingCash = null } = {}) {
     <div class="shift-summary-line"><span>Shift End / Sign Out</span><strong>${escapeHtml(endedAtText)}</strong></div>
     <div class="shift-summary-line"><span>Total Sales</span><strong>${money(summary.totalSales || 0)}</strong></div>
     <div class="shift-summary-line"><span>Total Transactions</span><strong>${Number(summary.totalTransactions || 0)}</strong></div>
-    <div class="shift-summary-line"><span>On Hold for Void</span><strong>${money(summary.holdForVoidAmount || 0)} (${Number(summary.holdForVoidCount || 0)})</strong></div>
     <div class="shift-summary-line"><span>Voided After Payment</span><strong>${money(summary.voidedAmount || 0)} (${Number(summary.voidedCount || 0)})</strong></div>
     <div class="shift-summary-line"><span>Cash Sales</span><strong>${money(summary.cashPayments || 0)}</strong></div>
     <div class="shift-summary-line"><span>Cash Tendered</span><strong>${money(summary.cashTendered || 0)}</strong></div>
@@ -1972,6 +2194,122 @@ function renderShiftSummary(containerEl, summary, { endingCash = null } = {}) {
   `;
 }
 
+function renderShiftMonitorTransactions(transactions = []) {
+  if (!shiftMonitorTransactionsEl) return;
+  const rows = Array.isArray(transactions) ? transactions : [];
+  const pendingCount = rows.filter((row) => normalizeInvoiceLifecycleStatus(row?.status) === 'PENDING').length;
+  const paidCount = rows.filter((row) => normalizeInvoiceLifecycleStatus(row?.status) === 'PAID').length;
+  const voidedCount = rows.filter((row) => normalizeInvoiceLifecycleStatus(row?.status) === 'VOIDED').length;
+
+  if (shiftMonitorTransactionsMetaEl) {
+    shiftMonitorTransactionsMetaEl.innerHTML = `
+      <span>${Number(rows.length)} total</span>
+      <span>${Number(pendingCount)} pending</span>
+      <span>${Number(paidCount)} paid</span>
+      <span>${Number(voidedCount)} voided</span>
+    `;
+  }
+
+  if (!rows.length) {
+    shiftMonitorTransactionsEl.innerHTML = '<p>No transactions recorded for this shift yet.</p>';
+    return;
+  }
+
+  const markup = rows.map((txn) => {
+    const normalizedStatus = normalizeInvoiceLifecycleStatus(txn?.status);
+    const statusClass = normalizedStatus === 'PAID'
+      ? 'badge-paid'
+      : normalizedStatus === 'HOLD_FOR_VOID'
+        ? 'badge-hold-void'
+        : normalizedStatus === 'CANCELLED'
+          ? 'badge-cancelled'
+          : normalizedStatus === 'VOIDED'
+            ? 'badge-voided'
+            : 'badge-pending';
+    const methodClass = String(txn?.paymentMethod || '').trim().toLowerCase() === 'cash' ? 'badge-cash' : 'badge-gcash';
+    const viewBtnLabel = (normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID' || normalizedStatus === 'VOIDED')
+      ? 'Receipt'
+      : 'View';
+    const verifyBtn = (normalizedStatus === 'PENDING' && String(txn?.paymentMethod || '').trim().toLowerCase() !== 'cash')
+      ? `<button class="verify-btn small" data-shift-monitor-verify="${escapeHtml(txn.id)}">Verify</button>`
+      : '';
+    const editBtn = ((normalizedStatus === 'PENDING' && isInvoiceAssignedToCurrentActor(txn)) || canEditPaidInvoiceFromShiftMonitor(txn))
+      ? `<button class="secondary small" data-shift-monitor-edit="${escapeHtml(txn.id)}">Edit</button>`
+      : '';
+    const cancelBtn = (normalizedStatus === 'PENDING' && canManageInvoiceActions(txn, 'CANCELLED'))
+      ? `<button class="secondary small" data-shift-monitor-status="${escapeHtml(txn.id)}" data-next-status="CANCELLED">Cancel</button>`
+      : '';
+    const authorizedVoidBtn = (normalizedStatus === 'PAID' && canRequestAuthorizedVoidFromShiftMonitor(txn))
+      ? `<button class="secondary small" data-shift-monitor-authorized-void="${escapeHtml(txn.id)}">Void</button>`
+      : '';
+    const voidBtn = ((normalizedStatus === 'PAID' || normalizedStatus === 'HOLD_FOR_VOID') && canManageInvoiceActions(txn, 'VOIDED'))
+      ? `<button class="secondary small" data-shift-monitor-status="${escapeHtml(txn.id)}" data-next-status="VOIDED">Void</button>`
+      : '';
+    const paidInfo = txn?.payment
+      ? `<div class="txn-paid-info">Sale: ${money(txn.total || 0)} | Tendered: ${money(txn.payment.amountPaid || 0)} | Change: ${money(txn.payment.change || 0)} at ${formatDate(txn.payment.paidAt)}</div>`
+      : '';
+    const lifecycleInfo = (normalizedStatus === 'CANCELLED' || normalizedStatus === 'VOIDED' || normalizedStatus === 'HOLD_FOR_VOID')
+      ? `<div class="txn-paid-info">${escapeHtml(getOverviewMixLabel(normalizedStatus))}${txn?.statusReason ? `: ${escapeHtml(txn.statusReason)}` : ''}${txn?.statusChangedAt ? ` • ${escapeHtml(formatDate(txn.statusChangedAt))}` : ''}${txn?.statusChangedByEmail ? ` • ${escapeHtml(txn.statusChangedByEmail)}` : ''}</div>`
+      : '';
+
+    return `
+      <div class="txn-row">
+        <div class="txn-main">
+          <button class="txn-ref receipt-link" data-shift-monitor-receipt="${escapeHtml(txn.id)}">${escapeHtml(txn.reference || txn.id)}</button>
+          <div class="txn-badges">
+            <span class="badge ${statusClass}">${escapeHtml(getOverviewMixLabel(normalizedStatus) || txn.status)}</span>
+            <span class="badge ${methodClass} method-badge">
+              <img class="payment-method-icon payment-method-icon-${escapeHtml(String(txn?.paymentMethod || '').toLowerCase())}" src="${getPaymentMethodIcon(txn?.paymentMethod)}" alt="${getPaymentMethodLabel(txn?.paymentMethod)}" />
+              ${getPaymentMethodLabel(txn?.paymentMethod)}
+            </span>
+          </div>
+        </div>
+        <div class="txn-details">
+          <div class="txn-amount">${money(txn?.total || 0)}</div>
+          <div class="txn-date">${escapeHtml(txn?.orderType ? getOrderTypeLabel(txn.orderType) : 'Order')} • ${formatDate(txn?.createdAt)}</div>
+          ${paidInfo}
+          ${lifecycleInfo}
+        </div>
+        <div class="txn-actions">
+          <button class="secondary small" data-shift-monitor-receipt="${escapeHtml(txn.id)}">${viewBtnLabel}</button>
+          ${verifyBtn}
+          ${editBtn}
+          ${authorizedVoidBtn}
+          ${cancelBtn}
+          ${voidBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  shiftMonitorTransactionsEl.innerHTML = markup;
+}
+
+async function refreshShiftMonitorTransactions() {
+  if (!shiftMonitorTransactionsEl) return [];
+  if (!activeAuthSession?.email) {
+    if (shiftMonitorTransactionsMetaEl) shiftMonitorTransactionsMetaEl.innerHTML = '<span>Login required</span>';
+    shiftMonitorTransactionsEl.innerHTML = '<p>Login is required to view shift transactions.</p>';
+    return [];
+  }
+
+  const shiftId = String(cashierShiftState?.shiftId || latestShiftSummary?.shiftId || '').trim();
+  if (!shiftId) {
+    if (shiftMonitorTransactionsMetaEl) shiftMonitorTransactionsMetaEl.innerHTML = '<span>No active shift</span>';
+    shiftMonitorTransactionsEl.innerHTML = '<p>Start a shift and process orders to see this session transaction list.</p>';
+    return [];
+  }
+
+  if (shiftMonitorTransactionsMetaEl) shiftMonitorTransactionsMetaEl.innerHTML = '<span>Loading...</span>';
+  shiftMonitorTransactionsEl.innerHTML = '<p>Loading session transactions...</p>';
+
+  const { transactions } = await api(`/api/shifts/${encodeURIComponent(shiftId)}/transactions`, {
+    headers: buildActorHeaders()
+  });
+  renderShiftMonitorTransactions(transactions || []);
+  return Array.isArray(transactions) ? transactions : [];
+}
+
 function openShiftMonitorModal() {
   if (!shiftMonitorModalEl) return;
   shiftMonitorModalEl.classList.add('open');
@@ -1982,26 +2320,306 @@ function closeShiftMonitorModal() {
   if (!shiftMonitorModalEl) return;
   shiftMonitorModalEl.classList.remove('open');
   shiftMonitorModalEl.setAttribute('aria-hidden', 'true');
+  closeShiftVoidAuthorizationModal();
 }
 
 async function showShiftMonitorSummary() {
-  if (!shiftMonitorSummaryEl) return;
-  shiftMonitorSummaryEl.innerHTML = '<p>Loading shift summary...</p>';
+  if (shiftMonitorSummaryEl) {
+    shiftMonitorSummaryEl.innerHTML = '<p>Loading shift summary...</p>';
+  }
+  if (shiftMonitorTransactionsEl) {
+    shiftMonitorTransactionsEl.innerHTML = '<p>Loading session transactions...</p>';
+  }
+
+  if (!activeAuthSession?.email) {
+    if (shiftMonitorSummaryEl) {
+      shiftMonitorSummaryEl.innerHTML = '<p>Login is required to view shift monitor.</p>';
+    }
+    if (shiftMonitorTransactionsMetaEl) {
+      shiftMonitorTransactionsMetaEl.innerHTML = '<span>Login required</span>';
+    }
+    if (shiftMonitorTransactionsEl) {
+      shiftMonitorTransactionsEl.innerHTML = '<p>Login is required to view shift transactions.</p>';
+    }
+    return;
+  }
 
   try {
-    if (!activeAuthSession?.email) {
-      shiftMonitorSummaryEl.innerHTML = '<p>Login is required to view shift monitor.</p>';
+    const summary = await refreshLatestShiftSummary();
+    if (shiftMonitorSummaryEl) {
+      renderShiftSummary(shiftMonitorSummaryEl, summary);
+    }
+  } catch (error) {
+    if (shiftMonitorSummaryEl) {
+      shiftMonitorSummaryEl.innerHTML = `<p class="error">Shift summary error: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+
+  try {
+    await refreshShiftMonitorTransactions();
+  } catch (error) {
+    if (shiftMonitorTransactionsMetaEl) {
+      shiftMonitorTransactionsMetaEl.innerHTML = '<span>Load failed</span>';
+    }
+    if (shiftMonitorTransactionsEl) {
+      shiftMonitorTransactionsEl.innerHTML = `<p class="error">Shift transaction error: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+}
+
+async function refreshShiftMonitorModalIfOpen() {
+  if (!shiftMonitorModalEl?.classList.contains('open')) return;
+  await showShiftMonitorSummary();
+}
+
+async function reopenShiftMonitorTransactionForEdit(invoiceId) {
+  const safeInvoiceId = String(invoiceId || '').trim();
+  if (!safeInvoiceId) return;
+
+  const { invoice } = await api(`/api/invoices/${encodeURIComponent(safeInvoiceId)}`);
+  if (!invoice) {
+    setStatus('Order not found.');
+    return;
+  }
+
+  const normalizedStatus = normalizeInvoiceLifecycleStatus(invoice.status);
+  if (normalizedStatus !== 'PENDING' && normalizedStatus !== 'PAID') {
+    setStatus('Only pending or paid transactions can be edited from Shift Monitor.');
+    return;
+  }
+  if (normalizedStatus === 'PENDING' && !isInvoiceAssignedToCurrentActor(invoice) && !canReviewInvoicesFromControlCenter()) {
+    setStatus('Current role cannot reopen this pending order.');
+    return;
+  }
+  if (normalizedStatus === 'PAID' && !canEditPaidInvoiceFromShiftMonitor(invoice)) {
+    setStatus('Current role cannot edit this paid transaction.');
+    return;
+  }
+
+  const validProducts = new Set((state.products || []).map((product) => String(product.id || '').trim()));
+  const restoredCart = {};
+  (Array.isArray(invoice.lineItems) ? invoice.lineItems : []).forEach((item) => {
+    const productId = String(item?.productId || '').trim();
+    const qty = Math.max(0, Math.floor(Number(item?.qty || 0)));
+    if (productId && qty > 0 && validProducts.has(productId)) {
+      restoredCart[productId] = qty;
+    }
+  });
+
+  if (!Object.keys(restoredCart).length) {
+    setStatus('This order cannot be reopened because its menu items are no longer available in the current catalog.');
+    return;
+  }
+
+  const hasLooseDraft = Object.values(state.cart || {}).some((qty) => Number(qty || 0) > 0);
+  const activePendingInvoiceId = String(state.activeInvoice?.id || state.scanQrContext?.invoiceId || '').trim();
+  const activePendingStatus = normalizeInvoiceLifecycleStatus(state.activeInvoice?.status);
+  if (activePendingInvoiceId && activePendingInvoiceId !== safeInvoiceId && activePendingStatus === 'PENDING') {
+    const replaceConfirmed = window.confirm(`Pending order ${state.activeInvoice?.reference || activePendingInvoiceId} will be cancelled so ${invoice.reference || 'this order'} can be reopened for editing. Continue?`);
+    if (!replaceConfirmed) return;
+    const cancelled = await cancelActivePendingInvoice(
+      'Cashier switched to another pending order from Shift Monitor.',
+      'Previous pending order cancelled so another order could be reopened.'
+    );
+    if (!cancelled) return;
+  }
+  if (!activePendingInvoiceId && hasLooseDraft && (!isPaidInvoiceEditActive() || String(state.paidInvoiceEditSession?.invoiceId || '').trim() !== safeInvoiceId)) {
+    const discardConfirmed = window.confirm('The current POS draft will be replaced. Continue editing this transaction instead?');
+    if (!discardConfirmed) return;
+    resetAfterSale();
+  }
+
+  if (normalizedStatus === 'PAID') {
+    const confirmed = window.confirm(`Edit paid transaction ${invoice.reference || safeInvoiceId}? The original receipt stays paid, but you must save the revised items from POS before leaving this edit mode.`);
+    if (!confirmed) return;
+
+    state.cart = restoredCart;
+    state.activeInvoice = null;
+    state.scanQrContext = null;
+    state.paidInvoiceEditSession = {
+      invoiceId: safeInvoiceId,
+      reference: invoice.reference || safeInvoiceId,
+      paymentMethod: String(invoice?.payment?.method || invoice.paymentMethod || 'cash').trim().toLowerCase() || 'cash',
+      amountPaid: Number(invoice?.payment?.amountPaid || invoice.total || 0)
+    };
+    state.orderType = (String(invoice.orderType || '').trim().toLowerCase() === 'take-out') ? 'take-out' : 'dine-in';
+    state.selectedDiscountProfileId = String(invoice?.discountProfile?.id || '').trim();
+    state.cashPromptActive = false;
+    ensureValidSelectedDiscountProfile();
+    if (customerNameEl) customerNameEl.value = String(invoice?.payment?.customerName || '').trim();
+    if (customerEmailEl) customerEmailEl.value = String(invoice?.payment?.customerEmail || '').trim();
+    if (customerPhoneEl) customerPhoneEl.value = String(invoice?.payment?.customerPhone || '').trim();
+    if (amountTenderedEl) amountTenderedEl.value = '';
+
+    const restoredMethod = String(invoice?.payment?.method || invoice.paymentMethod || 'cash').trim().toLowerCase();
+    setPaymentMethod(restoredMethod === 'paymaya' ? 'paymaya' : restoredMethod === 'cash' ? 'cash' : 'gcash');
+    renderCart();
+    updatePaymentActionAvailability();
+    persistPosDraftState();
+    closeShiftMonitorModal();
+    switchTab('pos');
+    setStatus(`Editing paid transaction ${invoice.reference || safeInvoiceId}. Update the products, discount, or order type, then click Save Transaction Changes.`);
+    return;
+  }
+
+  const confirmed = window.confirm(`Reopen ${invoice.reference || 'this pending order'} for editing? The original pending transaction will be cancelled and the items will be loaded back into POS as a new draft.`);
+  if (!confirmed) return;
+
+  await api(`/api/admin/invoices/${encodeURIComponent(safeInvoiceId)}/status`, {
+    method: 'PATCH',
+    headers: buildActorHeaders(),
+    body: JSON.stringify({
+      status: 'CANCELLED',
+      reason: `Reopened for editing in Shift Monitor by ${normalizeEmail(activeAuthSession?.email) || 'current user'}.`
+    })
+  });
+
+  state.cart = restoredCart;
+  state.activeInvoice = null;
+  state.paidInvoiceEditSession = null;
+  state.scanQrContext = null;
+  state.orderType = (String(invoice.orderType || '').trim().toLowerCase() === 'take-out') ? 'take-out' : 'dine-in';
+  state.selectedDiscountProfileId = String(invoice?.discountProfile?.id || '').trim();
+  ensureValidSelectedDiscountProfile();
+  if (customerNameEl) customerNameEl.value = '';
+  if (customerEmailEl) customerEmailEl.value = '';
+  if (customerPhoneEl) customerPhoneEl.value = '';
+  if (amountTenderedEl) amountTenderedEl.value = '';
+
+  const restoredMethod = String(invoice.paymentMethod || 'cash').trim().toLowerCase();
+  setPaymentMethod(restoredMethod === 'paymaya' ? 'paymaya' : restoredMethod === 'cash' ? 'cash' : 'gcash');
+  renderCart();
+  updatePaymentActionAvailability();
+  persistPosDraftState();
+  closeShiftMonitorModal();
+  switchTab('pos');
+
+  if (canAccessAdminFeatures()) {
+    await refreshSalesReport(activeSalesRange);
+  } else {
+    await refreshLatestShiftSummary().catch(() => {});
+  }
+  setStatus(`Pending transaction ${invoice.reference || safeInvoiceId} reopened as a new POS draft. The original pending record was cancelled to keep the transaction history clean.`);
+}
+
+async function savePaidInvoiceEdit() {
+  const session = state.paidInvoiceEditSession;
+  if (!session?.invoiceId) {
+    setStatus('No paid transaction edit is active.');
+    return;
+  }
+  if (!state.orderType) {
+    setStatus('Select order type first: Dine In or Take Out.');
+    return;
+  }
+  const items = getCartItems();
+  if (!items.length) {
+    setStatus('Add at least one item first.');
+    return;
+  }
+  if (!state.connectivity.serverReachable || (state.connectivity.supabaseEnabled && !state.connectivity.supabaseReachable)) {
+    setStatus('Paid transaction editing requires the POS to be online.');
+    return;
+  }
+
+  const reason = String(window.prompt('Enter the reason for editing this paid transaction:', '') || '').trim();
+  if (!reason) {
+    setStatus('A reason is required before editing a paid transaction.');
+    return;
+  }
+
+  const currentTotal = getTotalDue();
+  const paymentMethod = String(session.paymentMethod || 'cash').trim().toLowerCase();
+  let finalAmountPaid = currentTotal;
+  if (paymentMethod === 'cash') {
+    const defaultAmount = String(Math.max(Number(session.amountPaid || 0), currentTotal));
+    const amountInput = String(window.prompt('Enter the final cash received after the order change. This should include any extra cash collected from the customer.', defaultAmount) || '').trim();
+    if (!amountInput) {
+      setStatus('Final cash received is required to save the edited receipt.');
       return;
     }
-    const summary = await refreshLatestShiftSummary();
-    renderShiftSummary(shiftMonitorSummaryEl, summary);
-  } catch (error) {
-    shiftMonitorSummaryEl.innerHTML = `<p class="error">Shift summary error: ${escapeHtml(error.message)}</p>`;
+    finalAmountPaid = Number(amountInput);
+    if (!Number.isFinite(finalAmountPaid) || finalAmountPaid < currentTotal) {
+      setStatus('Final cash received must be a valid amount that covers the updated total.');
+      return;
+    }
+  } else {
+    const confirmed = window.confirm(`Save the updated ${getPaymentMethodLabel(paymentMethod)} transaction with a final settled total of ${money(currentTotal)}? Make sure any extra collection or refund with the customer has already been settled.`);
+    if (!confirmed) return;
+    finalAmountPaid = currentTotal;
   }
+
+  const saveBtn = paidInvoiceEditSaveBtn;
+  const previousLabel = saveBtn?.textContent || 'Save Transaction Changes';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+  }
+
+  try {
+    const { invoice } = await api(`/api/admin/invoices/${encodeURIComponent(session.invoiceId)}/paid-edit`, {
+      method: 'PATCH',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        items,
+        discountAmount: getDiscountAmount(),
+        discountProfile: normalizeInvoiceDiscountProfile(getSelectedDiscountProfile()),
+        orderType: state.orderType,
+        reason,
+        finalAmountPaid
+      })
+    });
+
+    state.lastPaidInvoice = invoice || null;
+    renderReceipt(invoice);
+    renderPaymentReceiptModal(invoice);
+    clearPaidInvoiceEditSession();
+    resetAfterSale();
+    showConfirmationToast({
+      title: 'Paid transaction updated',
+      message: `${invoice?.reference || session.reference || 'The paid receipt'} was updated successfully.`,
+      tone: 'success'
+    });
+
+    if (canAccessAdminFeatures()) {
+      await refreshSalesReport(activeSalesRange);
+    }
+    if (canAccessOperationsPanel()) {
+      await Promise.all([
+        refreshCashierMonitoring(),
+        refreshShiftManagement()
+      ]);
+    }
+    await refreshLatestShiftSummary().catch(() => {});
+    await refreshShiftMonitorModalIfOpen().catch(() => {});
+    setStatus(`Paid transaction ${invoice?.reference || session.reference || session.invoiceId} updated successfully.`);
+  } catch (error) {
+    setStatus(`Paid transaction update failed: ${error.message}`);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = previousLabel;
+    }
+  }
+}
+
+function cancelPaidInvoiceEdit() {
+  if (!isPaidInvoiceEditActive()) {
+    resetAfterSale();
+    setStatus('Cleared. Ready.');
+    return;
+  }
+  const confirmed = window.confirm('Cancel this paid transaction edit and clear the current draft?');
+  if (!confirmed) return;
+  resetAfterSale();
+  setStatus('Paid transaction edit cancelled.');
 }
 
 function openStartShiftModal() {
   if (!startShiftModalEl) return;
+  if (startShiftBackBtn) {
+    startShiftBackBtn.style.display = isAdminOrSupervisorRole(activeAuthSession?.role) ? 'inline-flex' : 'none';
+  }
   startShiftModalEl.classList.add('open');
   startShiftModalEl.setAttribute('aria-hidden', 'false');
 }
@@ -2068,6 +2686,52 @@ function updateStartShiftAdjustmentStatus() {
   startShiftAdjustmentStatusEl.textContent = 'Enter the starting drawer cash to begin this shift.';
 }
 
+function resetStartShiftEntryFields({ focusDrawer = false, focusCash = false } = {}) {
+  if (startShiftCashInputEl) startShiftCashInputEl.value = '';
+  if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
+  updateStartShiftAdjustmentStatus();
+  if (focusDrawer) {
+    startShiftDrawerSelectEl?.focus();
+    return;
+  }
+  if (focusCash) {
+    startShiftCashInputEl?.focus();
+  }
+}
+
+function clearStartShiftSelection(statusMessage = 'Select a drawer name first.') {
+  startShiftContext = {
+    drawerId: null,
+    drawerName: '',
+    activeShift: null,
+    previousShiftId: null,
+    previousDrawerBalance: null,
+    previousShiftEndedAt: null
+  };
+  if (startShiftDrawerSelectEl) startShiftDrawerSelectEl.value = '';
+  renderStartShiftReference(startShiftContext);
+  if (startShiftReferenceStatusEl) {
+    startShiftReferenceStatusEl.textContent = statusMessage;
+  }
+  resetStartShiftEntryFields({ focusDrawer: true });
+}
+
+function handleStartShiftFieldKeydown(event) {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  if (event.currentTarget === startShiftDrawerSelectEl) {
+    startShiftCashInputEl?.focus();
+    return;
+  }
+  if (event.currentTarget === startShiftCashInputEl) {
+    startShiftAdjustmentInputEl?.focus();
+    return;
+  }
+  if (event.currentTarget === startShiftAdjustmentInputEl) {
+    startShiftConfirmBtn?.focus();
+  }
+}
+
 async function fetchStartShiftContext() {
   const drawerId = String(startShiftDrawerSelectEl?.value || '').trim();
   if (!drawerId) {
@@ -2116,14 +2780,18 @@ async function loadSelectedStartShiftDrawerContext() {
   renderStartShiftReference(startShiftContext);
 
   if (!startShiftContext?.drawerId) {
-    if (startShiftCashInputEl) startShiftCashInputEl.value = '';
-    if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
-    updateStartShiftAdjustmentStatus();
+    resetStartShiftEntryFields();
     return;
   }
 
   const activeShift = startShiftContext?.activeShift || null;
   if (activeShift?.id && String(activeShift?.status || '').toLowerCase() === 'active') {
+    const activeDrawerName = String(activeShift.drawerName || startShiftContext.drawerName || 'this drawer').trim() || 'this drawer';
+    const shouldResume = window.confirm(`An active shift already exists for ${activeDrawerName}. Resume that shift now?`);
+    if (!shouldResume) {
+      clearStartShiftSelection(`${activeDrawerName} already has an active shift. Select another drawer, or ask an administrator to close the active shift first.`);
+      return;
+    }
     persistCashierShiftState({
       shiftId: String(activeShift.id || '').trim() || null,
       drawerId: String(activeShift.drawerId || startShiftContext.drawerId || '').trim() || null,
@@ -2138,12 +2806,7 @@ async function loadSelectedStartShiftDrawerContext() {
     return;
   }
 
-  if (startShiftCashInputEl) {
-    startShiftCashInputEl.value = '';
-    startShiftCashInputEl.focus();
-  }
-  if (startShiftAdjustmentInputEl) startShiftAdjustmentInputEl.value = '';
-  updateStartShiftAdjustmentStatus();
+  resetStartShiftEntryFields({ focusCash: true });
 }
 
 async function presentStartShiftModal() {
@@ -2412,20 +3075,75 @@ function clearActiveSession() {
   cashierShiftState = null;
   latestShiftSummary = null;
   startShiftContext = null;
+  closePaymentSuccessModal();
+  closePaymentReceiptModal();
   closeStartShiftModal();
   localStorage.removeItem(AUTH_SESSION_KEY);
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
   updateShiftMonitorVisibility();
   restoreAdminNavOrder();
 }
 
-function writeAccessToken(token) {
-  if (!token) return;
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+function normalizeAccessTokenExpiryMs(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric > 1e12 ? numeric : numeric * 1000;
+  }
+  const dateMs = new Date(value).getTime();
+  return Number.isFinite(dateMs) && dateMs > 0 ? dateMs : null;
+}
+
+function decodeJwtPayload(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length < 2) return null;
+  try {
+    const normalized = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, '=');
+    return JSON.parse(atob(normalized));
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeAccessToken(token, expiresAt = null) {
+  const safeToken = String(token || '').trim();
+  if (!safeToken) {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_TOKEN_KEY, safeToken);
+  const expiryMs = normalizeAccessTokenExpiryMs(expiresAt);
+  if (expiryMs) {
+    localStorage.setItem(AUTH_TOKEN_EXPIRY_KEY, String(expiryMs));
+  } else {
+    localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
+  }
+}
+
+function readStoredAccessToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function readAccessTokenExpiryMs(token = readStoredAccessToken()) {
+  const storedExpiryMs = normalizeAccessTokenExpiryMs(localStorage.getItem(AUTH_TOKEN_EXPIRY_KEY));
+  if (storedExpiryMs) return storedExpiryMs;
+  const jwtExpiry = Number(decodeJwtPayload(token)?.exp || 0);
+  return Number.isFinite(jwtExpiry) && jwtExpiry > 0 ? jwtExpiry * 1000 : null;
 }
 
 function readAccessToken() {
-  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+  const token = readStoredAccessToken();
+  if (!token) return '';
+  const expiryMs = readAccessTokenExpiryMs(token);
+  if (expiryMs && expiryMs <= (Date.now() + 5000)) {
+    writeAccessToken('');
+    return '';
+  }
+  return token;
 }
 
 function readOfflineAuthCache() {
@@ -2515,6 +3233,195 @@ function saveUserUiState(patch) {
   }
 }
 
+function readPosDraftState() {
+  const draft = readUserUiState()?.posDraft;
+  return draft && typeof draft === 'object' ? draft : null;
+}
+
+function persistPosDraftState() {
+  if (isRestoringPosDraft || !activeAuthSession?.email) return;
+
+  const cartItems = getCartItems().map((item) => ({
+    productId: String(item.productId || '').trim(),
+    qty: Math.max(0, Math.floor(Number(item.qty || 0)))
+  })).filter((item) => item.productId && item.qty > 0);
+  const customer = {
+    name: String(customerNameEl?.value || '').trim(),
+    email: String(customerEmailEl?.value || '').trim(),
+    phone: String(customerPhoneEl?.value || '').trim()
+  };
+  const activeInvoiceId = String(state.activeInvoice?.id || state.scanQrContext?.invoiceId || '').trim() || null;
+  const checkoutReference = String(state.scanQrContext?.checkout?.reference || '').trim() || null;
+  const checkoutChannel = String(state.scanQrContext?.checkoutChannel || '').trim() || null;
+  const paidInvoiceEditSession = state.paidInvoiceEditSession?.invoiceId
+    ? {
+      invoiceId: String(state.paidInvoiceEditSession.invoiceId || '').trim() || null,
+      reference: String(state.paidInvoiceEditSession.reference || '').trim() || null,
+      paymentMethod: String(state.paidInvoiceEditSession.paymentMethod || '').trim() || null,
+      amountPaid: Number(state.paidInvoiceEditSession.amountPaid || 0)
+    }
+    : null;
+  const orderType = String(state.orderType || '').trim().toLowerCase();
+  const selectedDiscountProfileId = String(state.selectedDiscountProfileId || '').trim();
+  const hasDraft = Boolean(
+    cartItems.length
+    || activeInvoiceId
+    || paidInvoiceEditSession?.invoiceId
+    || customer.name
+    || customer.email
+    || customer.phone
+    || selectedDiscountProfileId
+    || (orderType === 'dine-in' || orderType === 'take-out')
+  );
+
+  saveUserUiState({
+    posDraft: hasDraft ? {
+      cartItems,
+      orderType: orderType === 'dine-in' || orderType === 'take-out' ? orderType : null,
+      selectedDiscountProfileId: selectedDiscountProfileId || null,
+      customer,
+      activeInvoiceId,
+      paidInvoiceEditSession,
+      scanQrContext: activeInvoiceId && checkoutChannel === 'scanQr'
+        ? {
+          invoiceId: activeInvoiceId,
+          checkoutReference,
+          checkoutChannel
+        }
+        : null
+    } : null
+  });
+}
+
+async function restorePosDraftState() {
+  if (!activeAuthSession?.email) return;
+  const draft = readPosDraftState();
+  if (!draft) return;
+
+  isRestoringPosDraft = true;
+  try {
+    const validProducts = new Set((state.products || []).map((product) => String(product.id || '').trim()));
+    const restoredCart = {};
+    (Array.isArray(draft.cartItems) ? draft.cartItems : []).forEach((item) => {
+      const productId = String(item?.productId || '').trim();
+      const qty = Math.max(0, Math.floor(Number(item?.qty || 0)));
+      if (productId && qty > 0 && validProducts.has(productId)) {
+        restoredCart[productId] = qty;
+      }
+    });
+    state.cart = restoredCart;
+
+    const restoredOrderType = String(draft.orderType || '').trim().toLowerCase();
+    state.orderType = (restoredOrderType === 'dine-in' || restoredOrderType === 'take-out')
+      ? restoredOrderType
+      : null;
+    state.selectedDiscountProfileId = String(draft.selectedDiscountProfileId || '').trim();
+    ensureValidSelectedDiscountProfile();
+
+    if (customerNameEl) customerNameEl.value = String(draft.customer?.name || '').trim();
+    if (customerEmailEl) customerEmailEl.value = String(draft.customer?.email || '').trim();
+    if (customerPhoneEl) customerPhoneEl.value = String(draft.customer?.phone || '').trim();
+
+    state.activeInvoice = null;
+    state.paidInvoiceEditSession = null;
+    state.scanQrContext = null;
+    renderCart();
+    updatePaymentActionAvailability();
+
+    const activeInvoiceId = String(draft.activeInvoiceId || '').trim();
+    let restoredInvoice = null;
+    if (activeInvoiceId) {
+      try {
+        const { invoice } = await api(`/api/invoices/${encodeURIComponent(activeInvoiceId)}`);
+        if (String(invoice?.status || '').trim().toUpperCase() === 'PENDING') {
+          restoredInvoice = invoice;
+          state.activeInvoice = invoice;
+        }
+      } catch (_error) {
+        state.activeInvoice = null;
+      }
+    }
+
+    const persistedScanQr = draft.scanQrContext && typeof draft.scanQrContext === 'object'
+      ? draft.scanQrContext
+      : null;
+    const persistedPaidInvoiceEdit = draft.paidInvoiceEditSession && typeof draft.paidInvoiceEditSession === 'object'
+      ? draft.paidInvoiceEditSession
+      : null;
+    let restoredPaidInvoiceEdit = false;
+
+    if (persistedPaidInvoiceEdit?.invoiceId) {
+      try {
+        const { invoice: paidInvoice } = await api(`/api/invoices/${encodeURIComponent(persistedPaidInvoiceEdit.invoiceId)}`);
+        if (normalizeInvoiceLifecycleStatus(paidInvoice?.status) === 'PAID') {
+          state.paidInvoiceEditSession = {
+            invoiceId: String(persistedPaidInvoiceEdit.invoiceId || paidInvoice.id || '').trim(),
+            reference: String(persistedPaidInvoiceEdit.reference || paidInvoice.reference || '').trim() || paidInvoice.reference || paidInvoice.id,
+            paymentMethod: String(persistedPaidInvoiceEdit.paymentMethod || paidInvoice?.payment?.method || paidInvoice.paymentMethod || 'cash').trim().toLowerCase() || 'cash',
+            amountPaid: Number(persistedPaidInvoiceEdit.amountPaid || paidInvoice?.payment?.amountPaid || paidInvoice.total || 0)
+          };
+          if (customerNameEl) customerNameEl.value = String(paidInvoice?.payment?.customerName || draft.customer?.name || '').trim();
+          if (customerEmailEl) customerEmailEl.value = String(paidInvoice?.payment?.customerEmail || draft.customer?.email || '').trim();
+          if (customerPhoneEl) customerPhoneEl.value = String(paidInvoice?.payment?.customerPhone || draft.customer?.phone || '').trim();
+          const restoredMethod = String(state.paidInvoiceEditSession.paymentMethod || 'cash').trim().toLowerCase();
+          setPaymentMethod(restoredMethod === 'paymaya' ? 'paymaya' : restoredMethod === 'cash' ? 'cash' : 'gcash');
+          renderCart();
+          updatePaymentActionAvailability();
+          restoredPaidInvoiceEdit = true;
+          setStatus(`Paid transaction edit restored for ${state.paidInvoiceEditSession.reference || 'this receipt'}.`);
+        }
+      } catch (_error) {
+        state.paidInvoiceEditSession = null;
+      }
+    }
+
+    if (restoredPaidInvoiceEdit) {
+      // Keep the paid transaction edit status message.
+    } else if (persistedScanQr && restoredInvoice) {
+      const checkoutReference = String(persistedScanQr.checkoutReference || '').trim();
+      const checkoutChannel = String(persistedScanQr.checkoutChannel || 'scanQr').trim() || 'scanQr';
+      let checkout = {
+        reference: checkoutReference || restoredInvoice.reference,
+        checkoutChannel
+      };
+      if (checkoutReference) {
+        try {
+          const { session } = await api(`/api/payments/gcash/session/${encodeURIComponent(checkoutReference)}`);
+          checkout = {
+            ...(session || {}),
+            reference: checkoutReference,
+            checkoutChannel: String(session?.checkoutChannel || checkoutChannel).trim() || checkoutChannel
+          };
+        } catch (_error) {
+          // Keep the stored reference if the session lookup fails after refresh.
+        }
+      }
+
+      state.scanQrContext = {
+        invoiceId: restoredInvoice.id,
+        invoice: restoredInvoice,
+        checkout,
+        checkoutChannel
+      };
+      renderScanQrContent({
+        checkout,
+        invoice: restoredInvoice,
+        notice: 'Pending Scan QR payment restored after refresh. Review proof, then click Finish.'
+      });
+      if (scanQrFinishBtn) scanQrFinishBtn.disabled = false;
+      openScanQrModal();
+      setStatus(`Pending Scan QR payment restored for ${restoredInvoice.reference || 'this order'}.`);
+    } else if (restoredInvoice) {
+      setStatus(`Pending order ${restoredInvoice.reference || 'draft'} restored after refresh.`);
+    } else if (Object.keys(restoredCart).length) {
+      setStatus(`Restored ${Object.keys(restoredCart).length} item(s) from the last order draft.`);
+    }
+  } finally {
+    isRestoringPosDraft = false;
+    persistPosDraftState();
+  }
+}
+
 function readCatalogCache() {
   try {
     const raw = localStorage.getItem(getCatalogCacheKey());
@@ -2593,6 +3500,10 @@ function isAdminOrSupervisorRole(role = activeAuthSession?.role) {
   return normalizedRole === 'administrations' || normalizedRole === 'supervisor';
 }
 
+function shouldAutoOpenStartShiftOnLogin(role = activeAuthSession?.role) {
+  return isDrawerOperatorRole(role) && !isAdminOrSupervisorRole(role);
+}
+
 function canAccessAdminFeatures() {
   return hasRoleAccess('control_center_access');
 }
@@ -2669,6 +3580,14 @@ function canManageMonthlyExpenses() {
   return hasRoleAccess('monthly_expenses_manage');
 }
 
+function canAccessEPaymentSetupPanel() {
+  return canManageEPaymentSetup();
+}
+
+function canManageEPaymentSetup() {
+  return isAdminRole();
+}
+
 function canManageKitSpecMode() {
   return hasRoleAccess('kit_spec_mode_manage');
 }
@@ -2693,14 +3612,13 @@ function isInvoiceAssignedToCurrentActor(invoice = null) {
   );
 }
 
-function canManageInvoiceActions(invoice = state.lastPaidInvoice || state.activeInvoice || null, nextStatus = 'HOLD_FOR_VOID', role = activeAuthSession?.role) {
+function canManageInvoiceActions(invoice = state.lastPaidInvoice || state.activeInvoice || null, nextStatus = 'VOIDED', role = activeAuthSession?.role) {
   const normalizedNextStatus = normalizeInvoiceLifecycleStatus(nextStatus);
   const normalizedCurrentStatus = normalizeInvoiceLifecycleStatus(invoice?.status);
   if (!normalizedNextStatus || !normalizedCurrentStatus) return false;
 
   if (canReviewInvoicesFromControlCenter(role)) {
     if (normalizedNextStatus === 'CANCELLED') return normalizedCurrentStatus === 'PENDING';
-    if (normalizedNextStatus === 'HOLD_FOR_VOID') return normalizedCurrentStatus === 'PAID';
     if (normalizedNextStatus === 'VOIDED') {
       return normalizedCurrentStatus === 'PAID' || normalizedCurrentStatus === 'HOLD_FOR_VOID';
     }
@@ -2711,10 +3629,301 @@ function canManageInvoiceActions(invoice = state.lastPaidInvoice || state.active
   if (normalizedNextStatus === 'CANCELLED') {
     return normalizedCurrentStatus === 'PENDING' && isInvoiceAssignedToCurrentActor(invoice);
   }
-  if (normalizedNextStatus === 'HOLD_FOR_VOID') {
-    return normalizedCurrentStatus === 'PAID' && isInvoiceAssignedToCurrentActor(invoice);
-  }
   return false;
+}
+
+function canEditPaidInvoiceFromShiftMonitor(invoice = null, role = activeAuthSession?.role) {
+  if (normalizeInvoiceLifecycleStatus(invoice?.status) !== 'PAID') return false;
+  if (canReviewInvoicesFromControlCenter(role)) return true;
+  if (!hasRoleAccess('shift_monitor_access', role)) return false;
+  return isInvoiceAssignedToCurrentActor(invoice);
+}
+
+function canRequestAuthorizedVoidFromShiftMonitor(invoice = null, role = activeAuthSession?.role) {
+  if (normalizeInvoiceLifecycleStatus(invoice?.status) !== 'PAID') return false;
+  if (canManageInvoiceActions(invoice, 'VOIDED', role)) return false;
+  if (!hasRoleAccess('shift_monitor_access', role)) return false;
+  return isInvoiceAssignedToCurrentActor(invoice);
+}
+
+function getReceiptVoidActionConfig(invoice = state.lastPaidInvoice || null) {
+  const normalizedStatus = normalizeInvoiceLifecycleStatus(invoice?.status);
+  if (!invoice || !normalizedStatus) {
+    return {
+      visible: false,
+      enabled: false,
+      label: 'Void',
+      mode: null
+    };
+  }
+  if (normalizedStatus === 'HOLD_FOR_VOID') {
+    if (canManageInvoiceActions(invoice, 'VOIDED')) {
+      return {
+        visible: true,
+        enabled: true,
+        label: 'Void',
+        mode: 'direct-void'
+      };
+    }
+    return {
+      visible: false,
+      enabled: false,
+      label: 'Void',
+      mode: null
+    };
+  }
+  if (normalizedStatus === 'VOIDED') {
+    return {
+      visible: true,
+      enabled: false,
+      label: 'Voided',
+      mode: null
+    };
+  }
+  if (normalizedStatus !== 'PAID') {
+    return {
+      visible: false,
+      enabled: false,
+      label: 'Void',
+      mode: null
+    };
+  }
+  if (canManageInvoiceActions(invoice, 'VOIDED')) {
+    return {
+      visible: true,
+      enabled: true,
+      label: 'Void',
+      mode: 'direct-void'
+    };
+  }
+  if (canRequestAuthorizedVoidFromShiftMonitor(invoice)) {
+    return {
+      visible: true,
+      enabled: true,
+      label: 'Voided Order',
+      mode: 'authorized-void'
+    };
+  }
+  return {
+    visible: false,
+    enabled: false,
+    label: 'Void',
+    mode: null
+  };
+}
+
+async function triggerReceiptVoidAction(invoiceId = null) {
+  const targetInvoiceId = String(invoiceId || state.lastPaidInvoice?.id || '').trim();
+  if (!targetInvoiceId) {
+    setStatus('No paid receipt is available for a void action.');
+    return;
+  }
+  const targetInvoice = [state.lastPaidInvoice, state.activeInvoice]
+    .find((invoice) => String(invoice?.id || '').trim() === targetInvoiceId) || state.lastPaidInvoice || null;
+  const action = getReceiptVoidActionConfig(targetInvoice);
+  if (!action.visible || !action.enabled) {
+    setStatus('Current role cannot start a void action for this receipt.');
+    return;
+  }
+  if (action.mode === 'direct-void') {
+    await updateInvoiceStatus(targetInvoiceId, 'VOIDED');
+    return;
+  }
+  if (action.mode === 'authorized-void') {
+    await openShiftMonitorAuthorizedVoidRequest(targetInvoiceId);
+    return;
+  }
+}
+
+function setShiftVoidAuthorizationStatus(message = '', isSuccess = false) {
+  if (!shiftVoidAuthorizationStatusEl) return;
+  shiftVoidAuthorizationStatusEl.textContent = message || '';
+  shiftVoidAuthorizationStatusEl.classList.toggle('success', Boolean(isSuccess));
+}
+
+function renderShiftVoidAuthorizationSummary(context = shiftVoidAuthorizationContext) {
+  if (!shiftVoidAuthorizationSummaryEl) return;
+  if (!context?.invoiceId) {
+    shiftVoidAuthorizationSummaryEl.innerHTML = `
+      <div class="shift-summary-line">
+        <span>Receipt</span>
+        <strong>-</strong>
+      </div>
+    `;
+    return;
+  }
+
+  shiftVoidAuthorizationSummaryEl.innerHTML = `
+    <div class="shift-summary-line">
+      <span>Receipt</span>
+      <strong>${escapeHtml(context.reference || context.invoiceId)}</strong>
+    </div>
+    <div class="shift-summary-line">
+      <span>Amount</span>
+      <strong>${escapeHtml(money(context.total || 0))}</strong>
+    </div>
+    <div class="shift-summary-line">
+      <span>Payment Method</span>
+      <strong>${escapeHtml(getPaymentMethodLabel(context.paymentMethod || 'cash'))}</strong>
+    </div>
+    <div class="shift-summary-line">
+      <span>Requested By</span>
+      <strong>${escapeHtml(activeAuthSession?.email || 'Current user')}</strong>
+    </div>
+  `;
+}
+
+function openShiftVoidAuthorizationModal(context) {
+  if (!shiftVoidAuthorizationModalEl) return;
+  shiftVoidAuthorizationContext = context && typeof context === 'object'
+    ? {
+      invoiceId: String(context.invoiceId || '').trim() || null,
+      reference: String(context.reference || '').trim() || null,
+      total: Number(context.total || 0),
+      paymentMethod: String(context.paymentMethod || '').trim().toLowerCase() || 'cash'
+    }
+    : null;
+  renderShiftVoidAuthorizationSummary();
+  setShiftVoidAuthorizationStatus('');
+  if (shiftVoidAuthorizationFormEl) shiftVoidAuthorizationFormEl.reset();
+  shiftVoidAuthorizationModalEl.classList.add('open');
+  shiftVoidAuthorizationModalEl.setAttribute('aria-hidden', 'false');
+  if (shiftVoidAuthorizationEmailEl) shiftVoidAuthorizationEmailEl.focus();
+}
+
+function closeShiftVoidAuthorizationModal() {
+  if (!shiftVoidAuthorizationModalEl) return;
+  shiftVoidAuthorizationModalEl.classList.remove('open');
+  shiftVoidAuthorizationModalEl.setAttribute('aria-hidden', 'true');
+  if (shiftVoidAuthorizationFormEl) shiftVoidAuthorizationFormEl.reset();
+  setShiftVoidAuthorizationStatus('');
+  renderShiftVoidAuthorizationSummary(null);
+  shiftVoidAuthorizationContext = null;
+}
+
+async function openShiftMonitorAuthorizedVoidRequest(invoiceId) {
+  const safeInvoiceId = String(invoiceId || '').trim();
+  if (!safeInvoiceId) return;
+  const { invoice } = await api(`/api/invoices/${encodeURIComponent(safeInvoiceId)}`);
+  if (!invoice) {
+    setStatus('Receipt not found.');
+    return;
+  }
+  if (!canRequestAuthorizedVoidFromShiftMonitor(invoice)) {
+    setStatus('Current role cannot request a voided order action for this receipt.');
+    return;
+  }
+  openShiftVoidAuthorizationModal({
+    invoiceId: safeInvoiceId,
+    reference: invoice.reference || safeInvoiceId,
+    total: Number(invoice.total || 0),
+    paymentMethod: String(invoice?.payment?.method || invoice.paymentMethod || 'cash').trim().toLowerCase() || 'cash'
+  });
+}
+
+async function submitShiftVoidAuthorization(event) {
+  if (event) event.preventDefault();
+  const context = shiftVoidAuthorizationContext;
+  if (!context?.invoiceId) {
+    setShiftVoidAuthorizationStatus('Select a paid receipt first.');
+    return;
+  }
+  if (!state.connectivity.serverReachable || (state.connectivity.supabaseEnabled && !state.connectivity.supabaseReachable)) {
+    setShiftVoidAuthorizationStatus('Voided Order requires the POS to be online.');
+    return;
+  }
+
+  const authorizerEmail = normalizeEmail(shiftVoidAuthorizationEmailEl?.value);
+  const authorizerPassword = String(shiftVoidAuthorizationPasswordEl?.value || '');
+  if (!isValidEmail(authorizerEmail)) {
+    setShiftVoidAuthorizationStatus('Enter a valid authorized personnel email.');
+    if (shiftVoidAuthorizationEmailEl) shiftVoidAuthorizationEmailEl.focus();
+    return;
+  }
+  if (!authorizerPassword) {
+    setShiftVoidAuthorizationStatus('Enter the authorized personnel password.');
+    if (shiftVoidAuthorizationPasswordEl) shiftVoidAuthorizationPasswordEl.focus();
+    return;
+  }
+
+  const confirmed = window.confirm(`Void payment ${context.reference || context.invoiceId} for ${money(context.total || 0)}?`);
+  if (!confirmed) return;
+
+  setShiftVoidAuthorizationStatus('');
+  setFormSubmitBusy(shiftVoidAuthorizationFormEl, true, 'Authorizing...');
+  if (shiftVoidAuthorizationSubmitBtn) shiftVoidAuthorizationSubmitBtn.disabled = true;
+
+  try {
+    const { invoice, authorizedBy } = await api(`/api/admin/invoices/${encodeURIComponent(context.invoiceId)}/authorized-void`, {
+      method: 'POST',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        authorizerEmail,
+        authorizerPassword
+      })
+    });
+
+    if (state.lastPaidInvoice && String(state.lastPaidInvoice.id || '').trim() === context.invoiceId) {
+      state.lastPaidInvoice = invoice;
+      renderReceipt(invoice);
+      renderPaymentReceiptModal(invoice);
+    }
+    if (state.activeInvoice && String(state.activeInvoice.id || '').trim() === context.invoiceId) {
+      state.activeInvoice = invoice;
+    }
+
+    closeShiftVoidAuthorizationModal();
+    setStatus(`Invoice voided successfully with approval from ${authorizedBy?.email || 'authorized personnel'}.`);
+    showConfirmationToast({
+      title: 'Receipt voided',
+      message: `${invoice?.reference || context.reference || 'Paid receipt'} was voided successfully.`,
+      tone: 'success'
+    });
+
+    if (canAccessAdminFeatures()) {
+      await refreshSalesReport(activeSalesRange);
+      await refreshAdminTransactions();
+    }
+    if (canAccessOperationsPanel()) {
+      await Promise.all([
+        refreshCashierMonitoring(),
+        refreshShiftManagement()
+      ]);
+    }
+    await refreshLatestShiftSummary().catch(() => {});
+    await refreshShiftMonitorModalIfOpen().catch(() => {});
+  } catch (error) {
+    setShiftVoidAuthorizationStatus(error.message || 'Voided Order failed.');
+  } finally {
+    setFormSubmitBusy(shiftVoidAuthorizationFormEl, false);
+    if (shiftVoidAuthorizationSubmitBtn) shiftVoidAuthorizationSubmitBtn.disabled = false;
+  }
+}
+
+function isPaidInvoiceEditActive() {
+  return Boolean(state.paidInvoiceEditSession?.invoiceId);
+}
+
+function renderPaidInvoiceEditBar() {
+  if (!paidInvoiceEditBarEl) return;
+  const session = state.paidInvoiceEditSession;
+  if (!session?.invoiceId) {
+    paidInvoiceEditBarEl.style.display = 'none';
+    return;
+  }
+
+  if (paidInvoiceEditTitleEl) {
+    paidInvoiceEditTitleEl.textContent = `Editing Paid Transaction ${session.reference || session.invoiceId}`;
+  }
+  if (paidInvoiceEditSummaryEl) {
+    paidInvoiceEditSummaryEl.textContent = `Original payment: ${getPaymentMethodLabel(session.paymentMethod)}. Current revised total: ${money(getTotalDue())}. Update the products, discount, or order type, then save the adjusted paid receipt.`;
+  }
+  paidInvoiceEditBarEl.style.display = 'flex';
+}
+
+function clearPaidInvoiceEditSession() {
+  state.paidInvoiceEditSession = null;
+  renderPaidInvoiceEditBar();
 }
 
 const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
@@ -2722,6 +3931,15 @@ const DEFAULT_DISCOUNT_PROFILES = Object.freeze([
   { id: 'senior', name: 'Seniors', type: 'percent', amount: 20 },
   { id: 'pwd', name: 'PWD', type: 'percent', amount: 20 }
 ]);
+const DEFAULT_EPAYMENT_SETTINGS = Object.freeze({
+  gcash: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  paymaya: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' }),
+  scanQr: Object.freeze({ enabled: true, disabledReason: '', qrImageUrl: '' })
+});
+const EPAYMENT_CHANNEL_KEYS = Object.freeze(['gcash', 'paymaya', 'scanQr']);
+const SCAN_QR_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+let scanQrImageDraftUrl = '';
+let scanQrImageDraftDirty = false;
 const ROLE_ACCESS_CATALOG = Object.freeze([
   { key: 'control_center_access', group: 'Dashboard & Reports', label: 'Control Center Dashboard', description: 'Open the Control Center dashboard, overview, transaction view, and any admin tabs assigned to this role.' },
   { key: 'reports_access', group: 'Dashboard & Reports', label: 'Reports Dashboard', description: 'View reports, sales analytics, hourly trends, and weekday charts.' },
@@ -2741,8 +3959,8 @@ const ROLE_ACCESS_CATALOG = Object.freeze([
   { key: 'monthly_closing_access', group: 'Discounts & Closing', label: 'Monthly Closing', description: 'View monthly closing summaries, expenses, and month-end reports.' },
   { key: 'monthly_expenses_manage', group: 'Discounts & Closing', label: 'Expense Management', description: 'Add monthly expense entries and save them to the report.' },
   { key: 'shift_session_access', group: 'POS & Shift Flow', label: 'Shift Session', description: 'Start and end drawer shifts and keep cash-on-hand tracking active.' },
-  { key: 'shift_monitor_access', group: 'POS & Shift Flow', label: 'Shift Monitor', description: 'Open the POS shift monitor button and summary modal.' },
-  { key: 'invoice_action_access', group: 'POS & Shift Flow', label: 'Invoice Lifecycle Actions', description: 'Cancel own pending invoices and request hold-for-void on paid receipts. With Control Center access, this role can also review and void receipts from the dashboard.' }
+  { key: 'shift_monitor_access', group: 'POS & Shift Flow', label: 'Shift Monitor', description: 'Open the POS shift monitor button and review, edit, or request voided-order approval for your own session transactions.' },
+  { key: 'invoice_action_access', group: 'POS & Shift Flow', label: 'Invoice Lifecycle Actions', description: 'Cancel own pending invoices. With Control Center access, this role can also review and void paid receipts from the dashboard.' }
 ]);
 const ROLE_ACCESS_LABELS = Object.freeze(
   ROLE_ACCESS_CATALOG.reduce((rows, item) => {
@@ -2800,9 +4018,21 @@ const DEFAULT_ROLE_ACCESS = Object.freeze({
     'discounts_access',
     'monthly_closing_access',
     'shift_session_access',
+    'shift_monitor_access',
     'invoice_action_access'
   ])
 });
+
+function ensureRequiredRoleAccessEntries(entries = [], requiredEntries = []) {
+  const rows = Array.isArray(entries) ? [...entries] : [];
+  requiredEntries.forEach((entry) => {
+    const key = String(entry || '').trim().toLowerCase();
+    if (ROLE_ACCESS_LABELS[key] && !rows.includes(key)) {
+      rows.push(key);
+    }
+  });
+  return rows;
+}
 
 function normalizeRoleAccessEntries(entries = [], fallback = []) {
   const source = Array.isArray(entries) ? entries : fallback;
@@ -2818,8 +4048,14 @@ function normalizeRoleAccessEntries(entries = [], fallback = []) {
 
 function normalizeRoleAccessConfig(roleAccess = {}) {
   const source = roleAccess && typeof roleAccess === 'object' ? roleAccess : {};
-  const encharge = normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge);
-  const supervisor = normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor);
+  const encharge = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.encharge, DEFAULT_ROLE_ACCESS.encharge),
+    ['shift_session_access', 'shift_monitor_access']
+  );
+  const supervisor = ensureRequiredRoleAccessEntries(
+    normalizeRoleAccessEntries(source?.supervisor, DEFAULT_ROLE_ACCESS.supervisor),
+    ['shift_session_access', 'shift_monitor_access']
+  );
   return {
     encharge: encharge.length ? encharge : [...DEFAULT_ROLE_ACCESS.encharge],
     supervisor: supervisor.length ? supervisor : [...DEFAULT_ROLE_ACCESS.supervisor]
@@ -2894,11 +4130,69 @@ function normalizeDiscountProfiles(profiles = []) {
   }, []);
 }
 
+function normalizeEPaymentDisabledReason(reason) {
+  return String(reason || '').trim().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+function normalizeEPaymentImageUrl(value, fallback = '') {
+  const imageUrl = String(value || fallback || '').trim();
+  if (!imageUrl) return '';
+  if (imageUrl.length > 3_000_000) return '';
+  if (/^data:image\//i.test(imageUrl)) return imageUrl;
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  if (imageUrl.startsWith('/')) return imageUrl;
+  return '';
+}
+
+function normalizeEPaymentMethodConfig(entry = {}, fallback = DEFAULT_EPAYMENT_SETTINGS.gcash) {
+  const enabled = entry?.enabled !== false;
+  const disabledReason = enabled
+    ? ''
+    : normalizeEPaymentDisabledReason(entry?.disabledReason || entry?.reason || fallback?.disabledReason || '');
+  return {
+    enabled,
+    disabledReason,
+    qrImageUrl: normalizeEPaymentImageUrl(entry?.qrImageUrl || entry?.imageUrl || fallback?.qrImageUrl || '')
+  };
+}
+
+function normalizeEPaymentSettings(settings = {}) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return {
+    gcash: normalizeEPaymentMethodConfig(source?.gcash, DEFAULT_EPAYMENT_SETTINGS.gcash),
+    paymaya: normalizeEPaymentMethodConfig(source?.paymaya || source?.maya, DEFAULT_EPAYMENT_SETTINGS.paymaya),
+    scanQr: normalizeEPaymentMethodConfig(source?.scanQr || source?.scanqr || source?.qr, DEFAULT_EPAYMENT_SETTINGS.scanQr)
+  };
+}
+
+function normalizeEPaymentChannelKey(value, fallback = 'gcash') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'paymaya' || normalized === 'maya') return 'paymaya';
+  if (normalized === 'scanqr' || normalized === 'scan_qr' || normalized === 'scan-qr' || normalized === 'qr') return 'scanQr';
+  if (normalized === 'gcash') return 'gcash';
+  return normalizeEPaymentChannelKey(fallback || 'gcash', 'gcash');
+}
+
+function getEPaymentChannelLabel(channelKey) {
+  const normalized = normalizeEPaymentChannelKey(channelKey);
+  if (normalized === 'paymaya') return 'Maya';
+  if (normalized === 'scanQr') return 'Scan QR';
+  return 'GCash';
+}
+
+function normalizeReceiptWorkflowConfig(config = {}) {
+  return {
+    autoOpenAfterPayment: config?.autoOpenAfterPayment === true
+  };
+}
+
 function normalizeAppConfig(config = {}) {
   return {
     enforceKitSpec: config?.enforceKitSpec !== false,
     discountProfiles: normalizeDiscountProfiles(config?.discountProfiles),
-    roleAccess: normalizeRoleAccessConfig(config?.roleAccess)
+    roleAccess: normalizeRoleAccessConfig(config?.roleAccess),
+    ePaymentSettings: normalizeEPaymentSettings(config?.ePaymentSettings),
+    receiptWorkflow: normalizeReceiptWorkflowConfig(config?.receiptWorkflow)
   };
 }
 
@@ -3140,6 +4434,143 @@ function getDiscountProfiles() {
   return normalizeDiscountProfiles(state.appConfig?.discountProfiles);
 }
 
+function getEPaymentSettings() {
+  return normalizeEPaymentSettings(state.appConfig?.ePaymentSettings);
+}
+
+function getReceiptWorkflowConfig() {
+  return normalizeReceiptWorkflowConfig(state.appConfig?.receiptWorkflow);
+}
+
+function shouldAutoOpenPaymentReceiptAfterPayment() {
+  return getReceiptWorkflowConfig().autoOpenAfterPayment === true;
+}
+
+function getEPaymentMethodConfig(channelKey) {
+  const normalizedKey = normalizeEPaymentChannelKey(channelKey);
+  return {
+    key: normalizedKey,
+    label: getEPaymentChannelLabel(normalizedKey),
+    ...(getEPaymentSettings()?.[normalizedKey] || DEFAULT_EPAYMENT_SETTINGS.gcash)
+  };
+}
+
+function syncScanQrImageDraftFromConfig(force = false) {
+  if (!force && scanQrImageDraftDirty) return;
+  scanQrImageDraftUrl = normalizeEPaymentImageUrl(getEPaymentMethodConfig('scanQr')?.qrImageUrl || '');
+  scanQrImageDraftDirty = false;
+  clearScanQrImageFileInput();
+}
+
+function getScanQrImagePreviewUrl() {
+  if (scanQrImageDraftDirty) {
+    return normalizeEPaymentImageUrl(scanQrImageDraftUrl);
+  }
+  return normalizeEPaymentImageUrl(getEPaymentMethodConfig('scanQr')?.qrImageUrl || '');
+}
+
+function renderScanQrImageSetupPreview() {
+  if (!ePaymentSetupScanQrPreviewEl) return;
+  const previewUrl = getScanQrImagePreviewUrl();
+  ePaymentSetupScanQrPreviewEl.innerHTML = previewUrl
+    ? `<img src="${escapeHtml(previewUrl)}" alt="Configured Scan QR image preview" />`
+    : '<span>No custom QR image uploaded yet.</span>';
+  if (ePaymentSetupScanQrClearBtnEl) {
+    ePaymentSetupScanQrClearBtnEl.disabled = !canManageEPaymentSetup() || !previewUrl;
+  }
+}
+
+function clearScanQrImageFileInput() {
+  if (ePaymentSetupScanQrImageInputEl) {
+    ePaymentSetupScanQrImageInputEl.value = '';
+  }
+}
+
+function readImageFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (!/^data:image\//i.test(result)) {
+        reject(new Error('Selected file is not a supported image.'));
+        return;
+      }
+      resolve(result);
+    };
+    reader.onerror = () => reject(new Error('Failed to read the selected image.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleScanQrImageInputChange(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const file = input.files?.[0];
+  if (!file) return;
+  if (!String(file.type || '').toLowerCase().startsWith('image/')) {
+    clearScanQrImageFileInput();
+    throw new Error('Choose an image file for the Scan QR prompt.');
+  }
+  if (Number(file.size || 0) > SCAN_QR_IMAGE_MAX_BYTES) {
+    clearScanQrImageFileInput();
+    throw new Error('Scan QR image must be 2 MB or smaller.');
+  }
+  const dataUrl = await readImageFileAsDataUrl(file);
+  scanQrImageDraftUrl = normalizeEPaymentImageUrl(dataUrl);
+  scanQrImageDraftDirty = true;
+  renderScanQrImageSetupPreview();
+  setStatus(`Scan QR image ready: ${file.name}. Save E-Payment Setup to apply it.`);
+}
+
+function clearScanQrImageDraft() {
+  scanQrImageDraftUrl = '';
+  scanQrImageDraftDirty = true;
+  clearScanQrImageFileInput();
+  renderScanQrImageSetupPreview();
+}
+
+function getEPaymentMethodAvailability(channelKey) {
+  const config = getEPaymentMethodConfig(channelKey);
+  if (!isEwalletAvailable()) {
+    return {
+      ...config,
+      available: false,
+      statusNote: 'Offline mode active. E-payment is unavailable.'
+    };
+  }
+  if (!config.enabled) {
+    return {
+      ...config,
+      available: false,
+      statusNote: config.disabledReason || `${config.label} is currently disabled in Control Center.`
+    };
+  }
+  if (channelKey === 'scanQr' && !normalizeEPaymentImageUrl(config.qrImageUrl || '')) {
+    return {
+      ...config,
+      available: false,
+      statusNote: 'Upload a GCash or merchant QR image in Control Center before using Scan QR.'
+    };
+  }
+  return {
+    ...config,
+    available: true,
+    statusNote: `${config.label} is ready for checkout.`
+  };
+}
+
+function isConfiguredEPaymentMethodEnabled(channelKey) {
+  return getEPaymentMethodConfig(channelKey).enabled;
+}
+
+function getAvailableEPaymentMethodCount() {
+  return EPAYMENT_CHANNEL_KEYS.filter((channelKey) => getEPaymentMethodAvailability(channelKey).available).length;
+}
+
+function isEPaymentUnavailableError(error) {
+  return String(error?.message || '').trim().toLowerCase().includes('e-payment channel unavailable:');
+}
+
 function getSelectedDiscountProfile() {
   const selectedId = String(state.selectedDiscountProfileId || '').trim();
   if (!selectedId) return null;
@@ -3165,7 +4596,7 @@ function formatDiscountProfileValue(profile = null) {
 }
 
 function getDiscountProfileSummaryText(profile = null) {
-  if (!profile) return 'Regular Customer (No discount)';
+  if (!profile) return 'No Discount';
   return `${profile.name} (${formatDiscountProfileValue(profile)})`;
 }
 
@@ -3198,7 +4629,7 @@ function renderDiscountProfileSelect() {
   if (!discountProfileSelectEl) return;
   const profiles = getDiscountProfiles();
   const options = [
-    '<option value="">Regular Customer</option>',
+    '<option value="">No Discount</option>',
     ...profiles.map((profile) => `
       <option value="${escapeHtml(profile.id)}">${escapeHtml(getDiscountProfileSummaryText(profile))}</option>
     `)
@@ -3330,11 +4761,17 @@ function renderDiscountManager() {
       </div>
     `
     : '<p>No discount profiles available yet.</p>';
+  discountProfilesListEl.dataset.loaded = 'true';
+  discountManagerLoaded = true;
 }
 
 async function refreshDiscountManager() {
   if (!discountProfilesListEl || !canAccessDiscountManager()) return;
-  discountProfilesListEl.innerHTML = '<p>Loading discount profiles...</p>';
+  const hasRenderedList = discountProfilesListEl.dataset.loaded === 'true' || discountManagerLoaded;
+  if (!hasRenderedList) {
+    discountProfilesListEl.innerHTML = '<p>Loading discount profiles...</p>';
+  }
+  discountProfilesListEl.classList.add('is-refreshing');
 
   try {
     const result = await api('/api/admin/discount-profiles', {
@@ -3344,6 +4781,8 @@ async function refreshDiscountManager() {
   } catch (error) {
     renderDiscountManager();
     setStatus(`Discount manager load failed: ${error.message}`);
+  } finally {
+    discountProfilesListEl.classList.remove('is-refreshing');
   }
 }
 
@@ -3571,6 +5010,131 @@ async function handleDiscountProfileModalDelete() {
     title: 'Discount settings updated',
     message: `Discount type "${profile.name}" deleted.`
   });
+}
+
+function getEPaymentSetupFields() {
+  return [
+    { key: 'gcash', statusEl: ePaymentSetupGcashStatusEl, reasonEl: ePaymentSetupGcashReasonEl },
+    { key: 'paymaya', statusEl: ePaymentSetupPaymayaStatusEl, reasonEl: ePaymentSetupPaymayaReasonEl },
+    { key: 'scanQr', statusEl: ePaymentSetupScanQrStatusEl, reasonEl: ePaymentSetupScanQrReasonEl }
+  ];
+}
+
+function syncEPaymentSetupReasonInputs() {
+  const canEdit = canManageEPaymentSetup();
+  getEPaymentSetupFields().forEach(({ statusEl, reasonEl }) => {
+    if (!(reasonEl instanceof HTMLInputElement)) return;
+    const isDisabled = String(statusEl?.value || 'enabled').trim().toLowerCase() === 'disabled';
+    reasonEl.disabled = !canEdit || !isDisabled;
+    reasonEl.placeholder = isDisabled
+      ? 'Explain why this channel is disabled.'
+      : 'This channel is enabled.';
+    const methodCard = reasonEl.closest('.epayment-setup-method');
+    if (methodCard) {
+      methodCard.classList.toggle('is-disabled', isDisabled);
+    }
+  });
+}
+
+function renderEPaymentSetup() {
+  const canEdit = canManageEPaymentSetup();
+  const settings = getEPaymentSettings();
+  syncScanQrImageDraftFromConfig();
+
+  if (ePaymentSetupAdminNoteEl) {
+    ePaymentSetupAdminNoteEl.textContent = canEdit
+      ? 'Turn channels on or off here. Disabled notes are shown to the cashier before checkout, and Scan QR can use a custom uploaded image.'
+      : 'View-only mode. Only admin can change e-payment channel availability and disable notes.';
+  }
+
+  getEPaymentSetupFields().forEach(({ key, statusEl, reasonEl }) => {
+    const config = settings[key] || DEFAULT_EPAYMENT_SETTINGS[key];
+    if (statusEl) {
+      statusEl.value = config?.enabled !== false ? 'enabled' : 'disabled';
+      statusEl.disabled = !canEdit;
+    }
+    if (reasonEl) {
+      reasonEl.value = String(config?.disabledReason || '');
+      reasonEl.readOnly = !canEdit;
+    }
+  });
+
+  if (ePaymentSetupSaveBtnEl) {
+    ePaymentSetupSaveBtnEl.disabled = !canEdit;
+  }
+
+  if (ePaymentSetupFormEl) {
+    Array.from(ePaymentSetupFormEl.elements || []).forEach((element) => {
+      if (
+        element instanceof HTMLInputElement
+        || element instanceof HTMLSelectElement
+        || element instanceof HTMLButtonElement
+      ) {
+        element.disabled = !canEdit && element !== ePaymentSetupSaveBtnEl;
+      }
+    });
+  }
+
+  syncEPaymentSetupReasonInputs();
+  renderScanQrImageSetupPreview();
+}
+
+function collectEPaymentSetupPayload() {
+  return getEPaymentSetupFields().reduce((rows, { key, statusEl, reasonEl }) => {
+    const enabled = String(statusEl?.value || 'enabled').trim().toLowerCase() !== 'disabled';
+    rows[key] = {
+      enabled,
+      disabledReason: enabled ? '' : normalizeEPaymentDisabledReason(reasonEl?.value || ''),
+      qrImageUrl: key === 'scanQr'
+        ? normalizeEPaymentImageUrl(getScanQrImagePreviewUrl())
+        : normalizeEPaymentImageUrl(getEPaymentMethodConfig(key)?.qrImageUrl || '')
+    };
+    return rows;
+  }, {});
+}
+
+async function handleEPaymentSetupSubmit(event) {
+  event.preventDefault();
+  if (!canManageEPaymentSetup()) {
+    setStatus('Only admin can change e-payment setup.');
+    return;
+  }
+
+  const payload = collectEPaymentSetupPayload();
+  const missingReasonField = getEPaymentSetupFields().find(({ key }) => payload[key]?.enabled === false && !payload[key]?.disabledReason);
+  if (missingReasonField?.reasonEl) {
+    setStatus(`Add a disabled note for ${getEPaymentChannelLabel(missingReasonField.key)} before saving.`);
+    missingReasonField.reasonEl.disabled = false;
+    missingReasonField.reasonEl.focus();
+    return;
+  }
+  if (ePaymentSetupSaveBtnEl) {
+    ePaymentSetupSaveBtnEl.disabled = true;
+    ePaymentSetupSaveBtnEl.textContent = 'Saving...';
+  }
+
+  try {
+    const result = await api('/api/admin/app-config', {
+      method: 'PUT',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        ePaymentSettings: payload
+      })
+    });
+    applyAppConfig(result?.appConfig || state.appConfig);
+    syncScanQrImageDraftFromConfig(true);
+    renderScanQrImageSetupPreview();
+    setStatus('E-payment setup saved.');
+    showConfirmationToast({
+      title: 'E-payment setup saved',
+      message: 'Channel availability, cashier notes, and Scan QR image were updated.'
+    });
+  } finally {
+    if (ePaymentSetupSaveBtnEl) {
+      ePaymentSetupSaveBtnEl.disabled = !canManageEPaymentSetup();
+      ePaymentSetupSaveBtnEl.textContent = 'Save E-Payment Setup';
+    }
+  }
 }
 
 function getDisplayRoleAccessRoles() {
@@ -3813,6 +5377,7 @@ function canAccessAdminPanel(panelName) {
   if (normalizedPanel === 'receipt-templates') return canAccessReceiptTemplatesPanel();
   if (normalizedPanel === 'reports') return canAccessReportsPanel();
   if (normalizedPanel === 'others') return canAccessDiscountManager() || canAccessMonthlyClosing();
+  if (normalizedPanel === 'e-payment') return canAccessEPaymentSetupPanel();
   return false;
 }
 
@@ -3837,6 +5402,8 @@ function applyAppConfig(config = {}) {
   ensureValidSelectedDiscountProfile();
   renderDiscountProfileSelect();
   renderDiscountManager();
+  renderEPaymentSetup();
+  renderReceiptWorkflowSettings();
   renderRoleAccessManager();
   renderKitSpecModeControl();
   updateSettingsRoleItems();
@@ -3849,6 +5416,7 @@ function applyAppConfig(config = {}) {
       closeAdminDashboard();
     }
   }
+  updatePaymentActionAvailability();
   renderCart();
 }
 
@@ -3858,6 +5426,10 @@ function canManageUsers() {
 
 function canManageReceiptTemplates() {
   return hasRoleAccess('receipt_templates_manage');
+}
+
+function canManageReceiptWorkflowSettings() {
+  return isAdminRole();
 }
 
 function canManageCashDrawer() {
@@ -3872,10 +5444,20 @@ function buildActorHeaders() {
   };
 }
 
+function normalizeAdminRange(range) {
+  const normalized = String(range || '').trim().toLowerCase();
+  if (normalized === 'daily' || normalized === 'weekly' || normalized === 'monthly' || normalized === 'custom_month' || normalized === 'all') {
+    return normalized;
+  }
+  return 'daily';
+}
+
 function getAdminRangeQueryValue() {
-  const range = String(adminRangeEl?.value || '').trim().toLowerCase();
-  if (range === 'daily' || range === 'weekly') return range;
-  return '';
+  return normalizeAdminRange(adminRangeEl?.value || activeSalesRange);
+}
+
+function getAdminSelectedMonth() {
+  return String(adminMonthPickerEl?.value || getCurrentMonthValue()).trim();
 }
 
 function getMonthRangeBounds(monthValue) {
@@ -4153,6 +5735,9 @@ function getCashierInvoiceContext() {
 function updateSettingsRoleItems() {
   if (settingsAdminDashboardBtn) {
     settingsAdminDashboardBtn.style.display = canAccessAdminFeatures() ? 'block' : 'none';
+  }
+  if (settingsShiftMonitorBtn) {
+    settingsShiftMonitorBtn.style.display = (activeAuthSession?.email && canViewShiftMonitorOnPos(activeAuthSession?.role)) ? 'block' : 'none';
   }
   if (settingsEditMenuBtn) {
     settingsEditMenuBtn.style.display = canAccessMenuEditor() ? 'block' : 'none';
@@ -4467,9 +6052,12 @@ async function finalizeLogout() {
 
     closeSettingsMenu();
     closeAdminDashboard();
+    closePaymentSuccessModal();
+    closePaymentReceiptModal();
     closeAdminReceiptModal();
     closeEwalletModal();
     closeShiftMonitorModal();
+    closeShiftVoidAuthorizationModal();
     closeStartShiftModal();
     closeCashoutSummaryModal();
     closeInventoryEditModal();
@@ -4598,7 +6186,7 @@ async function handleLoginSubmit(event) {
     };
 
     writeActiveSession(sessionUser);
-    writeAccessToken(result.session?.accessToken || '');
+    writeAccessToken(result.session?.accessToken || '', result.session?.expiresAt || null);
     clearCashierShiftState();
     setAuthMessage('');
     unlockDashboard();
@@ -4615,7 +6203,7 @@ async function handleLoginSubmit(event) {
       userId: sessionUser.userId,
       password
     }).catch(() => {});
-    if (canViewShiftMonitorOnPos(accountRole)) {
+    if (shouldAutoOpenStartShiftOnLogin(accountRole)) {
       await waitForNextPaint();
       await presentStartShiftModal();
     }
@@ -4640,7 +6228,7 @@ async function handleLoginSubmit(event) {
           });
           unlockDashboard();
           startAppOnce();
-          if (canViewShiftMonitorOnPos(offlineRole)) {
+          if (shouldAutoOpenStartShiftOnLogin(offlineRole)) {
             await presentStartShiftModal();
           }
           return;
@@ -4684,8 +6272,10 @@ function setupAuth() {
   }
   if (startShiftCashInputEl) {
     startShiftCashInputEl.addEventListener('input', updateStartShiftAdjustmentStatus);
+    startShiftCashInputEl.addEventListener('keydown', handleStartShiftFieldKeydown);
   }
   if (startShiftDrawerSelectEl) {
+    startShiftDrawerSelectEl.addEventListener('keydown', handleStartShiftFieldKeydown);
     startShiftDrawerSelectEl.addEventListener('change', () => {
       loadSelectedStartShiftDrawerContext().catch((error) => {
         if (startShiftReferenceStatusEl) {
@@ -4696,6 +6286,7 @@ function setupAuth() {
   }
   if (startShiftAdjustmentInputEl) {
     startShiftAdjustmentInputEl.addEventListener('input', updateStartShiftAdjustmentStatus);
+    startShiftAdjustmentInputEl.addEventListener('keydown', handleStartShiftFieldKeydown);
   }
   if (startShiftUsePreviousBtn) {
     startShiftUsePreviousBtn.addEventListener('click', usePreviousStartShiftBalance);
@@ -4710,6 +6301,12 @@ function setupAuth() {
       });
     });
   }
+  if (startShiftBackBtn) {
+    startShiftBackBtn.addEventListener('click', () => {
+      closeStartShiftModal();
+      setStatus('Shift start cancelled.');
+    });
+  }
   if (startShiftSignOutBtn) {
     startShiftSignOutBtn.addEventListener('click', () => {
       finalizeLogout().catch(() => {});
@@ -4719,6 +6316,14 @@ function setupAuth() {
     settingsAdminDashboardBtn.addEventListener('click', async () => {
       closeSettingsMenu();
       await openAdminDashboard();
+    });
+  }
+  if (settingsShiftMonitorBtn) {
+    settingsShiftMonitorBtn.addEventListener('click', async () => {
+      closeSettingsMenu();
+      if (!activeAuthSession?.email) return;
+      openShiftMonitorModal();
+      await showShiftMonitorSummary();
     });
   }
   if (settingsEditMenuBtn) {
@@ -4887,9 +6492,6 @@ async function bootstrap() {
       restoreAdminNavOrder();
       hydrateCashierShiftState();
       unlockDashboard();
-      if (canViewShiftMonitorOnPos(activeAuthSession?.role) && needsCashierShiftStart()) {
-        await presentStartShiftModal();
-      }
     } catch (error) {
       const errorText = String(error?.message || '');
       const isNetworkLike = /fetch|network|offline|failed to fetch/i.test(errorText);
@@ -4897,8 +6499,6 @@ async function bootstrap() {
         clearActiveSession();
         lockDashboard();
         if (loginEmailEl) loginEmailEl.focus();
-      } else if (canViewShiftMonitorOnPos(activeAuthSession?.role) && needsCashierShiftStart()) {
-        await presentStartShiftModal();
       }
     }
     return;
@@ -5108,6 +6708,7 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   const isReceiptTemplates = activePanel === 'receipt-templates';
   const isReports = activePanel === 'reports';
   const isOthers = activePanel === 'others';
+  const isEPayment = activePanel === 'e-payment';
 
   if (adminPanelOverviewEl) adminPanelOverviewEl.classList.toggle('active', isOverview);
   if (adminPanelInventoryEl) adminPanelInventoryEl.classList.toggle('active', isInventory);
@@ -5117,6 +6718,7 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   if (adminPanelReceiptTemplatesEl) adminPanelReceiptTemplatesEl.classList.toggle('active', isReceiptTemplates);
   if (adminPanelReportsEl) adminPanelReportsEl.classList.toggle('active', isReports);
   if (adminPanelOthersEl) adminPanelOthersEl.classList.toggle('active', isOthers);
+  if (adminPanelEPaymentEl) adminPanelEPaymentEl.classList.toggle('active', isEPayment);
 
   if (adminNavOverviewBtn) adminNavOverviewBtn.classList.toggle('active', isOverview);
   if (adminNavInventoryBtn) adminNavInventoryBtn.classList.toggle('active', isInventory);
@@ -5126,6 +6728,7 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   if (adminNavReceiptTemplatesBtn) adminNavReceiptTemplatesBtn.classList.toggle('active', isReceiptTemplates);
   if (adminNavReportsBtn) adminNavReportsBtn.classList.toggle('active', isReports);
   if (adminNavOthersBtn) adminNavOthersBtn.classList.toggle('active', isOthers);
+  if (adminNavEPaymentBtn) adminNavEPaymentBtn.classList.toggle('active', isEPayment);
 
   if (isInventory) {
     refreshInventoryModule();
@@ -5149,7 +6752,11 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   }
   if (isOthers) {
     refreshDiscountManager();
-    refreshMonthlyClosingModule();
+    refreshMonthlyClosingModule().catch(() => {});
+    refreshMonthlyClosingSnapshots().catch(() => {});
+  }
+  if (isEPayment) {
+    renderEPaymentSetup();
   }
   if (persist) {
     saveUserUiState({ adminPanel: activePanel });
@@ -5169,12 +6776,56 @@ async function openAdminDashboard({ panelName, persist = true } = {}) {
   document.body.classList.add('admin-open');
   saveUserUiState({ adminOpen: true });
   switchAdminPanel(activePanel, { persist });
+  if (canAccessDiscountManager()) {
+    refreshDiscountManager().catch(() => {});
+  }
+  if (canAccessMonthlyClosing()) {
+    refreshMonthlyClosingModule().catch(() => {});
+    refreshMonthlyClosingSnapshots().catch(() => {});
+  }
 }
 
 function closeAdminDashboard() {
   closeAdminNavContextMenu();
   document.body.classList.remove('admin-open');
   saveUserUiState({ adminOpen: false });
+}
+
+function highlightOperationsDiscrepancyModule({ scroll = true } = {}) {
+  if (!(operationsDiscrepancyModuleEl instanceof HTMLElement)) return;
+  if (operationsDiscrepancyHighlightTimer) {
+    window.clearTimeout(operationsDiscrepancyHighlightTimer);
+    operationsDiscrepancyHighlightTimer = null;
+  }
+  operationsDiscrepancyModuleEl.classList.remove('is-focused');
+  if (scroll) {
+    operationsDiscrepancyModuleEl.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+      inline: 'nearest'
+    });
+  }
+  void operationsDiscrepancyModuleEl.offsetWidth;
+  operationsDiscrepancyModuleEl.classList.add('is-focused');
+  operationsDiscrepancyHighlightTimer = window.setTimeout(() => {
+    operationsDiscrepancyModuleEl.classList.remove('is-focused');
+    operationsDiscrepancyHighlightTimer = null;
+  }, 2600);
+}
+
+function openOperationsDiscrepancyModule() {
+  if (!canAccessOperationsPanel()) {
+    setStatus('Current role does not have Operations Dashboard access.');
+    return;
+  }
+  if (document.body.classList.contains('admin-open')) {
+    switchAdminPanel('operations');
+  } else {
+    openAdminDashboard({ panelName: 'operations' });
+  }
+  window.setTimeout(() => {
+    highlightOperationsDiscrepancyModule();
+  }, 180);
 }
 
 // ------------------------------------------
@@ -5901,16 +7552,30 @@ function renderCart() {
   const selectedProfile = getSelectedDiscountProfile();
   const discount = getDiscountAmount();
   const totalDue = getTotalDue();
+  const hasSelectedDiscount = Boolean(selectedProfile);
+  const hasActiveDiscount = hasSelectedDiscount && discount > 0;
+  const showDiscountBreakdown = hasSelectedDiscount && subtotal > 0;
   state.discountAmount = discount;
   if (subtotalValueEl) subtotalValueEl.textContent = money(subtotal);
   if (totalDueValueEl) totalDueValueEl.textContent = money(totalDue);
   renderDiscountProfileSelect();
+  if (discountSummaryCardEl) {
+    discountSummaryCardEl.style.display = showDiscountBreakdown ? 'grid' : 'none';
+  }
   if (discountPreviousTotalValueEl) discountPreviousTotalValueEl.textContent = money(subtotal);
   if (discountAppliedLabelEl) {
     discountAppliedLabelEl.textContent = getDiscountProfileSummaryText(selectedProfile);
   }
   if (discountDeductionValueEl) discountDeductionValueEl.textContent = money(discount);
-  if (discountCurrentTotalValueEl) discountCurrentTotalValueEl.textContent = money(totalDue);
+  if (discountSummaryHintEl) {
+    discountSummaryHintEl.textContent = hasActiveDiscount
+      ? `Amount to Pay already includes the ${selectedProfile?.name || 'selected'} discount.`
+      : hasSelectedDiscount
+        ? `${selectedProfile?.name || 'Selected discount'} is selected. Add items to calculate the discount amount.`
+        : 'No discount selected. Amount to Pay matches Subtotal.';
+    discountSummaryHintEl.classList.toggle('is-active-discount', hasActiveDiscount);
+  }
+  renderPaidInvoiceEditBar();
 }
 
 function onProductClick(e) {
@@ -5933,17 +7598,20 @@ function onProductClick(e) {
     state.cart[addId] = (state.cart[addId] || 0) + 1;
     renderCart();
     playAddToCartConfetti();
+    persistPosDraftState();
   }
 
   if (removeId) {
     state.cart[removeId] = Math.max(0, (state.cart[removeId] || 0) - 1);
     renderCart();
+    persistPosDraftState();
   }
 }
 
 function resetAfterSale() {
   state.cart = {};
   state.activeInvoice = null;
+  state.paidInvoiceEditSession = null;
   state.scanQrContext = null;
   state.selectedDiscountProfileId = '';
   state.discountAmount = 0;
@@ -5958,14 +7626,13 @@ function resetAfterSale() {
   if (customerEmailEl) customerEmailEl.value = '';
   if (customerPhoneEl) customerPhoneEl.value = '';
   renderCart();
+  renderPaidInvoiceEditBar();
+  persistPosDraftState();
 }
 
 function updateReceiptActionVisibility() {
   const hasReceipt = Boolean(state.lastPaidInvoice);
-  const canHoldForVoid = Boolean(
-    hasReceipt
-    && canManageInvoiceActions(state.lastPaidInvoice, 'HOLD_FOR_VOID')
-  );
+  const receiptVoidAction = getReceiptVoidActionConfig(state.lastPaidInvoice);
   if (statusReceiptActionsEl) {
     statusReceiptActionsEl.style.display = hasReceipt ? 'flex' : 'none';
   }
@@ -5973,12 +7640,14 @@ function updateReceiptActionVisibility() {
     statusPrintReceiptBtn.disabled = !hasReceipt;
   }
   if (statusHoldForVoidBtn) {
-    statusHoldForVoidBtn.disabled = !canHoldForVoid;
-    statusHoldForVoidBtn.textContent = canHoldForVoid ? 'Hold for Void' : 'Hold for Void Requested';
+    statusHoldForVoidBtn.style.display = receiptVoidAction.visible ? 'inline-flex' : 'none';
+    statusHoldForVoidBtn.disabled = !receiptVoidAction.enabled;
+    statusHoldForVoidBtn.textContent = receiptVoidAction.label;
   }
   if (receiptHoldForVoidBtn) {
-    receiptHoldForVoidBtn.disabled = !canHoldForVoid;
-    receiptHoldForVoidBtn.textContent = canHoldForVoid ? 'Hold for Void' : 'Hold for Void Requested';
+    receiptHoldForVoidBtn.style.display = receiptVoidAction.visible ? 'inline-flex' : 'none';
+    receiptHoldForVoidBtn.disabled = !receiptVoidAction.enabled;
+    receiptHoldForVoidBtn.textContent = receiptVoidAction.label;
   }
 }
 
@@ -6184,6 +7853,68 @@ function setReceiptTemplatesStatus(message, tone = 'info') {
     receiptTemplatesStatusEl.classList.add('status-success');
   } else if (tone === 'error') {
     receiptTemplatesStatusEl.classList.add('status-error');
+  }
+}
+
+function renderReceiptWorkflowSettings({ useInputValue = false } = {}) {
+  const settings = getReceiptWorkflowConfig();
+  const autoOpenAfterPayment = useInputValue
+    ? receiptWorkflowAutoPopupInputEl?.checked === true
+    : settings.autoOpenAfterPayment === true;
+  const canEdit = canManageReceiptWorkflowSettings();
+  if (receiptWorkflowAutoPopupInputEl) {
+    if (!useInputValue) {
+      receiptWorkflowAutoPopupInputEl.checked = autoOpenAfterPayment;
+    }
+    receiptWorkflowAutoPopupInputEl.disabled = !canEdit;
+  }
+  if (receiptWorkflowStatusEl) {
+    receiptWorkflowStatusEl.textContent = canEdit
+      ? autoOpenAfterPayment
+        ? 'Receipt popup opens automatically after every successful payment. Cashiers can still print directly from the paid-success screen.'
+        : 'Receipt popup stays hidden after payment by default. Cashiers can open it manually or print directly from the paid-success screen.'
+      : 'Only Administrations can change the automatic receipt popup behavior.';
+    receiptWorkflowStatusEl.classList.remove('status-success', 'status-error');
+  }
+  if (receiptWorkflowSaveBtnEl) {
+    if (!receiptWorkflowSaveBtnEl.dataset.defaultLabel) {
+      receiptWorkflowSaveBtnEl.dataset.defaultLabel = receiptWorkflowSaveBtnEl.textContent || 'Save Receipt Popup Behavior';
+    }
+    receiptWorkflowSaveBtnEl.textContent = receiptWorkflowSaveBtnEl.dataset.defaultLabel;
+    receiptWorkflowSaveBtnEl.disabled = !canEdit;
+  }
+}
+
+async function saveReceiptWorkflowSettings() {
+  if (!canManageReceiptWorkflowSettings()) {
+    setStatus('Only admin can change receipt popup behavior.');
+    return;
+  }
+  const payload = {
+    autoOpenAfterPayment: receiptWorkflowAutoPopupInputEl?.checked === true
+  };
+  if (receiptWorkflowSaveBtnEl) {
+    receiptWorkflowSaveBtnEl.disabled = true;
+    receiptWorkflowSaveBtnEl.textContent = 'Saving...';
+  }
+  try {
+    const result = await api('/api/admin/app-config', {
+      method: 'PUT',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        receiptWorkflow: payload
+      })
+    });
+    applyAppConfig(result?.appConfig || state.appConfig);
+    setStatus('Receipt popup behavior saved.');
+    showConfirmationToast({
+      title: 'Receipt behavior saved',
+      message: payload.autoOpenAfterPayment
+        ? 'Receipt popup will now open automatically after payment.'
+        : 'Receipt popup will now stay hidden after payment unless opened manually.'
+    });
+  } finally {
+    renderReceiptWorkflowSettings();
   }
 }
 
@@ -6543,22 +8274,121 @@ function renderAdminReceiptModal(invoice) {
   });
 }
 
+function prepareLatestPaymentReceipt(invoice = state.lastPaidInvoice) {
+  if (!invoice) return null;
+  renderPaymentReceiptModal(invoice);
+  return invoice;
+}
+
+function updatePaymentSuccessHero(invoice, modeLabel = '') {
+  const safeModeLabel = String(modeLabel || '').trim() || getPaymentMethodLabel(invoice?.paymentMethod || 'cash');
+  const safeReference = String(invoice?.reference || '-').trim() || '-';
+  const paidAmount = money(invoice?.payment?.amountPaid || invoice?.total || 0);
+  const autoPopupEnabled = shouldAutoOpenPaymentReceiptAfterPayment();
+  if (paymentSuccessEyebrowEl) paymentSuccessEyebrowEl.textContent = `${safeModeLabel} Payment Completed`;
+  if (paymentSuccessTitleEl) paymentSuccessTitleEl.textContent = 'Paid Successfully';
+  if (paymentSuccessSummaryEl) {
+    paymentSuccessSummaryEl.textContent = autoPopupEnabled
+      ? `${paidAmount} received. OR Number ${safeReference} is saved, and the receipt popup will open automatically after the animation.`
+      : `${paidAmount} received. OR Number ${safeReference} is saved. Use Print Receipt for direct printing or View Receipt for preview.`;
+  }
+  if (paymentSuccessReferenceValueEl) paymentSuccessReferenceValueEl.textContent = safeReference;
+  if (paymentSuccessAmountValueEl) paymentSuccessAmountValueEl.textContent = paidAmount;
+  if (paymentSuccessMethodValueEl) paymentSuccessMethodValueEl.textContent = safeModeLabel;
+}
+
+function triggerPaymentSuccessAnimation() {
+  const successCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  if (!successCardEl) return;
+  successCardEl.classList.remove('is-celebrating');
+  if (paymentSuccessAnimationTimer) {
+    clearTimeout(paymentSuccessAnimationTimer);
+    paymentSuccessAnimationTimer = null;
+  }
+  void waitForNextPaint().then(() => {
+    if (!paymentSuccessModalEl?.classList.contains('open')) return;
+    successCardEl.classList.add('is-celebrating');
+    paymentSuccessAnimationTimer = window.setTimeout(() => {
+      successCardEl.classList.remove('is-celebrating');
+      paymentSuccessAnimationTimer = null;
+    }, 1800);
+  });
+}
+
+function clearPaymentReceiptAutoOpenTimer() {
+  if (paymentReceiptAutoOpenTimer) {
+    clearTimeout(paymentReceiptAutoOpenTimer);
+    paymentReceiptAutoOpenTimer = null;
+  }
+}
+
+function openPaymentReceiptModal() {
+  if (!paymentReceiptModalEl) return;
+  paymentReceiptModalEl.classList.add('open');
+  paymentReceiptModalEl.setAttribute('aria-hidden', 'false');
+}
+
+function closePaymentReceiptModal() {
+  if (!paymentReceiptModalEl) return;
+  paymentReceiptModalEl.classList.remove('open');
+  paymentReceiptModalEl.setAttribute('aria-hidden', 'true');
+}
+
+function schedulePaymentReceiptAutoOpen() {
+  clearPaymentReceiptAutoOpenTimer();
+  if (!shouldAutoOpenPaymentReceiptAfterPayment()) return;
+  paymentReceiptAutoOpenTimer = window.setTimeout(() => {
+    paymentReceiptAutoOpenTimer = null;
+    if (!paymentSuccessModalEl?.classList.contains('open')) return;
+    const invoice = prepareLatestPaymentReceipt();
+    if (!invoice) return;
+    closePaymentSuccessModal();
+    openPaymentReceiptModal();
+  }, 1900);
+}
+
+function showPaymentSuccessModal(invoice, modeLabel = '', { playAnimation = true } = {}) {
+  prepareLatestPaymentReceipt(invoice);
+  updatePaymentSuccessHero(invoice, modeLabel);
+  if (!paymentSuccessModalEl) return;
+  paymentSuccessModalEl.classList.add('open');
+  paymentSuccessModalEl.setAttribute('aria-hidden', 'false');
+  const successCardEl = paymentSuccessModalEl.querySelector('.payment-success-card');
+  if (successCardEl) {
+    successCardEl.classList.remove('is-celebrating');
+    successCardEl.style.transform = '';
+    successCardEl.style.opacity = '';
+  }
+  if (playAnimation) {
+    triggerPaymentSuccessAnimation();
+  }
+  schedulePaymentReceiptAutoOpen();
+}
+
 function finalizeSuccessfulPayment(invoice, modeLabel) {
   state.lastPaidInvoice = invoice;
   updateReceiptActionVisibility();
   state.cashPromptActive = false;
   if (amountTenderedEl) amountTenderedEl.value = '';
   resetAfterSale();
+  closePaymentReceiptModal();
+  showPaymentSuccessModal(invoice, modeLabel, { playAnimation: true });
+  refreshLatestShiftSummary().catch(() => {});
+  refreshShiftMonitorModalIfOpen().catch(() => {});
 }
 
 function closePaymentSuccessModal() {
+  clearPaymentReceiptAutoOpenTimer();
+  if (paymentSuccessAnimationTimer) {
+    clearTimeout(paymentSuccessAnimationTimer);
+    paymentSuccessAnimationTimer = null;
+  }
   if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
-  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
-  if (receiptCardEl) receiptCardEl.classList.remove('collapsed');
-  if (receiptCardEl) receiptCardEl.classList.remove('minimizing');
-  if (receiptCardEl) receiptCardEl.style.transform = '';
-  if (receiptCardEl) receiptCardEl.style.opacity = '';
-  if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
+  if (paymentSuccessModalEl) paymentSuccessModalEl.setAttribute('aria-hidden', 'true');
+  const successCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
+  if (successCardEl) successCardEl.classList.remove('is-celebrating');
+  if (successCardEl) successCardEl.style.transform = '';
+  if (successCardEl) successCardEl.style.opacity = '';
 }
 
 function printReceiptContent(printAreaEl) {
@@ -6668,48 +8498,35 @@ function printReceiptContent(printAreaEl) {
 }
 
 function printReceiptFromModal() {
+  const invoice = prepareLatestPaymentReceipt();
+  if (!invoice) {
+    setStatus('No paid transaction yet to print.');
+    return;
+  }
   printReceiptContent(receiptPrintAreaEl);
 }
 
-function openLatestReceiptPreview() {
-  if (!state.lastPaidInvoice) {
+function printLatestPaidReceipt() {
+  clearPaymentReceiptAutoOpenTimer();
+  const invoice = prepareLatestPaymentReceipt();
+  if (!invoice) {
+    setStatus('No paid transaction yet to print.');
+    return;
+  }
+  printReceiptContent(receiptPrintAreaEl);
+}
+
+function openLatestReceiptPreview({ closeSuccessModal: shouldCloseSuccessModal = false } = {}) {
+  clearPaymentReceiptAutoOpenTimer();
+  const invoice = prepareLatestPaymentReceipt();
+  if (!invoice) {
     setStatus('No paid transaction yet to preview receipt.');
     return;
   }
-  renderPaymentReceiptModal(state.lastPaidInvoice);
-  if (paymentSuccessModalEl) paymentSuccessModalEl.classList.add('open');
-}
-
-function togglePaymentReceiptCollapse() {
-  const receiptCardEl = paymentSuccessModalEl?.querySelector('.payment-success-card');
-  const targetBtn = statusPrintReceiptBtn;
-  if (!receiptCardEl || !receiptMinimizeBtn) return;
-
-  if (receiptMinimizeBtn.textContent === 'Minimize' && paymentSuccessModalEl?.classList.contains('open')) {
-    if (!targetBtn) return;
-    const cardRect = receiptCardEl.getBoundingClientRect();
-    const targetRect = targetBtn.getBoundingClientRect();
-    const dx = (targetRect.left + (targetRect.width / 2)) - (cardRect.left + (cardRect.width / 2));
-    const dy = (targetRect.top + (targetRect.height / 2)) - (cardRect.top + (cardRect.height / 2));
-
-    receiptCardEl.classList.add('minimizing');
-    receiptCardEl.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
-    receiptCardEl.style.opacity = '0.15';
-    receiptMinimizeBtn.textContent = 'Expand';
-
-    setTimeout(() => {
-      if (paymentSuccessModalEl) paymentSuccessModalEl.classList.remove('open');
-      receiptCardEl.classList.remove('minimizing');
-      receiptCardEl.style.transform = '';
-      receiptCardEl.style.opacity = '';
-      if (receiptMinimizeBtn) receiptMinimizeBtn.textContent = 'Minimize';
-    }, 360);
-    return;
+  if (shouldCloseSuccessModal) {
+    closePaymentSuccessModal();
   }
-
-  const collapsed = !receiptCardEl.classList.contains('collapsed');
-  receiptCardEl.classList.toggle('collapsed', collapsed);
-  receiptMinimizeBtn.textContent = collapsed ? 'Expand' : 'Minimize';
+  openPaymentReceiptModal();
 }
 
 function printAdminReceiptFromModal() {
@@ -6726,6 +8543,7 @@ function closeAdminReceiptModal() {
 
 function openEwalletModal() {
   if (!eWalletModalEl) return;
+  renderEPaymentOptionAvailability();
   eWalletModalEl.classList.add('open');
 }
 
@@ -6746,42 +8564,27 @@ function closeScanQrModal() {
 
 function renderScanQrContent({ checkout, invoice, notice = 'Waiting for payment confirmation...' }) {
   if (!scanQrContentEl) return;
-  const sampleQrDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
-      <rect width="220" height="220" fill="white"/>
-      <rect x="12" y="12" width="56" height="56" fill="black"/>
-      <rect x="20" y="20" width="40" height="40" fill="white"/>
-      <rect x="28" y="28" width="24" height="24" fill="black"/>
-      <rect x="152" y="12" width="56" height="56" fill="black"/>
-      <rect x="160" y="20" width="40" height="40" fill="white"/>
-      <rect x="168" y="28" width="24" height="24" fill="black"/>
-      <rect x="12" y="152" width="56" height="56" fill="black"/>
-      <rect x="20" y="160" width="40" height="40" fill="white"/>
-      <rect x="28" y="168" width="24" height="24" fill="black"/>
-      <rect x="84" y="84" width="8" height="8" fill="black"/>
-      <rect x="100" y="84" width="8" height="8" fill="black"/>
-      <rect x="116" y="84" width="8" height="8" fill="black"/>
-      <rect x="132" y="84" width="8" height="8" fill="black"/>
-      <rect x="84" y="100" width="8" height="8" fill="black"/>
-      <rect x="116" y="100" width="8" height="8" fill="black"/>
-      <rect x="132" y="100" width="8" height="8" fill="black"/>
-      <rect x="84" y="116" width="8" height="8" fill="black"/>
-      <rect x="100" y="116" width="8" height="8" fill="black"/>
-      <rect x="132" y="116" width="8" height="8" fill="black"/>
-      <rect x="84" y="132" width="8" height="8" fill="black"/>
-      <rect x="100" y="132" width="8" height="8" fill="black"/>
-      <rect x="116" y="132" width="8" height="8" fill="black"/>
-      <rect x="132" y="132" width="8" height="8" fill="black"/>
-      <text x="110" y="212" text-anchor="middle" font-size="11" font-family="Arial" fill="#5a3521">Sample QR for Scan-to-Pay</text>
-    </svg>
-  `)}`;
-  const qrMarkup = `<img class="qr" alt="Sample Payment QR Code" src="${sampleQrDataUrl}" />`;
+  const checkoutChannel = checkout?.checkoutChannel || state.scanQrContext?.checkoutChannel || 'scanQr';
+  const paymentLabel = normalizeEPaymentChannelKey(checkoutChannel, 'scanQr') === 'scanQr'
+    ? getEPaymentChannelLabel('scanQr')
+    : getPaymentMethodLabel(invoice?.paymentMethod || checkout?.method || 'gcash');
+  const configuredQrImageUrl = normalizeEPaymentImageUrl(getEPaymentMethodConfig('scanQr')?.qrImageUrl || '');
+  const orderReference = String(
+    invoice?.reference
+    || state.scanQrContext?.invoice?.reference
+    || checkout?.invoiceReference
+    || checkout?.reference
+    || '-'
+  ).trim() || '-';
+  const qrMarkup = configuredQrImageUrl
+    ? `<img class="qr" alt="Configured Scan QR payment image" src="${escapeHtml(configuredQrImageUrl)}" />`
+    : '<div class="scan-qr-empty">No Scan QR image is uploaded in Control Center yet.</div>';
 
   scanQrContentEl.innerHTML = `
     <div class="scan-qr-meta">
-      <div><strong>Reference:</strong> ${escapeHtml(checkout?.reference || invoice?.reference || '-')}</div>
+      <div><strong>OR Number:</strong> ${escapeHtml(orderReference)}</div>
       <div><strong>Amount:</strong> ${money(invoice?.total || checkout?.amount || 0)}</div>
-      <div><strong>Method:</strong> ${escapeHtml(getPaymentMethodLabel(invoice?.paymentMethod || checkout?.method || 'gcash'))}</div>
+      <div><strong>Method:</strong> ${escapeHtml(paymentLabel)}</div>
       <div><strong>Status:</strong> ${escapeHtml(notice)}</div>
     </div>
     ${qrMarkup}
@@ -6793,6 +8596,12 @@ async function startScanQrPaymentFlow() {
     const items = getCartItems();
     if (!items.length) {
       setStatus('Add at least one item first.');
+      return;
+    }
+
+    const qrAvailability = getEPaymentMethodAvailability('scanQr');
+    if (!qrAvailability.available) {
+      setStatus(qrAvailability.statusNote);
       return;
     }
 
@@ -6818,23 +8627,38 @@ async function startScanQrPaymentFlow() {
     if (cEmail) customerInfo.email = cEmail;
     if (cPhone) customerInfo.phone = cPhone;
 
-    const { checkout } = await api('/api/payments/ewallet/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
-    });
+    let checkoutResult;
+    try {
+      checkoutResult = await api('/api/payments/ewallet/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ invoiceId: invoice.id, customerInfo, checkoutChannel: 'scanQr' })
+      });
+    } catch (error) {
+      if (isEPaymentUnavailableError(error)) {
+        await cancelActivePendingInvoice(
+          'QR checkout was disabled before the payment session could start.',
+          'Pending invoice cancelled because Scan QR is disabled.'
+        );
+      }
+      throw error;
+    }
+
+    const { checkout } = checkoutResult;
 
     state.scanQrContext = {
       invoiceId: invoice.id,
       invoice,
-      checkout
+      checkout,
+      checkoutChannel: 'scanQr'
     };
+    persistPosDraftState();
 
     renderScanQrContent({ checkout, invoice, notice: 'Waiting for customer proof of payment...' });
     if (scanQrFinishBtn) scanQrFinishBtn.disabled = false;
     openScanQrModal();
-    setStatus('Sample QR is ready. Ask customer to scan and pay, then confirm proof and click Finish.');
+    setStatus('Scan QR prompt is ready. Ask customer to scan and pay, then confirm proof and click Finish.');
   } catch (error) {
-    setStatus(`QR checkout error: ${error.message}`);
+    setStatus(isEPaymentUnavailableError(error) ? error.message : `QR checkout error: ${error.message}`);
   }
 }
 
@@ -6847,7 +8671,10 @@ async function finishScanQrPayment() {
   let paidInvoice = null;
   try {
     const completeResult = await api(`/api/payments/ewallet/manual-complete/${state.scanQrContext.invoiceId}`, {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({
+        checkoutChannel: state.scanQrContext?.checkoutChannel || 'scanQr'
+      })
     });
     paidInvoice = completeResult?.invoice || null;
   } catch (error) {
@@ -6859,7 +8686,7 @@ async function finishScanQrPayment() {
   closeScanQrModal();
   renderReceipt(paidInvoice);
   await refreshSalesReport(activeSalesRange);
-  finalizeSuccessfulPayment(paidInvoice, 'E-Payment');
+  finalizeSuccessfulPayment(paidInvoice, 'Scan QR');
   state.scanQrContext = null;
 }
 
@@ -6886,7 +8713,7 @@ function formatOverviewCountDelta(comparison) {
 function getOverviewMixLabel(value, fallback = 'Unknown') {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return fallback;
-  if (normalized === 'gcash' || normalized === 'paymaya' || normalized === 'cash') {
+  if (normalized === 'gcash' || normalized === 'paymaya' || normalized === 'cash' || normalized === 'scanqr') {
     return getPaymentMethodLabel(normalized);
   }
   if (normalized === 'dine-in' || normalized === 'take-out') {
@@ -6920,37 +8747,21 @@ function renderOverviewMixRows(rows, type) {
 function renderOverviewMetricCards(report) {
   const metrics = report?.metrics || {};
   const comparisons = report?.comparisons || {};
+  const monthlySalesMonthLabel = formatMonthLabel(metrics.monthlySalesMonth);
   return `
     <div class="overview-kpi-grid">
       <article class="overview-kpi-card highlight">
         <span>Gross Sales</span>
         <strong>${money(metrics.totalSales || 0)}</strong>
-        <small>${formatOverviewDelta(comparisons.sales, money)}</small>
       </article>
       <article class="overview-kpi-card">
         <span>Paid Transactions</span>
         <strong>${Number(metrics.paidTransactions || 0)}</strong>
-        <small>${formatOverviewCountDelta(comparisons.transactions)}</small>
       </article>
       <article class="overview-kpi-card">
-        <span>Average Ticket</span>
-        <strong>${money(metrics.averageTicket || 0)}</strong>
-        <small>${formatOverviewDelta(comparisons.averageTicket, money)}</small>
-      </article>
-      <article class="overview-kpi-card">
-        <span>Items Sold</span>
-        <strong>${Number(metrics.itemsSold || 0)}</strong>
-        <small>${formatOverviewCountDelta(comparisons.itemsSold)}</small>
-      </article>
-      <article class="overview-kpi-card">
-        <span>Net Cash</span>
-        <strong>${money(metrics.netCash || 0)}</strong>
-        <small>Tendered ${money(metrics.cashTendered || 0)} | Change ${money(metrics.changeGiven || 0)}</small>
-      </article>
-      <article class="overview-kpi-card">
-        <span>Monthly Net After Expenses</span>
-        <strong>${money(metrics.monthlyNetAfterExpenses || 0)}</strong>
-        <small>Monthly expenses ${money(metrics.monthlyExpenses || 0)}</small>
+        <span>Monthly Sales</span>
+        <strong>${money(metrics.monthlySales || 0)}</strong>
+        <small>${escapeHtml(monthlySalesMonthLabel)}</small>
       </article>
     </div>
   `;
@@ -9278,22 +11089,28 @@ async function submitInventoryDelete() {
 async function refreshSalesReport(range = activeSalesRange, options = {}) {
   try {
     const { refreshSalesOps = true } = options;
-    activeSalesRange = range;
+    activeSalesRange = normalizeAdminRange(range);
     saveUserUiState({ salesRange: activeSalesRange });
     if (!canAccessAdminFeatures()) return;
     if (adminRangeEl) {
-      adminRangeEl.value = range;
+      adminRangeEl.value = activeSalesRange;
     }
-    
-    let url = `/api/admin/overview?range=${encodeURIComponent(range)}`;
-    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
-      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
-      const year = parseInt(monthVal.split('-')[0], 10);
-      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
-      const from = new Date(year, month, 1, 0, 0, 0);
-      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      url += `&dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}`;
+
+    const params = new URLSearchParams();
+    if (activeSalesRange) params.set('range', activeSalesRange);
+    if (activeSalesRange === 'monthly') {
+      params.set('month', getCurrentMonthValue());
+    } else if (activeSalesRange === 'custom_month') {
+      const monthVal = getAdminSelectedMonth();
+      const bounds = getMonthRangeBounds(monthVal);
+      if (monthVal) params.set('month', monthVal);
+      if (bounds?.dateFrom && bounds?.dateTo) {
+        params.set('dateFrom', bounds.dateFrom);
+        params.set('dateTo', bounds.dateTo);
+      }
     }
+    const query = params.toString();
+    const url = `/api/admin/overview${query ? `?${query}` : ''}`;
 
     const report = await api(url, {
       headers: buildActorHeaders()
@@ -9367,6 +11184,10 @@ async function pollInvoice(invoiceId) {
 
 async function handleCheckout() {
   try {
+    if (isPaidInvoiceEditActive()) {
+      setStatus('A paid transaction edit is active. Save the edited receipt first before starting a new checkout.');
+      return;
+    }
     const items = getCartItems();
     if (!items.length) {
       setStatus('Add at least one item first.');
@@ -9428,6 +11249,13 @@ async function handleCheckout() {
       }
     }
 
+    const eWalletMethod = normalizeEPaymentChannelKey(paymentMethod, paymentMethod);
+    const eWalletAvailability = getEPaymentMethodAvailability(eWalletMethod);
+    if (!eWalletAvailability.available) {
+      setStatus(eWalletAvailability.statusNote);
+      return;
+    }
+
     const { invoice } = await api('/api/invoices', {
       method: 'POST',
       body: JSON.stringify({
@@ -9441,6 +11269,7 @@ async function handleCheckout() {
     });
 
     state.activeInvoice = invoice;
+    persistPosDraftState();
 
     // Collect customer info from the form
     const customerInfo = {};
@@ -9451,12 +11280,24 @@ async function handleCheckout() {
     if (cEmail) customerInfo.email = cEmail;
     if (cPhone) customerInfo.phone = cPhone;
 
-    const eWalletMethod = String(paymentMethod).toLowerCase();
     const eWalletLabel = getPaymentMethodLabel(eWalletMethod);
-    const { checkout } = await api('/api/payments/ewallet/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ invoiceId: invoice.id, customerInfo })
-    });
+    let checkoutResult;
+    try {
+      checkoutResult = await api('/api/payments/ewallet/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ invoiceId: invoice.id, customerInfo, checkoutChannel: eWalletMethod })
+      });
+    } catch (error) {
+      if (isEPaymentUnavailableError(error)) {
+        await cancelActivePendingInvoice(
+          `${eWalletLabel} checkout was disabled before the payment session could start.`,
+          `Pending invoice cancelled because ${eWalletLabel} is disabled.`
+        );
+      }
+      throw error;
+    }
+
+    const { checkout } = checkoutResult;
 
     const qrMarkup = checkout.qrDataUrl
       ? `<img class="qr" alt="GCash QR" src="${checkout.qrDataUrl}" />`
@@ -9493,11 +11334,17 @@ async function handleCheckout() {
 
     await pollInvoice(invoice.id);
   } catch (error) {
-    setStatus(`Checkout error: ${error.message}`);
+    setStatus(isEPaymentUnavailableError(error) ? error.message : `Checkout error: ${error.message}`);
   }
 }
 
 function onPaymentMethodChange() {
+  if (isPaidInvoiceEditActive()) {
+    if (cashRowEl) {
+      cashRowEl.style.display = 'none';
+    }
+    return;
+  }
   const isCash = paymentMethodEl.value === 'cash';
   if (cashRowEl) {
     cashRowEl.style.display = (isCash && state.cashPromptActive) ? 'flex' : 'none';
@@ -9511,20 +11358,19 @@ function onPaymentMethodChange() {
 async function refreshAdminTransactions() {
   try {
     const filterStatus = adminFilterEl.value;
-    const range = adminRangeEl.value;
-
-    let url = '/api/admin/transactions?';
-    if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
-    if (range) url += `range=${encodeURIComponent(range)}&`;
-    
-    if (range === 'custom_month' && adminMonthPickerEl && adminMonthPickerEl.value) {
-      const monthVal = adminMonthPickerEl.value; // e.g. "2026-03"
-      const year = parseInt(monthVal.split('-')[0], 10);
-      const month = parseInt(monthVal.split('-')[1], 10) - 1; // 0-based
-      const from = new Date(year, month, 1, 0, 0, 0);
-      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
-      url += `dateFrom=${encodeURIComponent(from.toISOString())}&dateTo=${encodeURIComponent(to.toISOString())}&`;
+    const range = normalizeAdminRange(adminRangeEl.value);
+    const params = new URLSearchParams();
+    if (filterStatus) params.set('status', filterStatus);
+    if (range) params.set('range', range);
+    if (range === 'custom_month') {
+      const bounds = getMonthRangeBounds(getAdminSelectedMonth());
+      if (bounds?.dateFrom && bounds?.dateTo) {
+        params.set('dateFrom', bounds.dateFrom);
+        params.set('dateTo', bounds.dateTo);
+      }
     }
+    const query = params.toString();
+    const url = `/api/admin/transactions${query ? `?${query}` : ''}`;
 
     const { transactions } = await api(url, {
       headers: buildActorHeaders()
@@ -9535,100 +11381,27 @@ async function refreshAdminTransactions() {
   }
 }
 
-async function requestHoldForVoid(invoiceId = null) {
-  const targetInvoiceId = String(invoiceId || state.lastPaidInvoice?.id || '').trim();
-  if (!targetInvoiceId) {
-    setStatus('No paid receipt is available to hold for void.');
-    return;
-  }
-  const targetInvoice = [state.lastPaidInvoice, state.activeInvoice]
-    .find((invoice) => String(invoice?.id || '').trim() === targetInvoiceId) || null;
-  if (!canManageInvoiceActions(targetInvoice, 'HOLD_FOR_VOID')) {
-    setStatus('Current role cannot place this receipt on hold for void.');
-    return;
-  }
-
-  const reason = String(window.prompt('Enter the note before this receipt is sent for void review:', '') || '').trim();
-  if (!reason) {
-    setStatus('A note is required to place a receipt on hold for void.');
-    return;
-  }
-
-  try {
-    const { invoice } = await api(`/api/admin/invoices/${encodeURIComponent(targetInvoiceId)}/status`, {
-      method: 'PATCH',
-      headers: buildActorHeaders(),
-      body: JSON.stringify({
-        status: 'HOLD_FOR_VOID',
-        reason
-      })
-    });
-    if (state.lastPaidInvoice && String(state.lastPaidInvoice.id || '') === targetInvoiceId) {
-      state.lastPaidInvoice = invoice;
-      renderReceipt(invoice);
-      renderPaymentReceiptModal(invoice);
-    }
-    if (state.activeInvoice && String(state.activeInvoice.id || '') === targetInvoiceId) {
-      state.activeInvoice = invoice;
-    }
-    setStatus('Receipt placed on hold for void review.');
-    try {
-      const summary = await refreshLatestShiftSummary();
-      if (shiftMonitorModalEl?.classList.contains('open') && summary) {
-        renderShiftSummary(shiftMonitorSummaryEl, summary);
-      }
-    } catch (_error) {
-      // Keep the hold request successful even if the summary refresh fails.
-    }
-    if (canAccessAdminFeatures()) {
-      await Promise.all([
-        refreshAdminTransactions(),
-        refreshSalesReport(activeSalesRange),
-        refreshCashierMonitoring(),
-        refreshShiftManagement()
-      ]);
-    }
-  } catch (error) {
-    setStatus(`Hold for void failed: ${error.message}`);
-  }
-}
-
 function renderAdminStats(report) {
   if (!adminStatsEl) return;
   const metrics = report?.metrics || {};
   const comparisons = report?.comparisons || {};
+  const monthlySalesMonthLabel = formatMonthLabel(metrics.monthlySalesMonth);
+  const canJumpToDiscrepancies = canAccessOperationsPanel();
 
   adminStatsEl.innerHTML = `
     <div class="sales-ops-summary-grid admin-health-grid">
       <article class="sales-ops-summary-card highlight">
         <span>Gross Sales</span>
         <strong>${money(metrics.totalSales || 0)}</strong>
-        <small>${formatOverviewDelta(comparisons.sales, money)}</small>
       </article>
       <article class="sales-ops-summary-card">
         <span>Paid Transactions</span>
         <strong>${Number(metrics.paidTransactions || 0)}</strong>
-        <small>${formatOverviewCountDelta(comparisons.transactions)}</small>
       </article>
       <article class="sales-ops-summary-card">
-        <span>Average Ticket</span>
-        <strong>${money(metrics.averageTicket || 0)}</strong>
-        <small>${formatOverviewDelta(comparisons.averageTicket, money)}</small>
-      </article>
-      <article class="sales-ops-summary-card">
-        <span>Items Sold</span>
-        <strong>${Number(metrics.itemsSold || 0)}</strong>
-        <small>${formatOverviewCountDelta(comparisons.itemsSold)}</small>
-      </article>
-      <article class="sales-ops-summary-card">
-        <span>Net Cash</span>
-        <strong>${money(metrics.netCash || 0)}</strong>
-        <small>Tendered ${money(metrics.cashTendered || 0)} | Change ${money(metrics.changeGiven || 0)}</small>
-      </article>
-      <article class="sales-ops-summary-card">
-        <span>Monthly Net After Expenses</span>
-        <strong>${money(metrics.monthlyNetAfterExpenses || 0)}</strong>
-        <small>Monthly expenses ${money(metrics.monthlyExpenses || 0)}</small>
+        <span>Monthly Sales</span>
+        <strong>${money(metrics.monthlySales || 0)}</strong>
+        <small>${escapeHtml(monthlySalesMonthLabel)}</small>
       </article>
       <article class="sales-ops-summary-card">
         <span>Pending Payments</span>
@@ -9640,11 +11413,17 @@ function renderAdminStats(report) {
         <strong>${Number(metrics.voidedTransactions || 0)}</strong>
         <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
       </article>
-      <article class="sales-ops-summary-card">
+      <button
+        class="sales-ops-summary-card${canJumpToDiscrepancies ? ' actionable' : ''}"
+        type="button"
+        ${canJumpToDiscrepancies ? 'data-admin-summary-action="open-discrepancies"' : 'disabled'}
+        ${canJumpToDiscrepancies ? 'title="Open discrepancy alerts in Operations"' : ''}
+      >
         <span>Discrepancy Alerts</span>
         <strong>${Number(metrics.discrepancyAlerts || 0)}</strong>
         <small>Shift reviews needing reconciliation</small>
-      </article>
+        ${canJumpToDiscrepancies ? '<small class="sales-ops-summary-link">Open in Operations</small>' : ''}
+      </button>
       <article class="sales-ops-summary-card">
         <span>Unsynced Operations</span>
         <strong>${Number(metrics.unsyncedOperations || 0)}</strong>
@@ -9753,6 +11532,13 @@ function getAdminRangeSearchParams() {
   const params = new URLSearchParams();
   const range = getAdminRangeQueryValue();
   if (range) params.set('range', range);
+  if (range === 'custom_month') {
+    const bounds = getMonthRangeBounds(getAdminSelectedMonth());
+    if (bounds?.dateFrom && bounds?.dateTo) {
+      params.set('dateFrom', bounds.dateFrom);
+      params.set('dateTo', bounds.dateTo);
+    }
+  }
   return params;
 }
 
@@ -9816,7 +11602,6 @@ function renderCashierMonitoring(cashiers = []) {
       <td>${escapeHtml(formatDate(row.loginTime))}</td>
       <td>${money(row.startingCash || 0)}</td>
       <td>${money(row.currentSales || 0)}</td>
-      <td>${money(row.holdForVoidAmount || 0)}<br /><small>${Number(row.holdForVoidCount || 0)} receipt(s)</small></td>
       <td>${money(row.cashWithdrawals || 0)}</td>
       <td>${money(row.currentDrawerBalance || 0)}</td>
       <td>${Number(row.totalTransactions || 0)}</td>
@@ -9833,7 +11618,6 @@ function renderCashierMonitoring(cashiers = []) {
           <th>Shift Start</th>
           <th>Cash on Hand</th>
           <th>Current Sales</th>
-          <th>Hold for Void</th>
           <th>Admin Deductions</th>
           <th>Current Drawer Cash</th>
           <th>Transactions</th>
@@ -10196,6 +11980,7 @@ async function handleCashDrawerDeleteClick(drawerId, drawerName) {
 function renderShiftManagement(result) {
   const shifts = Array.isArray(result?.shifts) ? result.shifts : [];
   const summary = result?.summary || {};
+  const paymentMixNote = formatPaymentMethodBreakdownText(summary.paymentMethods || {}, { excludeCash: true });
 
   if (shiftManagementSummaryEl) {
     shiftManagementSummaryEl.innerHTML = `
@@ -10216,11 +12001,6 @@ function renderShiftManagement(result) {
           <small>Manual changes applied at shift start</small>
         </article>
         <article class="operations-metric-card">
-          <span>On Hold for Void</span>
-          <strong>${money(summary.holdForVoidAmount || 0)}</strong>
-          <small>${Number(summary.holdForVoidCount || 0)} receipt(s) waiting for admin void review</small>
-        </article>
-        <article class="operations-metric-card">
           <span>Drawer Deductions</span>
           <strong>${money(summary.cashWithdrawals || 0)}</strong>
           <small>Recorded cash pull-outs in selected range</small>
@@ -10239,6 +12019,11 @@ function renderShiftManagement(result) {
           <span>Net Cash</span>
           <strong>${money(summary.netCashRetained || 0)}</strong>
           <small>Cash retained after change and deductions</small>
+        </article>
+        <article class="operations-metric-card">
+          <span>E-Payments</span>
+          <strong>${money(summary.otherPayments || 0)}</strong>
+          <small>${escapeHtml(paymentMixNote)}</small>
         </article>
       </div>
     `;
@@ -10261,10 +12046,11 @@ function renderShiftManagement(result) {
       <td>${Number(row.openingAdjustment || 0) === 0 ? 'Verified' : formatDiscrepancyPill(row.openingAdjustment)}</td>
       <td>${money(row.expectedCash || 0)}</td>
       <td>${money(row.cashWithdrawals || 0)}</td>
-      <td>${money(row.holdForVoidAmount || 0)}<br /><small>${Number(row.holdForVoidCount || 0)} receipt(s)</small></td>
       <td>${money(row.cashTendered || 0)}</td>
       <td>${money(row.changeGiven || 0)}</td>
       <td>${money(row.netCashRetained || 0)}</td>
+      <td>${money(row.otherPayments || 0)}</td>
+      <td><small>${escapeHtml(formatPaymentMethodBreakdownText(row.paymentMethods || {}, { excludeCash: true }))}</small></td>
       <td>${row.endingCash === null || row.endingCash === undefined ? '—' : money(row.endingCash)}</td>
       <td>${Number(row.discrepancy || 0) === 0 ? 'Balanced' : formatDiscrepancyPill(row.discrepancy)}</td>
       <td>${Number(row.discrepancy || 0) === 0 ? 'None' : formatReviewStatusPill(row.reviewStatus)}</td>
@@ -10286,10 +12072,11 @@ function renderShiftManagement(result) {
           <th>Opening Adjustment</th>
           <th>Expected</th>
           <th>Drawer Deductions</th>
-          <th>Hold for Void</th>
           <th>Tendered</th>
           <th>Change</th>
           <th>Net Cash</th>
+          <th>E-Payments</th>
+          <th>E-Payment Breakdown</th>
           <th>Actual</th>
           <th>Discrepancy</th>
           <th>Review</th>
@@ -10556,13 +12343,201 @@ async function refreshSalesOpsDashboard(range = activeSalesOpsRange) {
   }
 }
 
-function renderMonthlyClosing(result) {
+function normalizeMonthlyClosingSnapshotRecord(snapshot = {}) {
+  return {
+    month: String(snapshot?.month || '').trim(),
+    report: snapshot?.report && typeof snapshot.report === 'object' ? snapshot.report : {},
+    savedAt: snapshot?.savedAt || null,
+    updatedAt: snapshot?.updatedAt || snapshot?.savedAt || null,
+    savedByName: snapshot?.savedByName || null,
+    savedByEmail: snapshot?.savedByEmail || null,
+    savedByUserId: snapshot?.savedByUserId || null
+  };
+}
+
+function renderMonthlyClosingSnapshotStatus() {
+  if (!monthlyClosingSnapshotStatusEl || !canAccessMonthlyClosing()) return;
+  const monthValue = String(monthlyClosingCurrentResult?.month || getMonthlyClosingSelectedMonth()).trim();
+  const monthLabel = formatMonthLabel(monthValue);
+  const snapshot = getMonthlyClosingSavedSnapshot(monthValue);
+  const hasData = hasMonthlyClosingData(monthlyClosingCurrentResult);
+
+  if (monthlyClosingCurrentViewMode === 'snapshot' && snapshot) {
+    monthlyClosingSnapshotStatusEl.textContent = `Reviewing saved snapshot for ${monthLabel}. Saved ${formatDate(snapshot.savedAt)} by ${snapshot.savedByName || snapshot.savedByEmail || 'Administrator'}.`;
+    monthlyClosingSnapshotStatusEl.classList.remove('status-error');
+    monthlyClosingSnapshotStatusEl.classList.add('status-success');
+    return;
+  }
+
+  if (!hasData && snapshot) {
+    monthlyClosingSnapshotStatusEl.textContent = `No live monthly closing data for ${monthLabel}. A saved snapshot is available for review.`;
+    monthlyClosingSnapshotStatusEl.classList.remove('status-error');
+    monthlyClosingSnapshotStatusEl.classList.add('status-success');
+    return;
+  }
+
+  if (!hasData) {
+    monthlyClosingSnapshotStatusEl.textContent = `No monthly closing data recorded for ${monthLabel} yet. Select another month or save a snapshot after this month has activity.`;
+    monthlyClosingSnapshotStatusEl.classList.remove('status-success', 'status-error');
+    return;
+  }
+
+  if (snapshot) {
+    monthlyClosingSnapshotStatusEl.textContent = `Live monthly closing data loaded for ${monthLabel}. Saved snapshot available from ${formatDate(snapshot.savedAt)} by ${snapshot.savedByName || snapshot.savedByEmail || 'Administrator'}.`;
+    monthlyClosingSnapshotStatusEl.classList.remove('status-error');
+    monthlyClosingSnapshotStatusEl.classList.add('status-success');
+    return;
+  }
+
+  monthlyClosingSnapshotStatusEl.textContent = `Live monthly closing data loaded for ${monthLabel}. Save a month-end snapshot if you want to review it later.`;
+  monthlyClosingSnapshotStatusEl.classList.remove('status-success', 'status-error');
+}
+
+function renderMonthlyClosingSnapshotArchive() {
+  if (!monthlyClosingSnapshotListEl) return;
+  if (!monthlyClosingSavedSnapshots.length) {
+    monthlyClosingSnapshotListEl.innerHTML = '<p>No saved monthly closing snapshots yet.</p>';
+    return;
+  }
+
+  const rows = monthlyClosingSavedSnapshots.map((rawSnapshot) => {
+    const snapshot = normalizeMonthlyClosingSnapshotRecord(rawSnapshot);
+    const report = snapshot.report || {};
+    const summary = report.summary || {};
+    const isActive = monthlyClosingCurrentViewMode === 'snapshot' && snapshot.month === monthlyClosingActiveSnapshotMonth;
+    return `
+      <tr class="monthly-closing-snapshot-row${isActive ? ' is-active' : ''}">
+        <td><strong>${escapeHtml(formatMonthLabel(snapshot.month))}</strong></td>
+        <td>${escapeHtml(snapshot.savedAt ? formatDate(snapshot.savedAt) : '—')}</td>
+        <td>${escapeHtml(snapshot.savedByName || snapshot.savedByEmail || 'Administrator')}</td>
+        <td>${money(summary.totalSales || 0)}</td>
+        <td>${money(summary.totalExpenses || 0)}</td>
+        <td>${money(summary.netSalesAfterExpenses || 0)}</td>
+        <td>
+          <button class="secondary small" type="button" data-monthly-closing-review="${escapeHtml(snapshot.month)}">Review</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  monthlyClosingSnapshotListEl.innerHTML = `
+    <table class="admin-inline-table monthly-closing-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Saved</th>
+          <th>By</th>
+          <th>Gross Sales</th>
+          <th>Expenses</th>
+          <th>Net</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function refreshMonthlyClosingSnapshots() {
+  if (!monthlyClosingSnapshotListEl || !canAccessMonthlyClosing()) return;
+  if (!monthlyClosingSavedSnapshots.length) {
+    monthlyClosingSnapshotListEl.innerHTML = '<p>Loading saved monthly closing snapshots...</p>';
+  }
+  try {
+    const result = await api('/api/admin/monthly-closing/snapshots', {
+      headers: buildActorHeaders()
+    });
+    monthlyClosingSavedSnapshots = Array.isArray(result?.snapshots)
+      ? result.snapshots.map(normalizeMonthlyClosingSnapshotRecord)
+      : [];
+    renderMonthlyClosingSnapshotArchive();
+    renderMonthlyClosingSnapshotStatus();
+  } catch (error) {
+    monthlyClosingSnapshotListEl.innerHTML = '<p>Saved monthly closing snapshots could not be loaded.</p>';
+    if (monthlyClosingSnapshotStatusEl) {
+      monthlyClosingSnapshotStatusEl.textContent = `Saved monthly closing snapshot load failed: ${error.message}`;
+      monthlyClosingSnapshotStatusEl.classList.remove('status-success');
+      monthlyClosingSnapshotStatusEl.classList.add('status-error');
+    }
+  }
+}
+
+async function reviewMonthlyClosingSnapshot(monthValue) {
+  const safeMonth = String(monthValue || '').trim();
+  if (!safeMonth || !canAccessMonthlyClosing()) return;
+  const result = await api(`/api/admin/monthly-closing/snapshots/${encodeURIComponent(safeMonth)}`, {
+    headers: buildActorHeaders()
+  });
+  const snapshot = normalizeMonthlyClosingSnapshotRecord(result?.snapshot || {});
+  if (!snapshot.month || !snapshot.report) {
+    throw new Error('Saved monthly closing snapshot could not be loaded.');
+  }
+  if (monthlyClosingMonthInputEl) {
+    monthlyClosingMonthInputEl.value = snapshot.month;
+  }
+  syncMonthlyExpenseDateToSelectedMonth({ force: false });
+  monthlyClosingActiveSnapshotMonth = snapshot.month;
+  renderMonthlyClosing(snapshot.report, { viewMode: 'snapshot', snapshot });
+  renderMonthlyClosingSnapshotArchive();
+}
+
+async function handleMonthlyClosingSaveClick() {
+  if (!canAccessMonthlyClosing()) {
+    setStatus('Current role does not have monthly closing access.');
+    return;
+  }
+
+  const monthValue = getMonthlyClosingSelectedMonth();
+  const liveResult = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
+    headers: buildActorHeaders()
+  });
+
+  if (!hasMonthlyClosingData(liveResult)) {
+    setStatus(`No monthly closing data found for ${formatMonthLabel(monthValue)} yet.`);
+    renderMonthlyClosing(liveResult, { viewMode: 'live' });
+    return;
+  }
+
+  if (monthlyClosingSaveBtnEl) {
+    monthlyClosingSaveBtnEl.disabled = true;
+    monthlyClosingSaveBtnEl.textContent = 'Saving...';
+  }
+
+  try {
+    const result = await api('/api/admin/monthly-closing/snapshots', {
+      method: 'POST',
+      headers: buildActorHeaders(),
+      body: JSON.stringify({
+        month: monthValue,
+        savedByName: activeAuthSession?.name || activeAuthSession?.email || 'Administrator'
+      })
+    });
+    const snapshot = normalizeMonthlyClosingSnapshotRecord(result?.snapshot || {});
+    monthlyClosingActiveSnapshotMonth = snapshot.month || monthValue;
+    renderMonthlyClosing(liveResult, { viewMode: 'live' });
+    await refreshMonthlyClosingSnapshots();
+    setStatus(`Monthly closing snapshot saved for ${formatMonthLabel(monthValue)}.`);
+  } finally {
+    if (monthlyClosingSaveBtnEl) {
+      monthlyClosingSaveBtnEl.disabled = false;
+      monthlyClosingSaveBtnEl.textContent = 'Save Snapshot';
+    }
+  }
+}
+
+function renderMonthlyClosing(result, { viewMode = 'live', snapshot = null } = {}) {
   const monthValue = String(result?.month || getMonthlyClosingSelectedMonth()).trim();
   const summary = result?.summary || {};
   const expenses = Array.isArray(result?.expenses) ? result.expenses : [];
   const expenseByCategory = Array.isArray(result?.expenseByCategory) ? result.expenseByCategory : [];
   const topProducts = Array.isArray(result?.topProducts) ? result.topProducts : [];
   const canEdit = canManageMonthlyExpenses();
+  const hasData = hasMonthlyClosingData(result);
+  monthlyClosingCurrentResult = result || null;
+  monthlyClosingCurrentViewMode = viewMode;
+  monthlyClosingActiveSnapshotMonth = viewMode === 'snapshot'
+    ? String(snapshot?.month || monthValue).trim()
+    : '';
   const summaryCards = [
     {
       label: 'Gross Sales',
@@ -10589,7 +12564,7 @@ function renderMonthlyClosing(result) {
     {
       label: 'E-Payments',
       value: money(summary.digitalSales || 0),
-      note: 'GCash and PayMaya sales combined.'
+      note: 'GCash, PayMaya, and Scan QR sales combined.'
     },
     {
       label: 'Drawer Withdrawals',
@@ -10614,6 +12589,10 @@ function renderMonthlyClosing(result) {
       : 'View-only mode. Current role can review the closing summary but cannot add expenses.';
   }
 
+  if (monthlyClosingSaveBtnEl) {
+    monthlyClosingSaveBtnEl.disabled = !canAccessMonthlyClosing() || !hasData;
+  }
+
   if (monthlyExpenseFormEl) {
     Array.from(monthlyExpenseFormEl.elements || []).forEach((element) => {
       if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
@@ -10627,8 +12606,14 @@ function renderMonthlyClosing(result) {
       <div class="monthly-closing-summary-head">
         <span class="monthly-closing-summary-eyebrow">Closing Snapshot</span>
         <h4>${escapeHtml(formatMonthLabel(monthValue))}</h4>
-        <p>Sales, expenses, withdrawals, and discrepancies for the selected month.</p>
+        <p>${escapeHtml(viewMode === 'snapshot'
+          ? 'Saved month-end snapshot for the selected month.'
+          : hasData
+            ? 'Sales, expenses, withdrawals, and discrepancies for the selected month.'
+            : 'No live monthly closing data recorded for the selected month yet.'
+        )}</p>
       </div>
+      ${!hasData ? `<div class="status monthly-closing-inline-status">No monthly closing data found for ${escapeHtml(formatMonthLabel(monthValue))} yet.</div>` : ''}
       <div class="monthly-closing-summary-grid">
         ${summaryCards.map((card) => `
           <article class="monthly-closing-summary-card${card.highlight ? ' highlight' : ''}">
@@ -10639,6 +12624,7 @@ function renderMonthlyClosing(result) {
         `).join('')}
       </div>
     `;
+    monthlyClosingSummaryEl.dataset.loaded = 'true';
   }
 
   if (!monthlyExpenseListEl) return;
@@ -10773,24 +12759,77 @@ function renderMonthlyClosing(result) {
       ${expensesMarkup}
     </div>
   `;
+  monthlyExpenseListEl.dataset.loaded = 'true';
+  if (viewMode === 'live') {
+    monthlyClosingLoadedMonth = monthValue;
+    try {
+      monthlyClosingSerializedSnapshot = JSON.stringify(result || {});
+    } catch (_error) {
+      monthlyClosingSerializedSnapshot = monthValue;
+    }
+  }
+  renderMonthlyClosingSnapshotStatus();
+  renderMonthlyClosingSnapshotArchive();
 }
 
-async function refreshMonthlyClosingModule() {
+async function refreshMonthlyClosingModule({ force = false } = {}) {
   if (!monthlyClosingSummaryEl || !canAccessMonthlyClosing()) return;
   const monthValue = getMonthlyClosingSelectedMonth();
+  const requestToken = ++monthlyClosingRefreshToken;
+  const hasRenderedSnapshot = monthlyClosingSummaryEl.dataset.loaded === 'true' || monthlyExpenseListEl?.dataset.loaded === 'true';
+  if (!force && hasRenderedSnapshot && monthlyClosingLoadedMonth === monthValue && monthlyClosingCurrentViewMode === 'live') {
+    return;
+  }
   if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
     monthlyClosingMonthInputEl.value = monthValue;
   }
-  if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly closing summary...</p>';
-  if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly expenses...</p>';
+  if (!hasRenderedSnapshot) {
+    if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly closing summary...</p>';
+  }
+  setMonthlyClosingRefreshing(true);
   try {
     const result = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
       headers: buildActorHeaders()
     });
-    renderMonthlyClosing(result);
+    if (requestToken !== monthlyClosingRefreshToken) return;
+    let nextSerializedSnapshot = '';
+    try {
+      nextSerializedSnapshot = JSON.stringify(result || {});
+    } catch (_error) {
+      nextSerializedSnapshot = monthValue;
+    }
+    if (!force && nextSerializedSnapshot && nextSerializedSnapshot === monthlyClosingSerializedSnapshot && monthlyClosingCurrentViewMode === 'live') {
+      monthlyClosingLoadedMonth = monthValue;
+      monthlyClosingCurrentResult = result || null;
+      monthlyClosingCurrentViewMode = 'live';
+      monthlyClosingActiveSnapshotMonth = '';
+      renderMonthlyClosingSnapshotStatus();
+      return;
+    }
+    renderMonthlyClosing(result, { viewMode: 'live' });
   } catch (error) {
-    if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = `<p class="monthly-closing-loading">Monthly closing error: ${escapeHtml(error.message)}</p>`;
-    if (monthlyExpenseListEl) monthlyExpenseListEl.innerHTML = '';
+    if (requestToken !== monthlyClosingRefreshToken) return;
+    if (!hasRenderedSnapshot) {
+      if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = `<p class="monthly-closing-loading">Monthly closing error: ${escapeHtml(error.message)}</p>`;
+      if (monthlyExpenseListEl) {
+        monthlyExpenseListEl.innerHTML = `
+          <div class="monthly-closing-grid">
+            <div class="monthly-closing-block full-width-block">
+              <div class="monthly-closing-block-head">
+                <h3>Expense Ledger</h3>
+                <p>Every recorded monthly expense for the selected closing period.</p>
+              </div>
+              <p class="monthly-closing-empty-state">Monthly expenses could not be loaded.</p>
+            </div>
+          </div>
+        `;
+      }
+    }
+    setStatus(`Monthly closing refresh failed: ${error.message}`);
+  } finally {
+    if (requestToken === monthlyClosingRefreshToken) {
+      setMonthlyClosingRefreshing(false);
+    }
   }
 }
 
@@ -10817,6 +12856,10 @@ async function handleMonthlyExpenseSubmit(event) {
   }
   if (!description) {
     setStatus('Enter the expense description.');
+    return;
+  }
+  if (!isDateWithinMonth(expenseDate)) {
+    setStatus(`Expense date must be inside ${formatMonthLabel(getMonthlyClosingSelectedMonth())}.`);
     return;
   }
   if (amount === null || amount <= 0) {
@@ -10846,7 +12889,7 @@ async function handleMonthlyExpenseSubmit(event) {
     if (monthlyExpenseAmountInputEl) monthlyExpenseAmountInputEl.value = '';
     if (monthlyExpenseNoteInputEl) monthlyExpenseNoteInputEl.value = '';
     setStatus(`Expense saved for ${formatMonthLabel(getMonthlyClosingSelectedMonth())}.`);
-    await refreshMonthlyClosingModule();
+    await refreshMonthlyClosingModule({ force: true });
   } catch (error) {
     setStatus(`Monthly expense save failed: ${error.message}`);
   } finally {
@@ -11913,18 +13956,30 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function setMonthlyClosingRefreshing(isRefreshing) {
+  if (monthlyClosingSummaryEl) {
+    monthlyClosingSummaryEl.classList.toggle('is-refreshing', isRefreshing);
+  }
+  if (monthlyExpenseListEl) {
+    monthlyExpenseListEl.classList.toggle('is-refreshing', isRefreshing);
+  }
+  if (monthlyClosingRefreshBtnEl) {
+    monthlyClosingRefreshBtnEl.disabled = isRefreshing;
+    monthlyClosingRefreshBtnEl.textContent = isRefreshing ? 'Refreshing...' : 'Refresh Closing';
+  }
+  if (monthlyClosingSaveBtnEl && monthlyClosingSaveBtnEl.textContent !== 'Saving...') {
+    monthlyClosingSaveBtnEl.disabled = isRefreshing || !hasMonthlyClosingData(monthlyClosingCurrentResult);
+  }
+}
+
 async function updateInvoiceStatus(invoiceId, nextStatus) {
   const normalizedStatus = String(nextStatus || '').trim().toUpperCase();
   const actionLabel = normalizedStatus === 'VOIDED'
     ? 'void'
-    : normalizedStatus === 'HOLD_FOR_VOID'
-      ? 'hold for void'
-      : 'cancel';
+    : 'cancel';
   const promptLabel = normalizedStatus === 'VOIDED'
     ? 'Enter the reason for voiding this paid invoice:'
-    : normalizedStatus === 'HOLD_FOR_VOID'
-      ? 'Enter the note before this receipt is sent for void review:'
-      : 'Enter the reason for cancelling this pending invoice:';
+    : 'Enter the reason for cancelling this pending invoice:';
   const reason = String(window.prompt(promptLabel, '') || '').trim();
   if (!reason) {
     setStatus(`A reason is required to ${actionLabel} the invoice.`);
@@ -11941,20 +13996,17 @@ async function updateInvoiceStatus(invoiceId, nextStatus) {
       })
     });
     setStatus(`Invoice ${actionLabel}ed successfully.`);
-    await refreshSalesReport(activeSalesRange);
-    await Promise.all([
-      refreshAdminTransactions(),
-      refreshCashierMonitoring(),
-      refreshShiftManagement()
-    ]);
-    try {
-      const summary = await refreshLatestShiftSummary();
-      if (shiftMonitorModalEl?.classList.contains('open') && summary) {
-        renderShiftSummary(shiftMonitorSummaryEl, summary);
-      }
-    } catch (_error) {
-      // Keep the lifecycle update successful even if the shift monitor refresh fails.
+    if (canAccessAdminFeatures()) {
+      await refreshSalesReport(activeSalesRange);
+      await refreshAdminTransactions();
     }
+    if (canAccessOperationsPanel()) {
+      await Promise.all([
+        refreshCashierMonitoring(),
+        refreshShiftManagement()
+      ]);
+    }
+    await refreshShiftMonitorModalIfOpen().catch(() => {});
   } catch (error) {
     setStatus(`Invoice ${actionLabel} failed: ${error.message}`);
   }
@@ -11997,7 +14049,7 @@ async function cancelActivePendingInvoice(reason, successMessage = 'Pending invo
 
 async function verifyPayment(invoiceId) {
   try {
-    const btn = document.querySelector(`[data-verify="${invoiceId}"]`);
+    const btn = document.querySelector(`[data-verify="${invoiceId}"], [data-shift-monitor-verify="${invoiceId}"]`);
     if (btn) {
       btn.textContent = 'Verifying...';
       btn.disabled = true;
@@ -12027,8 +14079,11 @@ async function verifyPayment(invoiceId) {
       });
     }
 
-    await refreshAdminTransactions();
-    await refreshSalesReport(activeSalesRange);
+    if (canAccessAdminFeatures()) {
+      await refreshAdminTransactions();
+      await refreshSalesReport(activeSalesRange);
+    }
+    await refreshShiftMonitorModalIfOpen().catch(() => {});
   } catch (error) {
     setStatus(`Verification failed: ${error.message}`);
     showConfirmationToast({
@@ -12037,7 +14092,10 @@ async function verifyPayment(invoiceId) {
       tone: 'warning',
       duration: 3200
     });
-    await refreshAdminTransactions();
+    if (canAccessAdminFeatures()) {
+      await refreshAdminTransactions();
+    }
+    await refreshShiftMonitorModalIfOpen().catch(() => {});
   }
 }
 
@@ -12046,10 +14104,10 @@ async function verifyAllPending() {
     adminVerifyAllBtn.textContent = 'Verifying...';
     adminVerifyAllBtn.disabled = true;
 
-    const range = adminRangeEl.value;
-
-    let url = '/api/admin/transactions?status=PENDING&';
-    if (range) url += `range=${encodeURIComponent(range)}&`;
+    const params = getAdminRangeSearchParams();
+    params.set('status', 'PENDING');
+    const query = params.toString();
+    const url = `/api/admin/transactions${query ? `?${query}` : ''}`;
 
     const { transactions } = await api(url, {
       headers: buildActorHeaders()
@@ -12156,24 +14214,30 @@ function setupEventListeners() {
   cartEl.addEventListener('click', onProductClick);
   paymentMethodEl.addEventListener('change', onPaymentMethodChange);
   if (dineInCheckoutBtn) {
-    dineInCheckoutBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before selecting an order type.')) return;
+    dineInCheckoutBtn.addEventListener('click', () => {
       setOrderType('dine-in');
     });
   }
   if (takeOutCheckoutBtn) {
-    takeOutCheckoutBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before selecting an order type.')) return;
+    takeOutCheckoutBtn.addEventListener('click', () => {
       setOrderType('take-out');
     });
   }
   if (cashPaymentBtn) {
     cashPaymentBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before taking a cash payment.')) return;
+      if (isPaidInvoiceEditActive()) {
+        setStatus('A paid transaction edit is active. Use Save Transaction Changes instead of starting a new payment.');
+        return;
+      }
       if (!state.orderType) {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
       }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before taking a cash payment.')) return;
       state.cashPromptActive = true;
       setPaymentMethod('cash');
       setStatus('Enter cash tendered amount, then click Pay.');
@@ -12182,11 +14246,19 @@ function setupEventListeners() {
   }
   if (cashPayBtn) {
     cashPayBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before processing a cash payment.')) return;
+      if (isPaidInvoiceEditActive()) {
+        setStatus('A paid transaction edit is active. Use Save Transaction Changes instead of starting a new payment.');
+        return;
+      }
       if (!state.orderType) {
         setStatus('Select order type first: Dine In or Take Out.');
         return;
       }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a cash payment.')) return;
       if (!amountTenderedEl?.value) {
         setStatus('Enter customer cash tendered amount.');
         if (amountTenderedEl) amountTenderedEl.focus();
@@ -12198,29 +14270,47 @@ function setupEventListeners() {
   }
   if (ePaymentBtn) {
     ePaymentBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before processing an e-payment.')) return;
-      if (!state.orderType) {
-        setStatus('Select order type first: Dine In or Take Out.');
+      if (isPaidInvoiceEditActive()) {
+        setStatus('A paid transaction edit is active. Use Save Transaction Changes instead of starting a new payment.');
         return;
       }
-      if (!isEwalletAvailable()) {
-        setStatus('Offline mode active. E-Payment is temporarily unavailable.');
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
         return;
       }
       if (!getCartItems().length) {
         setStatus('Add at least one item first.');
         return;
       }
+      if (!isEwalletAvailable()) {
+        setStatus('Offline mode active. E-Payment is temporarily unavailable.');
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before processing an e-payment.')) return;
+      renderEPaymentOptionAvailability();
       openEwalletModal();
     });
   }
   if (chooseGcashBtn) {
     chooseGcashBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before processing a GCash payment.')) return;
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. GCash checkout is unavailable.');
         return;
       }
+      const gcashAvailability = getEPaymentMethodAvailability('gcash');
+      if (!gcashAvailability.available) {
+        setStatus(gcashAvailability.statusNote);
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a GCash payment.')) return;
       closeEwalletModal();
       setPaymentMethod('gcash');
       await handleCheckout();
@@ -12228,11 +14318,24 @@ function setupEventListeners() {
   }
   if (choosePaymayaBtn) {
     choosePaymayaBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before processing a PayMaya payment.')) return;
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. PayMaya checkout is unavailable.');
         return;
       }
+      const paymayaAvailability = getEPaymentMethodAvailability('paymaya');
+      if (!paymayaAvailability.available) {
+        setStatus(paymayaAvailability.statusNote);
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a PayMaya payment.')) return;
       closeEwalletModal();
       setPaymentMethod('paymaya');
       await handleCheckout();
@@ -12240,11 +14343,24 @@ function setupEventListeners() {
   }
   if (chooseScanQrBtn) {
     chooseScanQrBtn.addEventListener('click', async () => {
-      if (!await requireCashierShiftForTransactions('Start your shift before processing a QR payment.')) return;
+      if (!state.orderType) {
+        setStatus('Select order type first: Dine In or Take Out.');
+        return;
+      }
+      if (!getCartItems().length) {
+        setStatus('Add at least one item first.');
+        return;
+      }
       if (!isEwalletAvailable()) {
         setStatus('Offline mode active. QR checkout is unavailable.');
         return;
       }
+      const qrAvailability = getEPaymentMethodAvailability('scanQr');
+      if (!qrAvailability.available) {
+        setStatus(qrAvailability.statusNote);
+        return;
+      }
+      if (!await requireCashierShiftForTransactions('Start your shift before processing a QR payment.')) return;
       closeEwalletModal();
       setPaymentMethod('gcash');
       await startScanQrPaymentFlow();
@@ -12268,13 +14384,34 @@ function setupEventListeners() {
       closeScanQrModal();
     });
   }
+  if (paidInvoiceEditSaveBtn) {
+    paidInvoiceEditSaveBtn.addEventListener('click', () => {
+      savePaidInvoiceEdit().catch((error) => {
+        setStatus(`Paid transaction update failed: ${error.message}`);
+      });
+    });
+  }
+  if (paidInvoiceEditCancelBtn) {
+    paidInvoiceEditCancelBtn.addEventListener('click', cancelPaidInvoiceEdit);
+  }
+  [customerNameEl, customerEmailEl, customerPhoneEl].forEach((fieldEl) => {
+    if (!fieldEl) return;
+    fieldEl.addEventListener('input', () => {
+      persistPosDraftState();
+    });
+  });
   if (discountProfileSelectEl) {
     discountProfileSelectEl.addEventListener('change', () => {
       state.selectedDiscountProfileId = String(discountProfileSelectEl.value || '').trim();
       renderCart();
+      persistPosDraftState();
     });
   }
   clearBtn.addEventListener('click', async () => {
+    if (isPaidInvoiceEditActive()) {
+      cancelPaidInvoiceEdit();
+      return;
+    }
     if (String(state.activeInvoice?.status || '').trim().toUpperCase() === 'PENDING') {
       await cancelActivePendingInvoice(
         'Customer cancelled the checkout before payment was completed.',
@@ -12305,6 +14442,18 @@ function setupEventListeners() {
     receiptTemplateFormEl.addEventListener('change', () => {
       renderReceiptTemplatePreview();
       updateReceiptTemplateEditorState();
+    });
+  }
+  if (receiptWorkflowAutoPopupInputEl) {
+    receiptWorkflowAutoPopupInputEl.addEventListener('change', () => {
+      renderReceiptWorkflowSettings({ useInputValue: true });
+    });
+  }
+  if (receiptWorkflowSaveBtnEl) {
+    receiptWorkflowSaveBtnEl.addEventListener('click', () => {
+      saveReceiptWorkflowSettings().catch((error) => {
+        setStatus(`Receipt popup behavior save failed: ${error.message}`);
+      });
     });
   }
   if (receiptTemplatePreviewAreaEl) {
@@ -12826,6 +14975,16 @@ function setupEventListeners() {
       handleShiftReviewAction(shiftId, reviewStatus);
     });
   }
+  if (adminStatsEl) {
+    adminStatsEl.addEventListener('click', (e) => {
+      const trigger = e.target.closest('[data-admin-summary-action]');
+      if (!trigger) return;
+      const action = String(trigger.getAttribute('data-admin-summary-action') || '').trim().toLowerCase();
+      if (action === 'open-discrepancies') {
+        openOperationsDiscrepancyModule();
+      }
+    });
+  }
   if (reportDailySalesBtn) {
     reportDailySalesBtn.addEventListener('click', () => generateAdminReport('daily-sales', 'Daily Sales'));
   }
@@ -12855,13 +15014,69 @@ function setupEventListeners() {
     reportPrintBtn.addEventListener('click', printLatestAdminReport);
   }
   if (monthlyClosingRefreshBtnEl) {
-    monthlyClosingRefreshBtnEl.addEventListener('click', refreshMonthlyClosingModule);
+    monthlyClosingRefreshBtnEl.addEventListener('click', () => {
+      refreshMonthlyClosingModule({ force: true });
+    });
+  }
+  if (monthlyClosingSaveBtnEl) {
+    monthlyClosingSaveBtnEl.addEventListener('click', () => {
+      handleMonthlyClosingSaveClick().catch((error) => {
+        setStatus(`Monthly closing snapshot save failed: ${error.message}`);
+      });
+    });
+  }
+  if (monthlyClosingMonthInputEl) {
+    monthlyClosingMonthInputEl.addEventListener('change', () => {
+      syncMonthlyExpenseDateToSelectedMonth({ force: true });
+      refreshMonthlyClosingModule({ force: true }).catch((error) => {
+        setStatus(`Monthly closing refresh failed: ${error.message}`);
+      });
+      refreshMonthlyClosingSnapshots().catch(() => {});
+    });
   }
   if (monthlyExpenseFormEl) {
     monthlyExpenseFormEl.addEventListener('submit', (event) => {
       handleMonthlyExpenseSubmit(event).catch((error) => {
         setStatus(`Monthly expense save failed: ${error.message}`);
       });
+    });
+  }
+  if (monthlyClosingSnapshotListEl) {
+    monthlyClosingSnapshotListEl.addEventListener('click', (event) => {
+      const reviewBtn = event.target.closest('[data-monthly-closing-review]');
+      if (!reviewBtn) return;
+      reviewMonthlyClosingSnapshot(reviewBtn.getAttribute('data-monthly-closing-review')).catch((error) => {
+        setStatus(`Monthly closing snapshot review failed: ${error.message}`);
+      });
+    });
+  }
+  if (ePaymentSetupFormEl) {
+    ePaymentSetupFormEl.addEventListener('change', (event) => {
+      if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) {
+        syncEPaymentSetupReasonInputs();
+      }
+    });
+    ePaymentSetupFormEl.addEventListener('submit', (event) => {
+      handleEPaymentSetupSubmit(event).catch((error) => {
+        setStatus(`E-payment setup save failed: ${error.message}`);
+      });
+    });
+  }
+  if (ePaymentSetupScanQrImageInputEl) {
+    ePaymentSetupScanQrImageInputEl.addEventListener('change', (event) => {
+      handleScanQrImageInputChange(event).catch((error) => {
+        setStatus(`Scan QR image load failed: ${error.message}`);
+      });
+    });
+  }
+  if (ePaymentSetupScanQrClearBtnEl) {
+    ePaymentSetupScanQrClearBtnEl.addEventListener('click', () => {
+      if (!canManageEPaymentSetup()) {
+        setStatus('Only admin can change e-payment setup.');
+        return;
+      }
+      clearScanQrImageDraft();
+      setStatus('Scan QR image cleared. Save E-Payment Setup to remove it.');
     });
   }
   if (discountProfileFormEl) {
@@ -12937,6 +15152,47 @@ function setupEventListeners() {
     }
   });
 
+  if (shiftMonitorTransactionsEl) {
+    shiftMonitorTransactionsEl.addEventListener('click', (event) => {
+      const verifyId = event.target.closest('[data-shift-monitor-verify]')?.getAttribute('data-shift-monitor-verify');
+      if (verifyId) {
+        verifyPayment(verifyId);
+        return;
+      }
+
+      const editId = event.target.closest('[data-shift-monitor-edit]')?.getAttribute('data-shift-monitor-edit');
+      if (editId) {
+        reopenShiftMonitorTransactionForEdit(editId).catch((error) => {
+          setStatus(`Reopen order failed: ${error.message}`);
+        });
+        return;
+      }
+
+        const authorizedVoidId = event.target.closest('[data-shift-monitor-authorized-void]')?.getAttribute('data-shift-monitor-authorized-void');
+        if (authorizedVoidId) {
+          openShiftMonitorAuthorizedVoidRequest(authorizedVoidId).catch((error) => {
+            setStatus(`Voided Order request failed: ${error.message}`);
+          });
+          return;
+        }
+
+      const statusBtn = event.target.closest('[data-shift-monitor-status]');
+      if (statusBtn) {
+        const invoiceId = String(statusBtn.getAttribute('data-shift-monitor-status') || '').trim();
+        const nextStatus = String(statusBtn.getAttribute('data-next-status') || '').trim();
+        if (invoiceId && nextStatus) {
+          updateInvoiceStatus(invoiceId, nextStatus);
+        }
+        return;
+      }
+
+      const receiptId = event.target.closest('[data-shift-monitor-receipt]')?.getAttribute('data-shift-monitor-receipt');
+      if (receiptId) {
+        viewReceipt(receiptId);
+      }
+    });
+  }
+
   if (adminCloseBtn) {
     adminCloseBtn.addEventListener('click', closeAdminDashboard);
   }
@@ -12944,28 +15200,48 @@ function setupEventListeners() {
   if (paymentSuccessDoneBtn) {
     paymentSuccessDoneBtn.addEventListener('click', closePaymentSuccessModal);
   }
-  if (receiptMinimizeBtn) {
-    receiptMinimizeBtn.addEventListener('click', togglePaymentReceiptCollapse);
+  if (paymentSuccessViewReceiptBtn) {
+    paymentSuccessViewReceiptBtn.addEventListener('click', () => {
+      openLatestReceiptPreview({ closeSuccessModal: true });
+    });
+  }
+  if (paymentSuccessPrintBtn) {
+    paymentSuccessPrintBtn.addEventListener('click', printLatestPaidReceipt);
   }
   if (receiptPrintBtn) {
     receiptPrintBtn.addEventListener('click', printReceiptFromModal);
   }
+  if (paymentReceiptCloseBtn) {
+    paymentReceiptCloseBtn.addEventListener('click', closePaymentReceiptModal);
+  }
+  if (paymentReceiptDoneBtn) {
+    paymentReceiptDoneBtn.addEventListener('click', closePaymentReceiptModal);
+  }
+  if (paymentReceiptModalEl) {
+    paymentReceiptModalEl.addEventListener('click', (event) => {
+      if (event.target === paymentReceiptModalEl) {
+        closePaymentReceiptModal();
+      }
+    });
+  }
   if (statusHoldForVoidBtn) {
     statusHoldForVoidBtn.addEventListener('click', () => {
-      requestHoldForVoid().catch((error) => {
-        setStatus(`Hold for void failed: ${error.message}`);
+      triggerReceiptVoidAction().catch((error) => {
+        setStatus(`Receipt void action failed: ${error.message}`);
       });
     });
   }
   if (receiptHoldForVoidBtn) {
     receiptHoldForVoidBtn.addEventListener('click', () => {
-      requestHoldForVoid().catch((error) => {
-        setStatus(`Hold for void failed: ${error.message}`);
+      triggerReceiptVoidAction().catch((error) => {
+        setStatus(`Receipt void action failed: ${error.message}`);
       });
     });
   }
   if (statusPrintReceiptBtn) {
-    statusPrintReceiptBtn.addEventListener('click', openLatestReceiptPreview);
+    statusPrintReceiptBtn.addEventListener('click', () => {
+      openLatestReceiptPreview({ closeSuccessModal: false });
+    });
   }
   if (adminReceiptPrintBtn) {
     adminReceiptPrintBtn.addEventListener('click', printAdminReceiptFromModal);
@@ -12988,15 +15264,21 @@ function setupEventListeners() {
   if (menuProductEditorListEl) {
     menuProductEditorListEl.addEventListener('click', handleMenuProductEditorClick);
   }
-  if (shiftMonitorToggleBtn) {
-    shiftMonitorToggleBtn.addEventListener('click', async () => {
-      if (!activeAuthSession?.email) return;
-      openShiftMonitorModal();
-      await showShiftMonitorSummary();
-    });
-  }
   if (shiftMonitorCloseBtn) {
     shiftMonitorCloseBtn.addEventListener('click', closeShiftMonitorModal);
+  }
+  if (shiftVoidAuthorizationCloseBtn) {
+    shiftVoidAuthorizationCloseBtn.addEventListener('click', closeShiftVoidAuthorizationModal);
+  }
+  if (shiftVoidAuthorizationCancelBtn) {
+    shiftVoidAuthorizationCancelBtn.addEventListener('click', closeShiftVoidAuthorizationModal);
+  }
+  if (shiftVoidAuthorizationFormEl) {
+    shiftVoidAuthorizationFormEl.addEventListener('submit', (event) => {
+      submitShiftVoidAuthorization(event).catch((error) => {
+        setShiftVoidAuthorizationStatus(error.message || 'Voided Order failed.');
+      });
+    });
   }
   if (shiftMonitorRefreshBtn) {
     shiftMonitorRefreshBtn.addEventListener('click', async () => {
@@ -13101,6 +15383,7 @@ function setupEventListeners() {
       if (paymentSuccessModalEl?.classList.contains('open')) {
         closePaymentSuccessModal();
       }
+      closePaymentReceiptModal();
       closeMenuEditor();
       closeAdminReceiptModal();
       closeShiftMonitorModal();
@@ -13118,9 +15401,7 @@ async function init() {
   if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
     monthlyClosingMonthInputEl.value = getCurrentMonthValue();
   }
-  if (monthlyExpenseDateInputEl && !monthlyExpenseDateInputEl.value) {
-    monthlyExpenseDateInputEl.value = new Date().toISOString().slice(0, 10);
-  }
+  syncMonthlyExpenseDateToSelectedMonth({ force: !monthlyExpenseDateInputEl?.value });
   restoreAdminNavOrder();
   const persistedUiState = readUserUiState();
   const persistedAdminPanel = normalizeAdminPanelName(persistedUiState.adminPanel);
@@ -13132,9 +15413,7 @@ async function init() {
   if (persistedCategory) {
     state.activeCategory = persistedCategory;
   }
-  if (persistedUiState.salesRange === 'daily' || persistedUiState.salesRange === 'weekly') {
-    activeSalesRange = persistedUiState.salesRange;
-  }
+  activeSalesRange = normalizeAdminRange(persistedUiState.salesRange) || 'daily';
   activeSalesOpsRange = normalizeSalesOpsRange(persistedUiState.salesOpsRange);
   activeSalesOpsHourlyView = normalizeSalesOpsHourlyView(persistedUiState.salesOpsHourlyView);
   activeSalesOpsWeekdayView = normalizeSalesOpsWeekdayView(persistedUiState.salesOpsWeekdayView);
@@ -13182,6 +15461,7 @@ async function init() {
   applyReceiptTemplatesState({
     activeReceiptTemplate: configResult?.activeReceiptTemplate || state.activeReceiptTemplate || DEFAULT_RECEIPT_TEMPLATE
   });
+  await restorePosDraftState();
   await refreshSalesReport(activeSalesRange);
 
   if (canAccessMenuEditor()) {

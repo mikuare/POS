@@ -722,7 +722,7 @@ body.admin-login-open .admin-login-backdrop {
 }
 
 .admin-receipt-backdrop {
-  display: none;
+  display: flex;
   position: fixed;
   inset: 0;
   z-index: 85;
@@ -731,10 +731,17 @@ body.admin-login-open .admin-login-backdrop {
   justify-content: center;
   padding: 16px;
   box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0s linear 0.22s;
 }
 
 .admin-receipt-backdrop.open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .menu-editor-backdrop {
@@ -1375,16 +1382,23 @@ select {
 .payment-success-modal {
   position: absolute;
   inset: 8px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(63, 38, 23, 0.45);
   border-radius: 10px;
   z-index: 30;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0s linear 0.22s;
 }
 
 .payment-success-modal.open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .e-wallet-modal {

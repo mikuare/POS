@@ -48,6 +48,20 @@ create table if not exists public.pos_payments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.pos_invoice_adjustments (
+  id uuid primary key,
+  invoice_id uuid not null references public.pos_invoices(id) on delete cascade,
+  reason text not null,
+  adjusted_by_user_id uuid,
+  adjusted_by_email text,
+  previous_snapshot jsonb not null default '{}'::jsonb,
+  next_snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_pos_invoice_adjustments_invoice_id
+  on public.pos_invoice_adjustments(invoice_id);
+
 create table if not exists public.pos_gcash_sessions (
   reference text primary key,
   invoice_id uuid not null references public.pos_invoices(id) on delete cascade,
@@ -63,7 +77,25 @@ create table if not exists public.pos_gcash_sessions (
   updated_at timestamptz not null
 );
 
+create table if not exists public.app_settings (
+  key text primary key,
+  value_json jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.discount_profiles (
+  id text primary key,
+  name text not null unique,
+  type text not null check (type in ('percent', 'fixed')),
+  amount numeric(12,2) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.pos_invoices disable row level security;
 alter table public.pos_invoice_items disable row level security;
 alter table public.pos_payments disable row level security;
+alter table public.pos_invoice_adjustments disable row level security;
 alter table public.pos_gcash_sessions disable row level security;
+alter table public.app_settings disable row level security;
+alter table public.discount_profiles disable row level security;
