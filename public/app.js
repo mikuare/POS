@@ -248,6 +248,7 @@ const statCashEl = document.getElementById('statCash');
 const statGcashEl = document.getElementById('statGcash');
 const adminCloseBtn = document.getElementById('adminCloseBtn');
 const adminNavEl = document.getElementById('adminNav');
+const adminNavDrawerBtnEl = document.getElementById('adminNavDrawerBtn');
 const adminNavOverviewBtn = document.getElementById('adminNavOverviewBtn');
 const adminNavInventoryBtn = document.getElementById('adminNavInventoryBtn');
 const adminNavKitSpecBtn = document.getElementById('adminNavKitSpecBtn');
@@ -269,6 +270,14 @@ const adminPanelEPaymentEl = document.getElementById('adminPanelEPayment');
 const adminNavContextMenuEl = document.getElementById('adminNavContextMenu');
 const adminNavContextPrevBtn = document.getElementById('adminNavContextPrevBtn');
 const adminNavContextNextBtn = document.getElementById('adminNavContextNextBtn');
+const adminNavDrawerModalEl = document.getElementById('adminNavDrawerModal');
+const adminNavDrawerCloseBtnEl = document.getElementById('adminNavDrawerCloseBtn');
+const adminNavDrawerCancelBtnEl = document.getElementById('adminNavDrawerCancelBtn');
+const adminNavDrawerSwapBtnEl = document.getElementById('adminNavDrawerSwapBtn');
+const adminNavDrawerStoredListEl = document.getElementById('adminNavDrawerStoredList');
+const adminNavDrawerVisibleListEl = document.getElementById('adminNavDrawerVisibleList');
+const adminNavDrawerStatusEl = document.getElementById('adminNavDrawerStatus');
+const ADMIN_NAV_VISIBLE_LIMIT = 5;
 const ADMIN_PANEL_ORDER = Object.freeze([
   'overview',
   'inventory',
@@ -391,6 +400,8 @@ const salesOpsRefreshBtn = document.getElementById('salesOpsRefreshBtn');
 const salesOpsSummaryEl = document.getElementById('salesOpsSummary');
 
 let operationsDiscrepancyHighlightTimer = null;
+let operationsDiscrepancyFocusRetryTimer = null;
+let pendingOperationsDiscrepancyRevealLoads = 0;
 const hourlySalesGraphEl = document.getElementById('hourlySalesGraph');
 const monthlyClosingMonthInputEl = document.getElementById('monthlyClosingMonthInput');
 const monthlyClosingRefreshBtnEl = document.getElementById('monthlyClosingRefreshBtn');
@@ -452,6 +463,10 @@ let monthlyClosingCurrentResult = null;
 let monthlyClosingCurrentViewMode = 'live';
 let monthlyClosingActiveSnapshotMonth = '';
 let monthlyClosingSavedSnapshots = [];
+let monthlyClosingRefreshPromise = null;
+let monthlyClosingRefreshMonth = '';
+let monthlyClosingSnapshotsLoaded = false;
+let monthlyClosingSnapshotsPromise = null;
 let discountManagerLoaded = false;
 const inventoryIngredientFormEl = document.getElementById('inventoryIngredientForm');
 const ingredientNameInputEl = document.getElementById('ingredientNameInput');
@@ -530,6 +545,8 @@ const CATALOG_CACHE_KEY_PREFIX = 'pos_catalog_cache_v1_';
 const CATALOG_CACHE_GLOBAL_KEY = 'pos_catalog_cache_v1_global';
 const OFFLINE_AUTH_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 const OFFLINE_SYNC_INTERVAL_MS = 15000;
+const DESKTOP_ADMIN_MIN_VIEWPORT_WIDTH = 1440;
+const DESKTOP_ADMIN_MIN_VIEWPORT_HEIGHT = 700;
 const offlineOutbox = window.POSOfflineOutbox || null;
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
@@ -537,6 +554,7 @@ let paymentSuccessAnimationTimer = null;
 let paymentReceiptAutoOpenTimer = null;
 let isRestoringPosDraft = false;
 let appInitialized = false;
+let appInitializationPromise = null;
 let authLogoRenderStarted = false;
 let activeAuthSession = null;
 let phClockInterval = null;
@@ -568,6 +586,8 @@ let activeSalesOpsHourlyView = 'bar';
 let activeSalesOpsWeekdayView = 'bar';
 let activeSalesOpsSelection = null;
 let activeAdminNavContextPanel = '';
+let activeAdminNavDrawerPanel = '';
+let activeAdminNavReplacePanel = '';
 const BOOTSTRAP_CATALOG_FALLBACK = {
   categories: [
     { key: 'main-dish', name: 'Main Dish', image: '/Menu/Main Dish.png', sortOrder: 10 },
@@ -1374,6 +1394,30 @@ function formatDate(isoString) {
     hour: '2-digit',
     minute: '2-digit'
   });
+}
+
+function formatDiscountManagerLastUsed(isoString) {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    full: date.toLocaleString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    date: date.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    time: date.toLocaleTimeString('en-PH', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  };
 }
 
 function getCurrentMonthValue() {
@@ -3083,6 +3127,7 @@ function clearActiveSession() {
   localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
   updateShiftMonitorVisibility();
   restoreAdminNavOrder();
+  syncDesktopAdminEntryMode();
 }
 
 function normalizeAccessTokenExpiryMs(value) {
@@ -3506,6 +3551,49 @@ function shouldAutoOpenStartShiftOnLogin(role = activeAuthSession?.role) {
 
 function canAccessAdminFeatures() {
   return hasRoleAccess('control_center_access');
+}
+
+function getViewportWidth() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+  return Math.max(
+    Number(window.innerWidth) || 0,
+    Number(document.documentElement?.clientWidth) || 0
+  );
+}
+
+function getViewportHeight() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+  return Math.max(
+    Number(window.innerHeight) || 0,
+    Number(document.documentElement?.clientHeight) || 0
+  );
+}
+
+function isLargeDesktopViewport() {
+  return getViewportWidth() >= DESKTOP_ADMIN_MIN_VIEWPORT_WIDTH
+    && getViewportHeight() >= DESKTOP_ADMIN_MIN_VIEWPORT_HEIGHT;
+}
+
+function shouldAutoOpenDesktopAdminDashboard() {
+  return Boolean(activeAuthSession?.email)
+    && canAccessAdminFeatures()
+    && isLargeDesktopViewport();
+}
+
+function isDesktopAdminEntryActive() {
+  return typeof document !== 'undefined'
+    && document.body.classList.contains('desktop-admin-entry');
+}
+
+function syncDesktopAdminEntryMode() {
+  if (typeof document === 'undefined') return;
+  const desktopAdminEntry = document.body.classList.contains('admin-open') && shouldAutoOpenDesktopAdminDashboard();
+  document.body.classList.toggle('desktop-admin-entry', desktopAdminEntry);
+  if (adminCloseBtn instanceof HTMLButtonElement) {
+    adminCloseBtn.textContent = desktopAdminEntry ? 'Sign Out' : 'Close';
+    adminCloseBtn.setAttribute('aria-label', desktopAdminEntry ? 'Sign out' : 'Close Control Center Dashboard');
+    adminCloseBtn.title = desktopAdminEntry ? 'Sign out' : 'Close';
+  }
 }
 
 function canManageInventory() {
@@ -4731,31 +4819,47 @@ function renderDiscountManager() {
     ? `
       <div class="discount-profile-table-wrap">
         <table class="discount-profile-table">
+          <colgroup>
+            <col class="discount-profile-col-name" />
+            <col class="discount-profile-col-type" />
+            <col class="discount-profile-col-value" />
+            <col class="discount-profile-col-usage" />
+            <col class="discount-profile-col-last-used" />
+          </colgroup>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Deduction Type</th>
-              <th>Value</th>
-              <th>Usage</th>
-              <th>Last Used</th>
+              <th class="discount-profile-head-name">Name</th>
+              <th class="discount-profile-head-type">Deduction Type</th>
+              <th class="discount-profile-head-value">Value</th>
+              <th class="discount-profile-head-usage">Usage</th>
+              <th class="discount-profile-head-last-used">Last Used</th>
             </tr>
           </thead>
           <tbody>
-            ${profiles.map((profile) => `
+            ${profiles.map((profile) => {
+              const lastUsedMeta = profile.lastUsedAt ? formatDiscountManagerLastUsed(profile.lastUsedAt) : null;
+              const lastUsedCell = lastUsedMeta
+                ? `
+                    <span class="discount-profile-last-used-date">${escapeHtml(lastUsedMeta.date)}</span>
+                    <span class="discount-profile-last-used-time">${escapeHtml(lastUsedMeta.time)}</span>
+                  `
+                : '—';
+              return `
               <tr class="discount-profile-table-row" tabindex="0" role="button" data-discount-profile-open="${escapeHtml(profile.id)}" aria-label="Open discount type ${escapeHtml(profile.name)}">
-                <td>
+                <td class="discount-profile-cell-name" data-label="Name">
                   <strong>${escapeHtml(profile.name)}</strong>
                 </td>
-                <td>${escapeHtml(profile.type === 'fixed' ? 'Minus Amount' : 'Percent')}</td>
-                <td>${escapeHtml(formatDiscountManagerValue(profile))}</td>
-                <td>
+                <td class="discount-profile-cell-type" data-label="Deduction Type">${escapeHtml(profile.type === 'fixed' ? 'Minus Amount' : 'Percent')}</td>
+                <td class="discount-profile-cell-value" data-label="Value">${escapeHtml(formatDiscountManagerValue(profile))}</td>
+                <td class="discount-profile-cell-usage" data-label="Usage">
                   <span class="discount-profile-usage-badge ${profile.canDelete ? 'unused' : 'used'}">
                     ${profile.usageCount ? `${escapeHtml(String(profile.usageCount))} transaction(s)` : 'Unused'}
                   </span>
                 </td>
-                <td>${escapeHtml(profile.lastUsedAt ? formatDate(profile.lastUsedAt) : '—')}</td>
+                <td class="discount-profile-cell-last-used" data-label="Last Used"${lastUsedMeta ? ` title="${escapeHtml(lastUsedMeta.full)}"` : ''}>${lastUsedCell}</td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
       </div>
@@ -5389,13 +5493,10 @@ function getFirstAccessibleAdminPanel(preferredPanel = readUserUiState()?.adminP
 }
 
 function updateAdminNavVisibility() {
-  ADMIN_NAV_ENTRIES.forEach(({ panelName, button }) => {
-    if (!(button instanceof HTMLElement)) return;
-    button.hidden = !canAccessAdminPanel(panelName);
-  });
+  syncAdminNavLayout();
 }
 
-function applyAppConfig(config = {}) {
+function applyAppConfig(config = {}, { refreshAdminPanel = true } = {}) {
   state.appConfig = normalizeAppConfig(config?.appConfig || config);
   syncRoleAccessDraftFromConfig();
   syncDiscountManagerProfilesWithAppConfig();
@@ -5411,13 +5512,16 @@ function applyAppConfig(config = {}) {
   updateAdminNavVisibility();
   if (document.body.classList.contains('admin-open')) {
     if (canAccessAdminFeatures()) {
-      switchAdminPanel(getFirstAccessibleAdminPanel(readUserUiState()?.adminPanel), { persist: false });
+      if (refreshAdminPanel) {
+        switchAdminPanel(getFirstAccessibleAdminPanel(readUserUiState()?.adminPanel), { persist: false });
+      }
     } else {
       closeAdminDashboard();
     }
   }
   updatePaymentActionAvailability();
   renderCart();
+  syncDesktopAdminEntryMode();
 }
 
 function canManageUsers() {
@@ -6115,19 +6219,23 @@ function unlockDashboard() {
   document.body.classList.remove('auth-locked');
   if (authGateEl) authGateEl.setAttribute('aria-hidden', 'true');
   updateWelcomeBanner();
+  syncDesktopAdminEntryMode();
 }
 
 function lockDashboard() {
   document.body.classList.add('auth-locked');
   if (authGateEl) authGateEl.setAttribute('aria-hidden', 'false');
+  syncDesktopAdminEntryMode();
 }
 
 function startAppOnce() {
-  if (appInitialized) return;
+  if (appInitializationPromise) return appInitializationPromise;
   appInitialized = true;
-  init().catch((error) => {
+  appInitializationPromise = init().catch((error) => {
     setStatus(`Startup error: ${error.message}`);
+    return false;
   });
+  return appInitializationPromise;
 }
 
 function waitForNextPaint() {
@@ -6191,6 +6299,7 @@ async function handleLoginSubmit(event) {
     setAuthMessage('');
     unlockDashboard();
     startAppOnce();
+    void routeAuthenticatedUserToPreferredDashboard().catch(() => {});
     showConfirmationToast({
       title: 'Login successful',
       message: `Welcome ${result.user.fullName}. Have a nice day.`,
@@ -6228,6 +6337,7 @@ async function handleLoginSubmit(event) {
           });
           unlockDashboard();
           startAppOnce();
+          void routeAuthenticatedUserToPreferredDashboard().catch(() => {});
           if (shouldAutoOpenStartShiftOnLogin(offlineRole)) {
             await presentStartShiftModal();
           }
@@ -6501,6 +6611,9 @@ async function bootstrap() {
         if (loginEmailEl) loginEmailEl.focus();
       }
     }
+    if (activeAuthSession?.email) {
+      void routeAuthenticatedUserToPreferredDashboard().catch(() => {});
+    }
     return;
   }
   clearActiveSession();
@@ -6524,6 +6637,33 @@ function switchTab(tabName) {
   if (tabName === 'admin') {
     refreshSalesReport(activeSalesRange);
   }
+}
+
+async function routeAuthenticatedUserToPreferredDashboard() {
+  if (!activeAuthSession?.email) {
+    syncDesktopAdminEntryMode();
+    return false;
+  }
+
+  const initialized = await startAppOnce();
+  if (initialized === false) {
+    syncDesktopAdminEntryMode();
+    return false;
+  }
+
+  if (!shouldAutoOpenDesktopAdminDashboard()) {
+    syncDesktopAdminEntryMode();
+    return false;
+  }
+
+  if (!document.body.classList.contains('admin-open')) {
+    await waitForNextPaint();
+    await openAdminDashboard({ persist: false, rememberOpen: false });
+    return true;
+  }
+
+  syncDesktopAdminEntryMode();
+  return true;
 }
 
 function normalizeAdminPanelName(panelName) {
@@ -6558,11 +6698,61 @@ function normalizeAdminNavOrder(order) {
   return nextOrder;
 }
 
+function getAdminNavMeta(panelName) {
+  const button = ADMIN_NAV_BUTTONS[panelName];
+  const label = String(button?.querySelector('.admin-nav-btn-label')?.textContent || panelName || 'Panel').trim() || 'Panel';
+  const shortLabel = String(button?.dataset.adminShortLabel || label).trim() || label;
+  const description = String(button?.querySelector('small')?.textContent || '').trim();
+  return { label, shortLabel, description };
+}
+
+function getAccessibleAdminNavPanels(order = getCurrentAdminNavOrder()) {
+  return normalizeAdminNavOrder(order).filter((panelName) => canAccessAdminPanel(panelName));
+}
+
+function getVisibleAdminNavPanels(order = getCurrentAdminNavOrder()) {
+  return getAccessibleAdminNavPanels(order).slice(0, ADMIN_NAV_VISIBLE_LIMIT);
+}
+
+function getStoredAdminNavPanels(order = getCurrentAdminNavOrder()) {
+  return getAccessibleAdminNavPanels(order).slice(ADMIN_NAV_VISIBLE_LIMIT);
+}
+
 function getCurrentAdminNavOrder() {
   if (!adminNavEl) return normalizeAdminNavOrder();
   return normalizeAdminNavOrder(
     Array.from(adminNavEl.querySelectorAll('.admin-nav-btn')).map((button) => getAdminNavPanelName(button))
   );
+}
+
+function syncAdminNavDrawerVisibility(order = getCurrentAdminNavOrder()) {
+  const hasStoredPanels = getStoredAdminNavPanels(order).length > 0;
+  if (adminNavDrawerBtnEl instanceof HTMLButtonElement) {
+    adminNavDrawerBtnEl.hidden = !hasStoredPanels;
+    adminNavDrawerBtnEl.disabled = !hasStoredPanels;
+  }
+  if (!hasStoredPanels) {
+    activeAdminNavDrawerPanel = '';
+    activeAdminNavReplacePanel = '';
+    closeAdminNavDrawerModal();
+  }
+}
+
+function syncAdminNavLayout(order = getCurrentAdminNavOrder()) {
+  const normalizedOrder = normalizeAdminNavOrder(order);
+  const visiblePanels = new Set(getVisibleAdminNavPanels(normalizedOrder));
+  const accessiblePanels = new Set(getAccessibleAdminNavPanels(normalizedOrder));
+
+  ADMIN_NAV_ENTRIES.forEach(({ panelName, button }) => {
+    if (!(button instanceof HTMLElement)) return;
+    const isAccessible = accessiblePanels.has(panelName);
+    const isVisible = visiblePanels.has(panelName);
+    button.hidden = !isAccessible || !isVisible;
+    button.classList.toggle('is-stored', isAccessible && !isVisible);
+  });
+
+  syncAdminNavDrawerVisibility(normalizedOrder);
+  refreshAdminNavContextMenu();
 }
 
 function applyAdminNavOrder(order) {
@@ -6575,7 +6765,7 @@ function applyAdminNavOrder(order) {
     }
   });
   adminNavEl.appendChild(fragment);
-  refreshAdminNavContextMenu();
+  syncAdminNavLayout(order);
 }
 
 function restoreAdminNavOrder(order = readUserUiState()?.adminNavOrder) {
@@ -6584,6 +6774,47 @@ function restoreAdminNavOrder(order = readUserUiState()?.adminNavOrder) {
 
 function persistAdminNavOrder() {
   saveUserUiState({ adminNavOrder: getCurrentAdminNavOrder() });
+}
+
+function swapStoredAdminNavPanel(panelToShow, replacePanel, { persist = true } = {}) {
+  const showPanel = normalizeAdminPanelName(panelToShow);
+  const targetPanel = normalizeAdminPanelName(replacePanel);
+  const currentOrder = normalizeAdminNavOrder(getCurrentAdminNavOrder());
+  const visiblePanels = getVisibleAdminNavPanels(currentOrder);
+  const storedPanels = getStoredAdminNavPanels(currentOrder);
+
+  if (!storedPanels.includes(showPanel) || !visiblePanels.includes(targetPanel)) {
+    return false;
+  }
+
+  const nextVisiblePanels = visiblePanels.map((panelName) => (panelName === targetPanel ? showPanel : panelName));
+  const remainingPanels = currentOrder.filter((panelName) => !nextVisiblePanels.includes(panelName) && panelName !== showPanel);
+  const nextOrder = [...nextVisiblePanels, ...remainingPanels];
+
+  applyAdminNavOrder(nextOrder);
+  if (persist) {
+    persistAdminNavOrder();
+  }
+  return true;
+}
+
+function promoteAdminNavPanel(panelName, { persist = true, replacePanel = '' } = {}) {
+  const normalizedPanel = normalizeAdminPanelName(panelName);
+  if (!canAccessAdminPanel(normalizedPanel)) return false;
+
+  const currentOrder = normalizeAdminNavOrder(getCurrentAdminNavOrder());
+  const visiblePanels = getVisibleAdminNavPanels(currentOrder);
+  if (visiblePanels.includes(normalizedPanel)) {
+    syncAdminNavLayout(currentOrder);
+    return false;
+  }
+
+  const normalizedReplacePanel = normalizeAdminPanelName(replacePanel);
+  const targetPanel = visiblePanels.includes(normalizedReplacePanel)
+    ? normalizedReplacePanel
+    : visiblePanels[visiblePanels.length - 1];
+  if (!targetPanel) return false;
+  return swapStoredAdminNavPanel(normalizedPanel, targetPanel, { persist });
 }
 
 function getAdminNavMoveAvailability(panelName) {
@@ -6604,6 +6835,100 @@ function closeAdminNavContextMenu() {
   if (!adminNavContextMenuEl) return;
   adminNavContextMenuEl.hidden = true;
   adminNavContextMenuEl.classList.remove('open');
+}
+
+function closeAdminNavDrawerModal() {
+  if (!(adminNavDrawerModalEl instanceof HTMLElement)) return;
+  adminNavDrawerModalEl.classList.remove('open');
+  adminNavDrawerModalEl.setAttribute('aria-hidden', 'true');
+  if (adminNavDrawerBtnEl instanceof HTMLButtonElement) {
+    adminNavDrawerBtnEl.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function renderAdminNavDrawerModal() {
+  if (!(adminNavDrawerStoredListEl instanceof HTMLElement) || !(adminNavDrawerVisibleListEl instanceof HTMLElement)) return;
+
+  const currentOrder = normalizeAdminNavOrder(getCurrentAdminNavOrder());
+  const storedPanels = getStoredAdminNavPanels(currentOrder);
+  const visiblePanels = getVisibleAdminNavPanels(currentOrder);
+
+  if (!storedPanels.length) {
+    adminNavDrawerStoredListEl.innerHTML = '<p class="admin-nav-drawer-empty">No hidden tabs available right now.</p>';
+    adminNavDrawerVisibleListEl.innerHTML = '';
+    if (adminNavDrawerStatusEl) {
+      adminNavDrawerStatusEl.textContent = 'All available tabs are already visible in the header.';
+    }
+    if (adminNavDrawerSwapBtnEl instanceof HTMLButtonElement) {
+      adminNavDrawerSwapBtnEl.disabled = true;
+    }
+    return;
+  }
+
+  if (!storedPanels.includes(activeAdminNavDrawerPanel)) {
+    activeAdminNavDrawerPanel = storedPanels[0] || '';
+  }
+  if (!visiblePanels.includes(activeAdminNavReplacePanel)) {
+    activeAdminNavReplacePanel = visiblePanels[visiblePanels.length - 1] || visiblePanels[0] || '';
+  }
+
+  adminNavDrawerStoredListEl.innerHTML = storedPanels.map((panelName) => {
+    const meta = getAdminNavMeta(panelName);
+    const isSelected = panelName === activeAdminNavDrawerPanel;
+    return `
+      <button
+        class="admin-nav-drawer-option${isSelected ? ' selected' : ''}"
+        type="button"
+        data-admin-drawer-stored-panel="${escapeHtml(panelName)}"
+      >
+        <strong>${escapeHtml(meta.label)}</strong>
+        <small>${escapeHtml(meta.description || 'Show this tab in the header.')}</small>
+      </button>
+    `;
+  }).join('');
+
+  adminNavDrawerVisibleListEl.innerHTML = visiblePanels.map((panelName) => {
+    const meta = getAdminNavMeta(panelName);
+    const isSelected = panelName === activeAdminNavReplacePanel;
+    const isActivePanel = ADMIN_NAV_BUTTONS[panelName]?.classList.contains('active');
+    return `
+      <button
+        class="admin-nav-drawer-option visible${isSelected ? ' selected' : ''}"
+        type="button"
+        data-admin-drawer-replace-panel="${escapeHtml(panelName)}"
+      >
+        <strong>${escapeHtml(meta.label)}</strong>
+        <small>${isActivePanel ? 'Currently open in the dashboard.' : 'Replace this visible tab slot.'}</small>
+      </button>
+    `;
+  }).join('');
+
+  if (adminNavDrawerStatusEl) {
+    if (activeAdminNavDrawerPanel && activeAdminNavReplacePanel) {
+      const storedMeta = getAdminNavMeta(activeAdminNavDrawerPanel);
+      const visibleMeta = getAdminNavMeta(activeAdminNavReplacePanel);
+      adminNavDrawerStatusEl.textContent = `Show "${storedMeta.label}" in place of "${visibleMeta.label}".`;
+    } else {
+      adminNavDrawerStatusEl.textContent = 'Select one hidden tab and one visible tab to replace.';
+    }
+  }
+
+  if (adminNavDrawerSwapBtnEl instanceof HTMLButtonElement) {
+    adminNavDrawerSwapBtnEl.disabled = !(activeAdminNavDrawerPanel && activeAdminNavReplacePanel);
+  }
+}
+
+function openAdminNavDrawerModal() {
+  if (!(adminNavDrawerModalEl instanceof HTMLElement)) return;
+  const currentOrder = normalizeAdminNavOrder(getCurrentAdminNavOrder());
+  if (!getStoredAdminNavPanels(currentOrder).length) return;
+  closeAdminNavContextMenu();
+  renderAdminNavDrawerModal();
+  adminNavDrawerModalEl.classList.add('open');
+  adminNavDrawerModalEl.setAttribute('aria-hidden', 'false');
+  if (adminNavDrawerBtnEl instanceof HTMLButtonElement) {
+    adminNavDrawerBtnEl.setAttribute('aria-expanded', 'true');
+  }
 }
 
 function refreshAdminNavContextMenu(panelName = activeAdminNavContextPanel) {
@@ -6648,6 +6973,7 @@ function moveAdminNavButton(panelName, direction) {
       adminNavEl.insertBefore(button, nextButton.nextElementSibling);
     }
   }
+  syncAdminNavLayout();
   persistAdminNavOrder();
   refreshAdminNavContextMenu(panelName);
 }
@@ -6658,6 +6984,49 @@ function handleAdminNavButtonClick(event) {
   if (panelName) {
     switchAdminPanel(panelName);
   }
+}
+
+function handleAdminNavDrawerModalClick(event) {
+  const storedTrigger = event.target?.closest('[data-admin-drawer-stored-panel]');
+  if (storedTrigger instanceof HTMLElement) {
+    activeAdminNavDrawerPanel = String(storedTrigger.dataset.adminDrawerStoredPanel || '').trim().toLowerCase();
+    renderAdminNavDrawerModal();
+    return;
+  }
+
+  const replaceTrigger = event.target?.closest('[data-admin-drawer-replace-panel]');
+  if (!(replaceTrigger instanceof HTMLElement)) return;
+  activeAdminNavReplacePanel = String(replaceTrigger.dataset.adminDrawerReplacePanel || '').trim().toLowerCase();
+  renderAdminNavDrawerModal();
+}
+
+function handleAdminNavDrawerSwap() {
+  if (!activeAdminNavDrawerPanel || !activeAdminNavReplacePanel) return;
+  const nextPanel = activeAdminNavDrawerPanel;
+  const didSwap = swapStoredAdminNavPanel(activeAdminNavDrawerPanel, activeAdminNavReplacePanel);
+  if (!didSwap) return;
+  closeAdminNavDrawerModal();
+  switchAdminPanel(nextPanel);
+}
+
+function handleAdminNavDrawerBackdropClick(event) {
+  if (event.target !== adminNavDrawerModalEl) return;
+  closeAdminNavDrawerModal();
+}
+
+function handleAdminNavDrawerCloseClick() {
+  closeAdminNavDrawerModal();
+}
+
+function handleAdminNavDrawerOpen(event) {
+  event.preventDefault();
+  openAdminNavDrawerModal();
+}
+
+function handleAdminNavDrawerClick(event) {
+  const trigger = event.target?.closest('[data-admin-drawer-stored-panel], [data-admin-drawer-replace-panel]');
+  if (!(trigger instanceof HTMLElement)) return;
+  handleAdminNavDrawerModalClick(event);
 }
 
 function handleAdminNavButtonContextMenu(event) {
@@ -6696,10 +7065,39 @@ function setupAdminNavButtons() {
     adminNavContextNextBtn.dataset.adminMove = 'next';
     adminNavContextNextBtn.addEventListener('click', handleAdminNavMoveButtonClick);
   }
+  if (adminNavDrawerBtnEl instanceof HTMLButtonElement && adminNavDrawerBtnEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerBtnEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerBtnEl.addEventListener('click', handleAdminNavDrawerOpen);
+  }
+  if (adminNavDrawerCloseBtnEl instanceof HTMLButtonElement && adminNavDrawerCloseBtnEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerCloseBtnEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerCloseBtnEl.addEventListener('click', handleAdminNavDrawerCloseClick);
+  }
+  if (adminNavDrawerCancelBtnEl instanceof HTMLButtonElement && adminNavDrawerCancelBtnEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerCancelBtnEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerCancelBtnEl.addEventListener('click', handleAdminNavDrawerCloseClick);
+  }
+  if (adminNavDrawerSwapBtnEl instanceof HTMLButtonElement && adminNavDrawerSwapBtnEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerSwapBtnEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerSwapBtnEl.addEventListener('click', handleAdminNavDrawerSwap);
+  }
+  if (adminNavDrawerStoredListEl instanceof HTMLElement && adminNavDrawerStoredListEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerStoredListEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerStoredListEl.addEventListener('click', handleAdminNavDrawerClick);
+  }
+  if (adminNavDrawerVisibleListEl instanceof HTMLElement && adminNavDrawerVisibleListEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerVisibleListEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerVisibleListEl.addEventListener('click', handleAdminNavDrawerClick);
+  }
+  if (adminNavDrawerModalEl instanceof HTMLElement && adminNavDrawerModalEl.dataset.adminDrawerBound !== 'true') {
+    adminNavDrawerModalEl.dataset.adminDrawerBound = 'true';
+    adminNavDrawerModalEl.addEventListener('click', handleAdminNavDrawerBackdropClick);
+  }
 }
 
 function switchAdminPanel(panelName, { persist = true } = {}) {
   const activePanel = getFirstAccessibleAdminPanel(panelName);
+  promoteAdminNavPanel(activePanel, { persist });
   const isOverview = activePanel === 'overview';
   const isInventory = activePanel === 'inventory';
   const isKit = activePanel === 'kit-spec';
@@ -6763,7 +7161,7 @@ function switchAdminPanel(panelName, { persist = true } = {}) {
   }
 }
 
-async function openAdminDashboard({ panelName, persist = true } = {}) {
+async function openAdminDashboard({ panelName, persist = true, rememberOpen = true } = {}) {
   if (!canAccessAdminFeatures()) {
     fireAudit('admin_access_denied', { reason: 'role_blocked', role: activeAuthSession?.role || 'unknown' });
     setStatus('Current role does not have Control Center access.');
@@ -6774,20 +7172,18 @@ async function openAdminDashboard({ panelName, persist = true } = {}) {
   const restoredPanel = panelName || readUserUiState()?.adminPanel;
   const activePanel = getFirstAccessibleAdminPanel(restoredPanel);
   document.body.classList.add('admin-open');
-  saveUserUiState({ adminOpen: true });
+  syncDesktopAdminEntryMode();
+  if (rememberOpen) {
+    saveUserUiState({ adminOpen: true });
+  }
   switchAdminPanel(activePanel, { persist });
-  if (canAccessDiscountManager()) {
-    refreshDiscountManager().catch(() => {});
-  }
-  if (canAccessMonthlyClosing()) {
-    refreshMonthlyClosingModule().catch(() => {});
-    refreshMonthlyClosingSnapshots().catch(() => {});
-  }
 }
 
 function closeAdminDashboard() {
   closeAdminNavContextMenu();
+  closeAdminNavDrawerModal();
   document.body.classList.remove('admin-open');
+  syncDesktopAdminEntryMode();
   saveUserUiState({ adminOpen: false });
 }
 
@@ -6798,6 +7194,12 @@ function highlightOperationsDiscrepancyModule({ scroll = true } = {}) {
     operationsDiscrepancyHighlightTimer = null;
   }
   operationsDiscrepancyModuleEl.classList.remove('is-focused');
+  if (discrepancySummaryEl instanceof HTMLElement) {
+    discrepancySummaryEl.classList.remove('is-focused-target');
+  }
+  if (discrepancyAlertsListEl instanceof HTMLElement) {
+    discrepancyAlertsListEl.classList.remove('is-focused-target');
+  }
   if (scroll) {
     operationsDiscrepancyModuleEl.scrollIntoView({
       behavior: 'smooth',
@@ -6807,10 +7209,63 @@ function highlightOperationsDiscrepancyModule({ scroll = true } = {}) {
   }
   void operationsDiscrepancyModuleEl.offsetWidth;
   operationsDiscrepancyModuleEl.classList.add('is-focused');
+  if (discrepancySummaryEl instanceof HTMLElement) {
+    discrepancySummaryEl.classList.add('is-focused-target');
+  }
+  if (discrepancyAlertsListEl instanceof HTMLElement) {
+    discrepancyAlertsListEl.classList.add('is-focused-target');
+  }
   operationsDiscrepancyHighlightTimer = window.setTimeout(() => {
     operationsDiscrepancyModuleEl.classList.remove('is-focused');
+    if (discrepancySummaryEl instanceof HTMLElement) {
+      discrepancySummaryEl.classList.remove('is-focused-target');
+    }
+    if (discrepancyAlertsListEl instanceof HTMLElement) {
+      discrepancyAlertsListEl.classList.remove('is-focused-target');
+    }
     operationsDiscrepancyHighlightTimer = null;
-  }, 2600);
+  }, 3200);
+}
+
+function focusOperationsDiscrepancyTable({ behavior = 'smooth' } = {}) {
+  if (operationsDiscrepancyModuleEl instanceof HTMLElement) {
+    operationsDiscrepancyModuleEl.scrollIntoView({
+      behavior,
+      block: 'start',
+      inline: 'nearest'
+    });
+  }
+  if (!(discrepancyAlertsListEl instanceof HTMLElement)) return;
+  discrepancyAlertsListEl.scrollTop = 0;
+  if (discrepancyAlertsListEl.getAttribute('tabindex') !== '-1') {
+    discrepancyAlertsListEl.setAttribute('tabindex', '-1');
+  }
+  discrepancyAlertsListEl.focus({ preventScroll: true });
+}
+
+function requestOperationsDiscrepancyReveal() {
+  pendingOperationsDiscrepancyRevealLoads = 3;
+  if (operationsDiscrepancyFocusRetryTimer) {
+    window.clearTimeout(operationsDiscrepancyFocusRetryTimer);
+    operationsDiscrepancyFocusRetryTimer = null;
+  }
+}
+
+function resolveOperationsDiscrepancyRevealLoad() {
+  if (pendingOperationsDiscrepancyRevealLoads <= 0) return;
+  pendingOperationsDiscrepancyRevealLoads -= 1;
+  if (pendingOperationsDiscrepancyRevealLoads > 0) return;
+  if (operationsDiscrepancyFocusRetryTimer) {
+    window.clearTimeout(operationsDiscrepancyFocusRetryTimer);
+  }
+  operationsDiscrepancyFocusRetryTimer = window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      focusOperationsDiscrepancyTable({ behavior: 'smooth' });
+      highlightOperationsDiscrepancyModule({ scroll: false });
+      pendingOperationsDiscrepancyRevealLoads = 0;
+      operationsDiscrepancyFocusRetryTimer = null;
+    });
+  }, 140);
 }
 
 function openOperationsDiscrepancyModule() {
@@ -6818,14 +7273,12 @@ function openOperationsDiscrepancyModule() {
     setStatus('Current role does not have Operations Dashboard access.');
     return;
   }
+  requestOperationsDiscrepancyReveal();
   if (document.body.classList.contains('admin-open')) {
     switchAdminPanel('operations');
   } else {
     openAdminDashboard({ panelName: 'operations' });
   }
-  window.setTimeout(() => {
-    highlightOperationsDiscrepancyModule();
-  }, 180);
 }
 
 // ------------------------------------------
@@ -6982,9 +7435,9 @@ function switchCategory(category) {
   renderProducts();
 }
 
-async function refreshCatalog({ keepCategory = true } = {}) {
+async function refreshCatalog({ keepCategory = true, refreshAdminPanel = true } = {}) {
   const result = await api('/api/products');
-  applyAppConfig(result?.appConfig || state.appConfig);
+  applyAppConfig(result?.appConfig || state.appConfig, { refreshAdminPanel });
   const nextCategories = Array.isArray(result.categories) ? result.categories : [];
   const nextProducts = Array.isArray(result.products) ? result.products : [];
 
@@ -9895,16 +10348,13 @@ function syncKitSpecBuilderVisibility() {
   }
   if (kitSpecEditorEl) {
     kitSpecEditorEl.style.display = enforceKitSpec ? '' : 'none';
-    if (!enforceKitSpec) {
-      kitSpecEditorEl.innerHTML = '';
-    }
   }
 }
 
-async function refreshKitSpecModule() {
-  if (!kitSpecModuleEl || !canAccessKitSpecPanel()) return;
+function renderKitSpecWorkspaceState({ renderEditor = false } = {}) {
   renderKitSpecModeControl();
   syncKitSpecBuilderVisibility();
+
   if (kitSpecNoteEl) {
     if (state.appConfig?.enforceKitSpec === false) {
       kitSpecNoteEl.textContent = canManageInventory()
@@ -9916,6 +10366,15 @@ async function refreshKitSpecModule() {
         : 'View-only mode. Current role cannot manage kit specification.';
     }
   }
+
+  if (renderEditor && state.appConfig?.enforceKitSpec !== false) {
+    renderKitSpecEditor();
+  }
+}
+
+async function refreshKitSpecModule() {
+  if (!kitSpecModuleEl || !canAccessKitSpecPanel()) return;
+  renderKitSpecWorkspaceState();
   if (kitSpecModuleEl) kitSpecModuleEl.innerHTML = '<p class="kit-spec-empty-state">Loading kit specification records...</p>';
   if (kitSpecEditorEl) kitSpecEditorEl.innerHTML = '<p class="kit-spec-empty-state">Loading product ingredients...</p>';
   if (kitSpecSummaryEl) kitSpecSummaryEl.innerHTML = '<div class="kit-spec-summary-loading">Loading product kit coverage...</div>';
@@ -9936,7 +10395,8 @@ async function refreshKitSpecModule() {
     state.products = Array.isArray(result?.products) ? result.products.map((x) => ({
       ...toClientProduct(x)
     })) : state.products;
-    applyAppConfig(result?.appConfig || state.appConfig);
+    applyAppConfig(result?.appConfig || state.appConfig, { refreshAdminPanel: false });
+    renderKitSpecWorkspaceState();
     kitSpecIngredients = Array.isArray(result?.ingredients) ? result.ingredients : [];
     kitSpecRecipes = Array.isArray(result?.recipes) ? result.recipes : [];
 
@@ -9972,13 +10432,13 @@ async function handleKitSpecModeToggle() {
       })
     });
 
-    applyAppConfig(result?.appConfig || state.appConfig);
-    syncKitSpecBuilderVisibility();
-    await Promise.all([
-      refreshCatalog({ keepCategory: true }),
-      refreshKitSpecModule(),
-      canAccessAdminFeatures() ? refreshInventoryModule() : Promise.resolve()
-    ]);
+    applyAppConfig(result?.appConfig || state.appConfig, { refreshAdminPanel: false });
+    renderKitSpecWorkspaceState({ renderEditor: nextEnforceKitSpec });
+
+    refreshCatalog({ keepCategory: true, refreshAdminPanel: false }).catch(() => {
+      // Keep the mode toggle stable even if the background catalog refresh fails.
+    });
+
     setStatus(nextEnforceKitSpec
       ? 'Kit Spec requirement turned on. Ordering now depends on kit specs and ingredient stock again.'
       : 'Kit Spec requirement turned off. Products can now be ordered without kit specs, and ingredient deduction is disabled.');
@@ -11414,15 +11874,15 @@ function renderAdminStats(report) {
         <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
       </article>
       <button
-        class="sales-ops-summary-card${canJumpToDiscrepancies ? ' actionable' : ''}"
+        class="sales-ops-summary-card discrepancy-action${canJumpToDiscrepancies ? ' actionable' : ''}"
         type="button"
         ${canJumpToDiscrepancies ? 'data-admin-summary-action="open-discrepancies"' : 'disabled'}
-        ${canJumpToDiscrepancies ? 'title="Open discrepancy alerts in Operations"' : ''}
+        ${canJumpToDiscrepancies ? 'title="Open Attention Queue discrepancy alerts table in Operations"' : ''}
       >
         <span>Discrepancy Alerts</span>
         <strong>${Number(metrics.discrepancyAlerts || 0)}</strong>
         <small>Shift reviews needing reconciliation</small>
-        ${canJumpToDiscrepancies ? '<small class="sales-ops-summary-link">Open in Operations</small>' : ''}
+        ${canJumpToDiscrepancies ? '<small class="sales-ops-summary-link">View Attention Queue table</small>' : ''}
       </button>
       <article class="sales-ops-summary-card">
         <span>Unsynced Operations</span>
@@ -11639,6 +12099,8 @@ async function refreshCashierMonitoring() {
     renderCashierMonitoring(Array.isArray(result?.cashiers) ? result.cashiers : []);
   } catch (error) {
     cashierMonitoringListEl.innerHTML = `<p class="error">Cashier monitoring error: ${escapeHtml(error.message)}</p>`;
+  } finally {
+    resolveOperationsDiscrepancyRevealLoad();
   }
 }
 
@@ -12103,6 +12565,8 @@ async function refreshShiftManagement() {
   } catch (error) {
     if (shiftManagementSummaryEl) shiftManagementSummaryEl.textContent = `Shift management error: ${error.message}`;
     if (shiftManagementListEl) shiftManagementListEl.innerHTML = '';
+  } finally {
+    resolveOperationsDiscrepancyRevealLoad();
   }
 }
 
@@ -12198,6 +12662,8 @@ async function refreshDiscrepancyAlerts() {
   } catch (error) {
     if (discrepancySummaryEl) discrepancySummaryEl.textContent = `Discrepancy alert error: ${error.message}`;
     if (discrepancyAlertsListEl) discrepancyAlertsListEl.innerHTML = '';
+  } finally {
+    resolveOperationsDiscrepancyRevealLoad();
   }
 }
 
@@ -12395,6 +12861,9 @@ function renderMonthlyClosingSnapshotStatus() {
 
 function renderMonthlyClosingSnapshotArchive() {
   if (!monthlyClosingSnapshotListEl) return;
+  if (!monthlyClosingSnapshotsLoaded && monthlyClosingSnapshotsPromise) {
+    return;
+  }
   if (!monthlyClosingSavedSnapshots.length) {
     monthlyClosingSnapshotListEl.innerHTML = '<p>No saved monthly closing snapshots yet.</p>';
     return;
@@ -12438,28 +12907,54 @@ function renderMonthlyClosingSnapshotArchive() {
   `;
 }
 
-async function refreshMonthlyClosingSnapshots() {
+async function refreshMonthlyClosingSnapshots({ force = false } = {}) {
   if (!monthlyClosingSnapshotListEl || !canAccessMonthlyClosing()) return;
-  if (!monthlyClosingSavedSnapshots.length) {
-    monthlyClosingSnapshotListEl.innerHTML = '<p>Loading saved monthly closing snapshots...</p>';
-  }
-  try {
-    const result = await api('/api/admin/monthly-closing/snapshots', {
-      headers: buildActorHeaders()
-    });
-    monthlyClosingSavedSnapshots = Array.isArray(result?.snapshots)
-      ? result.snapshots.map(normalizeMonthlyClosingSnapshotRecord)
-      : [];
+  if (!force && monthlyClosingSnapshotsLoaded) {
     renderMonthlyClosingSnapshotArchive();
     renderMonthlyClosingSnapshotStatus();
-  } catch (error) {
-    monthlyClosingSnapshotListEl.innerHTML = '<p>Saved monthly closing snapshots could not be loaded.</p>';
-    if (monthlyClosingSnapshotStatusEl) {
-      monthlyClosingSnapshotStatusEl.textContent = `Saved monthly closing snapshot load failed: ${error.message}`;
-      monthlyClosingSnapshotStatusEl.classList.remove('status-success');
-      monthlyClosingSnapshotStatusEl.classList.add('status-error');
-    }
+    return;
   }
+  if (monthlyClosingSnapshotsPromise) {
+    return monthlyClosingSnapshotsPromise;
+  }
+
+  const hadSnapshotArchive = monthlyClosingSnapshotsLoaded || monthlyClosingSavedSnapshots.length > 0;
+  if (!hadSnapshotArchive) {
+    monthlyClosingSnapshotListEl.innerHTML = '<p>Loading saved monthly closing snapshots...</p>';
+  }
+
+  let refreshPromise = null;
+  refreshPromise = (async () => {
+    try {
+      const result = await api('/api/admin/monthly-closing/snapshots', {
+        headers: buildActorHeaders()
+      });
+      monthlyClosingSavedSnapshots = Array.isArray(result?.snapshots)
+        ? result.snapshots.map(normalizeMonthlyClosingSnapshotRecord)
+        : [];
+      monthlyClosingSnapshotsLoaded = true;
+      renderMonthlyClosingSnapshotArchive();
+      renderMonthlyClosingSnapshotStatus();
+    } catch (error) {
+      if (!hadSnapshotArchive) {
+        monthlyClosingSnapshotListEl.innerHTML = '<p>Saved monthly closing snapshots could not be loaded.</p>';
+      } else {
+        renderMonthlyClosingSnapshotArchive();
+      }
+      if (monthlyClosingSnapshotStatusEl) {
+        monthlyClosingSnapshotStatusEl.textContent = `Saved monthly closing snapshot load failed: ${error.message}`;
+        monthlyClosingSnapshotStatusEl.classList.remove('status-success');
+        monthlyClosingSnapshotStatusEl.classList.add('status-error');
+      }
+    } finally {
+      if (monthlyClosingSnapshotsPromise === refreshPromise) {
+        monthlyClosingSnapshotsPromise = null;
+      }
+    }
+  })();
+
+  monthlyClosingSnapshotsPromise = refreshPromise;
+  return refreshPromise;
 }
 
 async function reviewMonthlyClosingSnapshot(monthValue) {
@@ -12515,7 +13010,7 @@ async function handleMonthlyClosingSaveClick() {
     const snapshot = normalizeMonthlyClosingSnapshotRecord(result?.snapshot || {});
     monthlyClosingActiveSnapshotMonth = snapshot.month || monthValue;
     renderMonthlyClosing(liveResult, { viewMode: 'live' });
-    await refreshMonthlyClosingSnapshots();
+    await refreshMonthlyClosingSnapshots({ force: true });
     setStatus(`Monthly closing snapshot saved for ${formatMonthLabel(monthValue)}.`);
   } finally {
     if (monthlyClosingSaveBtnEl) {
@@ -12775,10 +13270,12 @@ function renderMonthlyClosing(result, { viewMode = 'live', snapshot = null } = {
 async function refreshMonthlyClosingModule({ force = false } = {}) {
   if (!monthlyClosingSummaryEl || !canAccessMonthlyClosing()) return;
   const monthValue = getMonthlyClosingSelectedMonth();
-  const requestToken = ++monthlyClosingRefreshToken;
   const hasRenderedSnapshot = monthlyClosingSummaryEl.dataset.loaded === 'true' || monthlyExpenseListEl?.dataset.loaded === 'true';
   if (!force && hasRenderedSnapshot && monthlyClosingLoadedMonth === monthValue && monthlyClosingCurrentViewMode === 'live') {
     return;
+  }
+  if (!force && monthlyClosingRefreshPromise && monthlyClosingRefreshMonth === monthValue) {
+    return monthlyClosingRefreshPromise;
   }
   if (monthlyClosingMonthInputEl && !monthlyClosingMonthInputEl.value) {
     monthlyClosingMonthInputEl.value = monthValue;
@@ -12786,51 +13283,67 @@ async function refreshMonthlyClosingModule({ force = false } = {}) {
   if (!hasRenderedSnapshot) {
     if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = '<p class="monthly-closing-loading">Loading monthly closing summary...</p>';
   }
-  setMonthlyClosingRefreshing(true);
-  try {
-    const result = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
-      headers: buildActorHeaders()
-    });
-    if (requestToken !== monthlyClosingRefreshToken) return;
-    let nextSerializedSnapshot = '';
+  const requestToken = ++monthlyClosingRefreshToken;
+  const shouldShowRefreshingState = hasRenderedSnapshot;
+  if (shouldShowRefreshingState) {
+    setMonthlyClosingRefreshing(true);
+  }
+
+  let refreshPromise = null;
+  refreshPromise = (async () => {
     try {
-      nextSerializedSnapshot = JSON.stringify(result || {});
-    } catch (_error) {
-      nextSerializedSnapshot = monthValue;
-    }
-    if (!force && nextSerializedSnapshot && nextSerializedSnapshot === monthlyClosingSerializedSnapshot && monthlyClosingCurrentViewMode === 'live') {
-      monthlyClosingLoadedMonth = monthValue;
-      monthlyClosingCurrentResult = result || null;
-      monthlyClosingCurrentViewMode = 'live';
-      monthlyClosingActiveSnapshotMonth = '';
-      renderMonthlyClosingSnapshotStatus();
-      return;
-    }
-    renderMonthlyClosing(result, { viewMode: 'live' });
-  } catch (error) {
-    if (requestToken !== monthlyClosingRefreshToken) return;
-    if (!hasRenderedSnapshot) {
-      if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = `<p class="monthly-closing-loading">Monthly closing error: ${escapeHtml(error.message)}</p>`;
-      if (monthlyExpenseListEl) {
-        monthlyExpenseListEl.innerHTML = `
-          <div class="monthly-closing-grid">
-            <div class="monthly-closing-block full-width-block">
-              <div class="monthly-closing-block-head">
-                <h3>Expense Ledger</h3>
-                <p>Every recorded monthly expense for the selected closing period.</p>
+      const result = await api(`/api/admin/monthly-closing?month=${encodeURIComponent(monthValue)}`, {
+        headers: buildActorHeaders()
+      });
+      if (requestToken !== monthlyClosingRefreshToken) return;
+      let nextSerializedSnapshot = '';
+      try {
+        nextSerializedSnapshot = JSON.stringify(result || {});
+      } catch (_error) {
+        nextSerializedSnapshot = monthValue;
+      }
+      if (!force && nextSerializedSnapshot && nextSerializedSnapshot === monthlyClosingSerializedSnapshot && monthlyClosingCurrentViewMode === 'live') {
+        monthlyClosingLoadedMonth = monthValue;
+        monthlyClosingCurrentResult = result || null;
+        monthlyClosingCurrentViewMode = 'live';
+        monthlyClosingActiveSnapshotMonth = '';
+        renderMonthlyClosingSnapshotStatus();
+        return;
+      }
+      renderMonthlyClosing(result, { viewMode: 'live' });
+    } catch (error) {
+      if (requestToken !== monthlyClosingRefreshToken) return;
+      if (!hasRenderedSnapshot) {
+        if (monthlyClosingSummaryEl) monthlyClosingSummaryEl.innerHTML = `<p class="monthly-closing-loading">Monthly closing error: ${escapeHtml(error.message)}</p>`;
+        if (monthlyExpenseListEl) {
+          monthlyExpenseListEl.innerHTML = `
+            <div class="monthly-closing-grid">
+              <div class="monthly-closing-block full-width-block">
+                <div class="monthly-closing-block-head">
+                  <h3>Expense Ledger</h3>
+                  <p>Every recorded monthly expense for the selected closing period.</p>
+                </div>
+                <p class="monthly-closing-empty-state">Monthly expenses could not be loaded.</p>
               </div>
-              <p class="monthly-closing-empty-state">Monthly expenses could not be loaded.</p>
             </div>
-          </div>
-        `;
+          `;
+        }
+      }
+      setStatus(`Monthly closing refresh failed: ${error.message}`);
+    } finally {
+      if (requestToken === monthlyClosingRefreshToken && shouldShowRefreshingState) {
+        setMonthlyClosingRefreshing(false);
+      }
+      if (monthlyClosingRefreshPromise === refreshPromise) {
+        monthlyClosingRefreshPromise = null;
+        monthlyClosingRefreshMonth = '';
       }
     }
-    setStatus(`Monthly closing refresh failed: ${error.message}`);
-  } finally {
-    if (requestToken === monthlyClosingRefreshToken) {
-      setMonthlyClosingRefreshing(false);
-    }
-  }
+  })();
+
+  monthlyClosingRefreshMonth = monthValue;
+  monthlyClosingRefreshPromise = refreshPromise;
+  return refreshPromise;
 }
 
 async function handleMonthlyExpenseSubmit(event) {
@@ -15028,10 +15541,12 @@ function setupEventListeners() {
   if (monthlyClosingMonthInputEl) {
     monthlyClosingMonthInputEl.addEventListener('change', () => {
       syncMonthlyExpenseDateToSelectedMonth({ force: true });
+      monthlyClosingCurrentViewMode = 'live';
+      monthlyClosingActiveSnapshotMonth = '';
+      renderMonthlyClosingSnapshotArchive();
       refreshMonthlyClosingModule({ force: true }).catch((error) => {
         setStatus(`Monthly closing refresh failed: ${error.message}`);
       });
-      refreshMonthlyClosingSnapshots().catch(() => {});
     });
   }
   if (monthlyExpenseFormEl) {
@@ -15194,7 +15709,13 @@ function setupEventListeners() {
   }
 
   if (adminCloseBtn) {
-    adminCloseBtn.addEventListener('click', closeAdminDashboard);
+    adminCloseBtn.addEventListener('click', () => {
+      if (isDesktopAdminEntryActive()) {
+        handleLogout().catch(() => {});
+        return;
+      }
+      closeAdminDashboard();
+    });
   }
 
   if (paymentSuccessDoneBtn) {
@@ -15361,6 +15882,10 @@ function setupEventListeners() {
     });
   }
 
+  window.addEventListener('resize', () => {
+    syncDesktopAdminEntryMode();
+  });
+
   window.addEventListener('online', () => {
     refreshConnectivityStatus({ showTransitionToast: true })
       .then(() => syncClientOfflineOutbox())
@@ -15375,6 +15900,10 @@ function setupEventListeners() {
     if (e.key === 'Escape') {
       if (!adminNavContextMenuEl?.hidden) {
         closeAdminNavContextMenu();
+        return;
+      }
+      if (adminNavDrawerModalEl?.classList.contains('open')) {
+        closeAdminNavDrawerModal();
         return;
       }
       closeSettingsMenu();
@@ -15392,6 +15921,9 @@ function setupEventListeners() {
       closeInventoryDeleteModal();
       closeInventoryHistoryModal();
       closeCashDrawerControlModal();
+      if (isDesktopAdminEntryActive()) {
+        return;
+      }
       closeAdminDashboard();
     }
   });
@@ -15405,7 +15937,9 @@ async function init() {
   restoreAdminNavOrder();
   const persistedUiState = readUserUiState();
   const persistedAdminPanel = normalizeAdminPanelName(persistedUiState.adminPanel);
-  const shouldRestoreAdminDashboard = Boolean(persistedUiState.adminOpen) && canAccessAdminFeatures();
+  const shouldRestoreAdminDashboard = Boolean(persistedUiState.adminOpen)
+    && canAccessAdminFeatures()
+    && isLargeDesktopViewport();
   if (shouldRestoreAdminDashboard) {
     await openAdminDashboard({ panelName: persistedAdminPanel, persist: false });
   }

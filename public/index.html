@@ -32,7 +32,7 @@
             <canvas id="authLogoCanvas" class="auth-brand-logo"></canvas>
           </div>
           <h1>Ruel's Letchon Baka</h1>
-          <p>Welcome back. Sign in to continue to the product dashboard.</p>
+          <p>Welcome back. Sign in to continue to your dashboard.</p>
         </aside>
         <section class="auth-form-panel">
           <div class="auth-card">
@@ -350,84 +350,132 @@
               </div>
               <button id="adminCloseBtn" class="secondary">Close</button>
             </div>
-            <p class="admin-nav-hint">Right-click any tab card to move it left or right.</p>
-            <div id="adminNav" class="admin-nav">
-              <div id="adminNavOverviewBtn" class="admin-nav-btn active" data-admin-panel="overview">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Overview</span>
-                  </span>
-                  <small>Sales health and quick insights</small>
-                </button>
+            <p class="admin-nav-hint">Five tabs stay visible by default. Use the drawer button to show hidden tabs and choose which visible tab to replace.</p>
+            <div class="admin-nav-shell">
+              <div id="adminNav" class="admin-nav">
+                <div id="adminNavOverviewBtn" class="admin-nav-btn active" data-admin-panel="overview" data-admin-short-label="Overview">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Overview</span>
+                    </span>
+                    <small>Sales health and quick insights</small>
+                  </button>
+                </div>
+                <div id="adminNavInventoryBtn" class="admin-nav-btn" data-admin-panel="inventory" data-admin-short-label="Inventory">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Inventory</span>
+                    </span>
+                    <small>Stock levels and ingredient value</small>
+                  </button>
+                </div>
+                <div id="adminNavKitSpecBtn" class="admin-nav-btn" data-admin-panel="kit-spec" data-admin-short-label="Kit Spec">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Kit Specification</span>
+                    </span>
+                    <small>Recipe coverage and order requirements</small>
+                  </button>
+                </div>
+                <div id="adminNavUsersBtn" class="admin-nav-btn" data-admin-panel="users" data-admin-short-label="Users">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">User Management</span>
+                    </span>
+                    <small>Accounts, roles, and access control</small>
+                  </button>
+                </div>
+                <div id="adminNavOperationsBtn" class="admin-nav-btn" data-admin-panel="operations" data-admin-short-label="Operations">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Operations</span>
+                    </span>
+                    <small>Cashiers, shifts, and drawer activity</small>
+                  </button>
+                </div>
+                <div id="adminNavReceiptTemplatesBtn" class="admin-nav-btn" data-admin-panel="receipt-templates" data-admin-short-label="Order Slip">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Order Slip Templates</span>
+                    </span>
+                    <small>Receipt design and print settings</small>
+                  </button>
+                </div>
+                <div id="adminNavReportsBtn" class="admin-nav-btn" data-admin-panel="reports" data-admin-short-label="Reports">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Reports</span>
+                    </span>
+                    <small>Exports and print-ready summaries</small>
+                  </button>
+                </div>
+                <div id="adminNavOthersBtn" class="admin-nav-btn" data-admin-panel="others" data-admin-short-label="Others">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">Others</span>
+                    </span>
+                    <small>Discounts, expenses, and monthly closing</small>
+                  </button>
+                </div>
+                <div id="adminNavEPaymentBtn" class="admin-nav-btn" data-admin-panel="e-payment" data-admin-short-label="E-Payment">
+                  <button class="admin-nav-main-btn" type="button">
+                    <span class="admin-nav-btn-head">
+                      <span class="admin-nav-btn-label">E-Payment</span>
+                    </span>
+                    <small>GCash, Maya, and QR setup</small>
+                  </button>
+                </div>
               </div>
-              <div id="adminNavInventoryBtn" class="admin-nav-btn" data-admin-panel="inventory">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Inventory</span>
-                  </span>
-                  <small>Stock levels and ingredient value</small>
-                </button>
-              </div>
-              <div id="adminNavKitSpecBtn" class="admin-nav-btn" data-admin-panel="kit-spec">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Kit Specification</span>
-                  </span>
-                  <small>Recipe coverage and order requirements</small>
-                </button>
-              </div>
-              <div id="adminNavUsersBtn" class="admin-nav-btn" data-admin-panel="users">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">User Management</span>
-                  </span>
-                  <small>Accounts, roles, and access control</small>
-                </button>
-              </div>
-              <div id="adminNavOperationsBtn" class="admin-nav-btn" data-admin-panel="operations">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Operations</span>
-                  </span>
-                  <small>Cashiers, shifts, and drawer activity</small>
-                </button>
-              </div>
-              <div id="adminNavReceiptTemplatesBtn" class="admin-nav-btn" data-admin-panel="receipt-templates">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Order Slip Templates</span>
-                  </span>
-                  <small>Receipt design and print settings</small>
-                </button>
-              </div>
-              <div id="adminNavReportsBtn" class="admin-nav-btn" data-admin-panel="reports">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Reports</span>
-                  </span>
-                  <small>Exports and print-ready summaries</small>
-                </button>
-              </div>
-              <div id="adminNavOthersBtn" class="admin-nav-btn" data-admin-panel="others">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">Others</span>
-                  </span>
-                  <small>Discounts, expenses, and monthly closing</small>
-                </button>
-              </div>
-              <div id="adminNavEPaymentBtn" class="admin-nav-btn" data-admin-panel="e-payment">
-                <button class="admin-nav-main-btn" type="button">
-                  <span class="admin-nav-btn-head">
-                    <span class="admin-nav-btn-label">E-Payment</span>
-                  </span>
-                  <small>GCash, Maya, and QR setup</small>
-                </button>
-              </div>
+              <button
+                id="adminNavDrawerBtn"
+                class="admin-nav-drawer-btn"
+                type="button"
+                aria-haspopup="dialog"
+                aria-controls="adminNavDrawerModal"
+                aria-expanded="false"
+                aria-label="Open hidden tabs drawer"
+                title="Open hidden tabs drawer"
+              >
+                <img src="/Other/tab drawer.png" alt="" aria-hidden="true" />
+              </button>
             </div>
             <div id="adminNavContextMenu" class="admin-nav-context-menu" hidden>
               <button id="adminNavContextPrevBtn" class="admin-nav-context-btn" type="button">Move Prev</button>
               <button id="adminNavContextNextBtn" class="admin-nav-context-btn" type="button">Move Next</button>
+            </div>
+          </div>
+
+          <div id="adminNavDrawerModal" class="shift-monitor-backdrop" aria-hidden="true">
+            <div class="shift-monitor-card admin-nav-drawer-modal-card">
+              <div class="shift-monitor-header">
+                <div class="admin-nav-drawer-header-copy">
+                  <span class="admin-nav-drawer-eyebrow">Tab Drawer</span>
+                  <h3>Swap Hidden Tabs</h3>
+                  <p>Choose a hidden tab to show in the header, then choose which visible tab it should replace.</p>
+                </div>
+                <button id="adminNavDrawerCloseBtn" class="secondary" type="button">Close</button>
+              </div>
+              <div class="admin-nav-drawer-grid">
+                <section class="admin-nav-drawer-section">
+                  <div class="admin-nav-drawer-section-head">
+                    <strong>Hidden Tabs</strong>
+                    <small>Available tabs not shown in the header</small>
+                  </div>
+                  <div id="adminNavDrawerStoredList" class="admin-nav-drawer-list"></div>
+                </section>
+                <section class="admin-nav-drawer-section">
+                  <div class="admin-nav-drawer-section-head">
+                    <strong>Visible Tabs</strong>
+                    <small>Select the current header tab to replace</small>
+                  </div>
+                  <div id="adminNavDrawerVisibleList" class="admin-nav-drawer-list"></div>
+                </section>
+              </div>
+              <div id="adminNavDrawerStatus" class="status">Select one hidden tab and one visible tab to replace.</div>
+              <div class="admin-nav-drawer-actions">
+                <button id="adminNavDrawerSwapBtn" type="button">Swap Tab</button>
+                <button id="adminNavDrawerCancelBtn" class="secondary" type="button">Cancel</button>
+              </div>
             </div>
           </div>
 

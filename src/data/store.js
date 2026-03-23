@@ -1861,7 +1861,7 @@ async function seedMenuCatalogIfEmpty() {
 }
 
 async function listMenuCategories() {
-  if (!isSupabaseEnabled()) {
+  if (!canAttemptSupabaseRead()) {
     return listMenuCategoriesFallback();
   }
 
@@ -1876,6 +1876,7 @@ async function listMenuCategories() {
       .order('category_name', { ascending: true });
 
     if (error) throw new Error(`Supabase menu categories fetch failed: ${error.message}`);
+    markSupabaseReadHealthy();
     return (data || []).map((x) => ({
       key: x.category_key,
       name: x.category_name,
@@ -1883,13 +1884,13 @@ async function listMenuCategories() {
       sortOrder: Number(x.sort_order || 0)
     }));
   } catch (error) {
-    console.warn('[Offline] listMenuCategories Supabase failed, using fallback:', error.message);
+    markSupabaseReadFailure('listMenuCategories', error);
     return listMenuCategoriesFallback();
   }
 }
 
 async function listProducts() {
-  if (!isSupabaseEnabled()) {
+  if (!canAttemptSupabaseRead()) {
     return listProductsFallback();
   }
 
@@ -1912,6 +1913,7 @@ async function listProducts() {
       .order('name', { ascending: true });
 
     if (error) throw new Error(`Supabase products fetch failed: ${error.message}`);
+    markSupabaseReadHealthy();
 
     return (data || []).map((x) => ({
       id: x.id,
@@ -1921,7 +1923,7 @@ async function listProducts() {
       image: x.image_url || '/Business Logo/Ruels Logo for business.png'
     }));
   } catch (error) {
-    console.warn('[Offline] listProducts Supabase failed, using fallback:', error.message);
+    markSupabaseReadFailure('listProducts', error);
     return listProductsFallback();
   }
 }
@@ -4896,13 +4898,13 @@ async function createExpense({
 
 async function getMonthlyClosingReport({ month }) {
   const range = buildMonthRange(month);
-  const [salesReport, expenses, shifts, drawerMovements, topProducts, inventoryReport] = await Promise.all([
+  const [salesReport, expenses, shifts, drawerMovements, topProducts, inventoryIngredients] = await Promise.all([
     getSalesReport({ dateFrom: range.fromIso, dateTo: range.toIso }),
     listExpenses({ month: range.month, limit: 500 }),
     listCashierShifts({ dateFrom: range.fromIso, dateTo: range.toIso }),
     listCashDrawerMovements({ dateFrom: range.fromIso, dateTo: range.toIso, limit: 500 }),
     getTopSalesPerProductByRange({ dateFrom: range.fromIso, dateTo: range.toIso, limit: 10 }),
-    getInventoryReport()
+    listInventoryIngredients()
   ]);
 
   const totalExpenses = expenses.reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -4923,6 +4925,10 @@ async function getMonthlyClosingReport({ month }) {
   const totalDiscrepancy = shifts.reduce((sum, row) => sum + Math.abs(Number(row.discrepancy || 0)), 0);
   const cashSales = Number(salesReport.byMethod?.cash || 0);
   const digitalSales = Number(salesReport.totalSales || 0) - cashSales;
+  const inventoryValueSnapshot = inventoryIngredients.reduce(
+    (sum, row) => sum + (Number(row.qtyOnHand || 0) * Number(row.unitPrice || 0)),
+    0
+  );
 
   return {
     reportType: 'monthly-closing',
@@ -4944,7 +4950,7 @@ async function getMonthlyClosingReport({ month }) {
       expenseCount: expenses.length,
       drawerWithdrawals,
       totalDiscrepancy,
-      inventoryValueSnapshot: Number(inventoryReport?.totals?.totalInventoryValue || 0)
+      inventoryValueSnapshot
     },
     expenseByCategory: Array.from(expenseByCategoryMap.values())
       .sort((a, b) => b.totalAmount - a.totalAmount),
