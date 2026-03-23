@@ -547,6 +547,7 @@ const OFFLINE_AUTH_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 const OFFLINE_SYNC_INTERVAL_MS = 15000;
 const DESKTOP_ADMIN_MIN_VIEWPORT_WIDTH = 1440;
 const DESKTOP_ADMIN_MIN_VIEWPORT_HEIGHT = 700;
+const MOBILE_ADMIN_SIGNOUT_MAX_VIEWPORT_WIDTH = 760;
 const offlineOutbox = window.POSOfflineOutbox || null;
 let confettiAnimation = null;
 let yummyOrderAnimation = null;
@@ -3574,10 +3575,20 @@ function isLargeDesktopViewport() {
     && getViewportHeight() >= DESKTOP_ADMIN_MIN_VIEWPORT_HEIGHT;
 }
 
+function isMobileViewport() {
+  return getViewportWidth() <= MOBILE_ADMIN_SIGNOUT_MAX_VIEWPORT_WIDTH;
+}
+
 function shouldAutoOpenDesktopAdminDashboard() {
   return Boolean(activeAuthSession?.email)
     && canAccessAdminFeatures()
     && isLargeDesktopViewport();
+}
+
+function shouldAutoOpenAdminDashboardForViewport() {
+  return Boolean(activeAuthSession?.email)
+    && canAccessAdminFeatures()
+    && (isLargeDesktopViewport() || isMobileViewport());
 }
 
 function isDesktopAdminEntryActive() {
@@ -3585,14 +3596,23 @@ function isDesktopAdminEntryActive() {
     && document.body.classList.contains('desktop-admin-entry');
 }
 
+function shouldUseAdminDashboardSignOutAction() {
+  if (typeof document === 'undefined') return false;
+  return document.body.classList.contains('admin-open')
+    && Boolean(activeAuthSession?.email)
+    && canAccessAdminFeatures()
+    && (isDesktopAdminEntryActive() || isMobileViewport());
+}
+
 function syncDesktopAdminEntryMode() {
   if (typeof document === 'undefined') return;
   const desktopAdminEntry = document.body.classList.contains('admin-open') && shouldAutoOpenDesktopAdminDashboard();
   document.body.classList.toggle('desktop-admin-entry', desktopAdminEntry);
+  const useSignOutAction = shouldUseAdminDashboardSignOutAction();
   if (adminCloseBtn instanceof HTMLButtonElement) {
-    adminCloseBtn.textContent = desktopAdminEntry ? 'Sign Out' : 'Close';
-    adminCloseBtn.setAttribute('aria-label', desktopAdminEntry ? 'Sign out' : 'Close Control Center Dashboard');
-    adminCloseBtn.title = desktopAdminEntry ? 'Sign out' : 'Close';
+    adminCloseBtn.textContent = useSignOutAction ? 'Sign Out' : 'Close';
+    adminCloseBtn.setAttribute('aria-label', useSignOutAction ? 'Sign out' : 'Close Control Center Dashboard');
+    adminCloseBtn.title = useSignOutAction ? 'Sign out' : 'Close';
   }
 }
 
@@ -6651,7 +6671,7 @@ async function routeAuthenticatedUserToPreferredDashboard() {
     return false;
   }
 
-  if (!shouldAutoOpenDesktopAdminDashboard()) {
+  if (!shouldAutoOpenAdminDashboardForViewport()) {
     syncDesktopAdminEntryMode();
     return false;
   }
@@ -11850,31 +11870,31 @@ function renderAdminStats(report) {
 
   adminStatsEl.innerHTML = `
     <div class="sales-ops-summary-grid admin-health-grid">
-      <article class="sales-ops-summary-card highlight">
+      <article class="sales-ops-summary-card admin-health-card gross highlight">
         <span>Gross Sales</span>
         <strong>${money(metrics.totalSales || 0)}</strong>
       </article>
-      <article class="sales-ops-summary-card">
+      <article class="sales-ops-summary-card admin-health-card paid">
         <span>Paid Transactions</span>
         <strong>${Number(metrics.paidTransactions || 0)}</strong>
       </article>
-      <article class="sales-ops-summary-card">
+      <article class="sales-ops-summary-card admin-health-card monthly">
         <span>Monthly Sales</span>
         <strong>${money(metrics.monthlySales || 0)}</strong>
         <small>${escapeHtml(monthlySalesMonthLabel)}</small>
       </article>
-      <article class="sales-ops-summary-card">
+      <article class="sales-ops-summary-card admin-health-card pending">
         <span>Pending Payments</span>
         <strong>${Number(metrics.pendingTransactions || 0)}</strong>
         <small>Invoices waiting for payment confirmation</small>
       </article>
-      <article class="sales-ops-summary-card">
+      <article class="sales-ops-summary-card admin-health-card voided">
         <span>Voided Sales</span>
         <strong>${Number(metrics.voidedTransactions || 0)}</strong>
         <small>${money(metrics.voidedAmount || 0)} total amount voided in this range</small>
       </article>
       <button
-        class="sales-ops-summary-card discrepancy-action${canJumpToDiscrepancies ? ' actionable' : ''}"
+        class="sales-ops-summary-card admin-health-card discrepancy-action discrepancy${canJumpToDiscrepancies ? ' actionable' : ''}"
         type="button"
         ${canJumpToDiscrepancies ? 'data-admin-summary-action="open-discrepancies"' : 'disabled'}
         ${canJumpToDiscrepancies ? 'title="Open Attention Queue discrepancy alerts table in Operations"' : ''}
@@ -11884,7 +11904,7 @@ function renderAdminStats(report) {
         <small>Shift reviews needing reconciliation</small>
         ${canJumpToDiscrepancies ? '<small class="sales-ops-summary-link">View Attention Queue table</small>' : ''}
       </button>
-      <article class="sales-ops-summary-card">
+      <article class="sales-ops-summary-card admin-health-card unsynced">
         <span>Unsynced Operations</span>
         <strong>${Number(metrics.unsyncedOperations || 0)}</strong>
         <small>Offline queue items waiting to sync</small>
@@ -15710,7 +15730,7 @@ function setupEventListeners() {
 
   if (adminCloseBtn) {
     adminCloseBtn.addEventListener('click', () => {
-      if (isDesktopAdminEntryActive()) {
+      if (shouldUseAdminDashboardSignOutAction()) {
         handleLogout().catch(() => {});
         return;
       }
@@ -15921,7 +15941,7 @@ function setupEventListeners() {
       closeInventoryDeleteModal();
       closeInventoryHistoryModal();
       closeCashDrawerControlModal();
-      if (isDesktopAdminEntryActive()) {
+      if (shouldUseAdminDashboardSignOutAction()) {
         return;
       }
       closeAdminDashboard();

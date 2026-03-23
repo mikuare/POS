@@ -5905,7 +5905,13 @@ body.receipt-template-dragging .receipt-template-preview-surface .receipt-previe
   }
 
   .sales-ops-summary-grid.admin-health-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.gross,
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.discrepancy {
+    grid-column: 1 / -1;
   }
 
   .operations-workspace-grid {
@@ -6368,6 +6374,18 @@ body.receipt-template-dragging .receipt-template-preview-surface .receipt-previe
 .overview-transactions-subhead h3 {
   margin: 0;
   color: #4a2d1d;
+}
+
+.overview-transactions-subhead {
+  display: grid;
+  gap: 4px;
+}
+
+.overview-transactions-subhead p {
+  margin: 0;
+  color: #7b5a47;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .overview-transactions-head p {
@@ -7941,13 +7959,191 @@ button.sales-ops-summary-card.discrepancy-action.actionable:focus-visible {
     width: 100%;
   }
 
+  #adminPanelOverview .sales-ops-header {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+    width: 100%;
+    align-items: end;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #8a5b3d;
+    margin: 0;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar label[for="adminFilter"] {
+    grid-column: 1;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminFilter {
+    grid-column: 1;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar label[for="adminRange"] {
+    grid-column: 2;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminRange {
+    grid-column: 2;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminMonthPicker {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminRefreshBtn,
+  #adminPanelOverview .sales-ops-toolbar #adminVerifyAllBtn,
+  #adminPanelOverview .sales-ops-toolbar #adminMixToggleBtn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminRefreshBtn {
+    grid-column: 1;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar #adminVerifyAllBtn,
+  #adminPanelOverview .sales-ops-toolbar #adminMixToggleBtn {
+    grid-column: 1 / -1;
+  }
+
+  .overview-transactions-shell {
+    gap: 14px;
+  }
+
+  .overview-transactions-group-head {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .overview-transactions-section {
+    gap: 12px;
+  }
+
   .overview-transactions-row {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .overview-transactions-side {
     padding-left: 0;
     border-left: none;
+  }
+
+  .admin-stats {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .stat-item {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  #adminPanelOverview .admin-transactions {
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .txn-row {
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #e6cfbc;
+    border-radius: 14px;
+    background: #fffdf9;
+  }
+
+  .txn-row + .txn-row {
+    margin-top: 10px;
+  }
+
+  .txn-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .txn-ref {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .txn-badges {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .txn-details {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .txn-amount {
+    font-size: 16px;
+  }
+
+  .txn-paid-info {
+    width: 100%;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .txn-customer {
+    margin-top: 0;
+  }
+
+  .txn-customer-field {
+    align-items: flex-start;
+  }
+
+  .txn-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .txn-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .overview-transactions-side .sales-list {
+    min-height: 0;
+    margin-top: 0;
+  }
+
+  .overview-transactions-side .overview-list {
+    gap: 8px;
+  }
+
+  .overview-transactions-side .overview-list-row {
+    padding: 12px;
+    border: 1px solid #ead6c5;
+    border-radius: 12px;
+    background: #fffdf9;
+    border-bottom: none;
+    gap: 6px;
+  }
+
+  .overview-transactions-side .overview-list-row > span {
+    font-size: 15px;
   }
 
   .sales-ops-header {
@@ -8191,19 +8387,299 @@ button.sales-ops-summary-card.discrepancy-action.actionable:focus-visible {
     gap: 10px;
   }
 
+  .admin-nav-hint {
+    display: none;
+  }
+
   .admin-nav {
     padding: 10px;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .admin-nav-btn {
-    min-height: 52px;
-    padding: 8px 12px 9px;
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+
+  .admin-nav-btn small {
+    display: none;
+  }
+
+  .admin-nav-main-btn {
+    min-height: 100%;
   }
 
   .admin-nav-drawer-btn {
     min-height: 52px;
     border-radius: 16px;
+  }
+
+  #adminPanelInventory .admin-transactions,
+  #adminPanelKitSpec .admin-transactions,
+  #adminPanelUsers .admin-transactions,
+  #adminPanelOperations .admin-transactions,
+  #adminPanelReceiptTemplates .admin-transactions,
+  #adminPanelReports .admin-transactions,
+  #adminPanelOthers .admin-transactions,
+  #cashDrawerControlModal .admin-transactions {
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  #adminPanelInventory .inventory-table,
+  #adminPanelUsers .inventory-table,
+  #adminPanelKitSpec .admin-inline-table,
+  #adminPanelOperations .admin-inline-table,
+  #adminPanelReports .report-preview-table,
+  #adminPanelOthers .monthly-closing-table,
+  #cashDrawerControlModal .admin-inline-table {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  #adminPanelInventory .inventory-table th,
+  #adminPanelUsers .inventory-table th,
+  #adminPanelKitSpec .admin-inline-table th,
+  #adminPanelOperations .admin-inline-table th,
+  #adminPanelReports .report-preview-table th,
+  #adminPanelOthers .monthly-closing-table th,
+  #cashDrawerControlModal .admin-inline-table th {
+    white-space: nowrap;
+  }
+
+  #inventoryIngredientForm {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  #cashDrawerCreateForm {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  #inventoryIngredientForm input,
+  #inventoryIngredientForm button,
+  #cashDrawerCreateForm input,
+  #cashDrawerCreateForm button,
+  #discountProfileForm input,
+  #discountProfileForm select,
+  #discountProfileForm button,
+  .monthly-closing-toolbar input,
+  .monthly-closing-toolbar button,
+  .monthly-expense-form-grid input,
+  .monthly-expense-form-grid button,
+  .receipt-template-form input,
+  .receipt-template-form select,
+  .receipt-template-form textarea,
+  .epayment-setup-form input,
+  .epayment-setup-form select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .inventory-bulk-editor-head,
+  .inventory-insight-header,
+  .role-access-card-head,
+  .receipt-template-list-head,
+  .shift-monitor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-summary-hover-note,
+  .kit-spec-summary-hover-note {
+    display: none;
+  }
+
+  .inventory-summary-card,
+  .kit-spec-summary-btn,
+  .user-management-summary-card,
+  .cash-drawer-summary-card,
+  .operations-metric-card,
+  .monthly-closing-summary-card,
+  .report-preview-summary-card {
+    min-height: 0;
+  }
+
+  .inventory-summary-card strong,
+  .kit-spec-summary-btn strong,
+  .user-management-summary-card strong,
+  .cash-drawer-summary-value,
+  .operations-metric-card strong,
+  .monthly-closing-summary-card strong,
+  .report-preview-summary-card strong {
+    overflow-wrap: anywhere;
+  }
+
+  #kitSpecEditor,
+  #kitSpecModule,
+  #adminUsersList,
+  .operations-module-body,
+  .reports-preview-area,
+  .monthly-expense-archive,
+  .monthly-closing-snapshot-archive {
+    max-height: none;
+  }
+
+  #kitSpecEditor,
+  #kitSpecModule,
+  .operations-module-body {
+    padding: 12px;
+  }
+
+  #kitSpecControlBar button,
+  .role-access-toggle,
+  .role-access-add-row button,
+  .role-access-card-actions button,
+  .role-access-role-actions button,
+  .receipt-workflow-actions button,
+  .receipt-template-editor-actions button,
+  .receipt-template-list-actions button,
+  .report-actions-row button,
+  .epayment-setup-actions button,
+  .epayment-setup-upload-actions button,
+  .shift-monitor-header button,
+  .shift-monitor-header-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .user-management-actions {
+    min-width: 0;
+  }
+
+  .role-access-count,
+  .receipt-template-active-badge {
+    align-self: flex-start;
+  }
+
+  .role-access-chip-actions {
+    justify-items: stretch;
+    width: 100%;
+  }
+
+  .role-access-state {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .operations-module-card {
+    padding: 14px;
+  }
+
+  .operations-module-card::before {
+    width: 5px;
+  }
+
+  .operations-panel-header h3,
+  .kit-spec-panel-header h3,
+  .monthly-closing-summary-head h4 {
+    font-size: 24px;
+  }
+
+  .operations-metric-card small,
+  .monthly-closing-summary-card small {
+    overflow-wrap: anywhere;
+  }
+
+  .report-actions-row,
+  .receipt-workflow-actions,
+  .receipt-template-editor-actions,
+  .receipt-template-list-actions,
+  .epayment-setup-actions,
+  .shift-monitor-header-actions,
+  .report-export-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .report-preview-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-preview-table-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .receipt-template-preview-wrap {
+    padding: 12px;
+  }
+
+  .receipt-template-preview-wrap .receipt-print-area {
+    width: min(100%, 360px);
+  }
+
+  .epayment-setup-upload-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .epayment-setup-upload-actions input[type="file"] {
+    width: 100%;
+  }
+
+  .epayment-setup-qr-preview {
+    min-height: 140px;
+  }
+
+  .cash-drawer-summary-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-monitor-card {
+    width: min(100%, calc(100vw - 16px));
+    max-height: calc(100dvh - 16px);
+    padding: 14px;
+    overflow: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.gross,
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.discrepancy {
+    grid-column: auto;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card {
+    min-height: 0;
+    padding: 12px 12px 14px;
+  }
+
+  .txn-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  #adminPanelOverview .sales-ops-toolbar label[for="adminFilter"],
+  #adminPanelOverview .sales-ops-toolbar #adminFilter,
+  #adminPanelOverview .sales-ops-toolbar label[for="adminRange"],
+  #adminPanelOverview .sales-ops-toolbar #adminRange,
+  #adminPanelOverview .sales-ops-toolbar #adminRefreshBtn,
+  #adminPanelOverview .sales-ops-toolbar #adminVerifyAllBtn,
+  #adminPanelOverview .sales-ops-toolbar #adminMixToggleBtn {
+    grid-column: 1;
   }
 }
 
@@ -8327,6 +8803,56 @@ button.sales-ops-summary-card.discrepancy-action.actionable:focus-visible {
 
 @media (max-width: 760px) {
   .sales-ops-summary-grid.admin-health-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card {
+    min-height: 112px;
+    padding: 12px 12px 14px;
+    border-radius: 16px;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card::after {
+    inset: auto 12px 12px auto;
+    width: 40px;
+    height: 40px;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card span {
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card strong {
+    font-size: 18px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-card small {
+    font-size: 10px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.gross,
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.discrepancy {
+    grid-column: 1 / -1;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.gross strong,
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.discrepancy strong {
+    font-size: 20px;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .admin-health-card.discrepancy {
+    align-content: start;
+  }
+
+  .sales-ops-summary-grid.admin-health-grid .sales-ops-summary-link {
+    margin-top: 4px;
+    padding: 4px 8px;
+    font-size: 10px;
   }
 }
