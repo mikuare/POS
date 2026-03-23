@@ -1233,10 +1233,17 @@ async function refreshConnectivityStatus({ showTransitionToast = true } = {}) {
       throw new Error('Connectivity check failed');
     }
     const payload = await response.json();
+    const serverReachable = payload?.serverReachable !== undefined
+      ? Boolean(payload.serverReachable)
+      : true;
     applyConnectivitySnapshot({
-      serverReachable: true,
-      supabaseEnabled: Boolean(payload.supabaseEnabled),
-      supabaseReachable: Boolean(payload.supabaseReachable),
+      serverReachable,
+      supabaseEnabled: serverReachable
+        ? Boolean(payload.supabaseEnabled)
+        : state.connectivity.supabaseEnabled,
+      supabaseReachable: serverReachable
+        ? Boolean(payload.supabaseReachable)
+        : false,
       queuedOperations: clientSummary.operations,
       queuedInvoices: clientSummary.invoices
     }, { showTransitionToast });

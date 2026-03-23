@@ -92,10 +92,10 @@ create table if not exists public.discount_profiles (
   updated_at timestamptz not null default now()
 );
 
-alter table public.pos_invoices disable row level security;
-alter table public.pos_invoice_items disable row level security;
-alter table public.pos_payments disable row level security;
-alter table public.pos_invoice_adjustments disable row level security;
-alter table public.pos_gcash_sessions disable row level security;
-alter table public.app_settings disable row level security;
-alter table public.discount_profiles disable row level security;
+alter table public.pos_invoices enable row level security;
+alter table public.pos_invoice_items enable row level security;
+alter table public.pos_payments enable row level security;
+alter table public.pos_invoice_adjustments enable row level security;
+alter table public.pos_gcash_sessions enable row level security;
+alter table public.app_settings enable row level security;
+alter table public.discount_profiles enable row level security;

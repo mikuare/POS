@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ruel-pos-cache-v6';
+const CACHE_NAME = 'ruel-pos-cache-v7';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -58,12 +58,38 @@ function fetchFresh(request) {
   });
 }
 
+function buildOfflineConnectivityResponse() {
+  return new Response(
+    JSON.stringify({
+      online: false,
+      serverReachable: false,
+      supabaseReachable: false,
+      now: new Date().toISOString(),
+      source: 'service-worker-offline'
+    }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      }
+    }
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const requestUrl = new URL(event.request.url);
 
   if (isApiRequest(requestUrl)) {
+    if (requestUrl.pathname === '/api/connectivity') {
+      event.respondWith(
+        fetchFresh(event.request).catch(() => buildOfflineConnectivityResponse())
+      );
+      return;
+    }
+
     event.respondWith(
       fetchFresh(event.request).catch(() => caches.match(event.request).then((cached) => cached || new Response('', { status: 503 })))
     );

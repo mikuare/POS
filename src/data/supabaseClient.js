@@ -29,6 +29,10 @@ try {
   console.warn('[Supabase] Client initialization failed. Running without Supabase:', error.message);
 }
 
+if (mode === 'anon_or_publishable') {
+  console.warn('[Supabase] Running without SUPABASE_SERVICE_ROLE_KEY. Once RLS is enabled, server-side table access should use the service role key.');
+}
+
 function getSupabase() {
   return supabase;
 }
